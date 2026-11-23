@@ -35,6 +35,7 @@
     ],
     "yaw": 0
   },
+  "collision": { "default": "solid" },
   "rooms": [
     {
       "id": "principal",

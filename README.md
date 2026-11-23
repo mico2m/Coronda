@@ -30,7 +30,7 @@ Coronda/
     ├── dev.js              arranque del modo desarrollador
     ├── game.js             motor compartido por los dos
     ├── core/               utilidades base (carga de archivos)
-    ├── systems/            cámara, audio, gestor de escenas, inspector (solo dev)
+    ├── systems/            cámara, audio, gestor de escenas, colisiones, inspector (solo dev)
     ├── actors/             personajes y objetos con comportamiento (próximamente)
     └── ui/                 interfaz
 ```
@@ -80,12 +80,38 @@ El jugador se mueve en tercera persona con la cámara siguiéndolo. Código en `
 - **Modelo:** exportá el personaje a `assets/models/objects/personaje.glb` (o cambiá `model` en `player.json`). Hasta que exista se ve una cápsula con una "nariz" que marca el frente.
 - **Origen y orientación en Blender:** el origen del personaje en los **pies**; el frente hacia **-Y** de Blender (vista frontal, que es lo normal), que en el juego queda como +Z. Si en el juego camina de espaldas, poné `"yawOffset": 180` en `player.json`.
 - **Tamaño:** se respeta el de Blender (1 unidad = 1 m). Si hace falta, `scale` en `player.json`.
-- **Suelo:** el personaje se pega a la altura de las superficies de la escena (también sirve para escalones y rampas). Todavía **no hay colisiones con paredes**.
+- **Suelo y paredes:** el personaje camina sobre las superficies sólidas (escalones y rampas incluidos), cae si no hay suelo y choca con las paredes. Ver **Colisiones** más abajo.
 - **Animaciones:** el juego busca en el `.glb` acciones llamadas **`idle`** (quieto), **`walk`** (caminar) y **`run`** (correr con Shift), sin importar mayúsculas ni sufijos (`walk.001` sirve). Cambia entre ellas con una transición de `fade` segundos. Si falta alguna se avisa en pantalla qué clips trae el archivo; si falta `run` se usa `walk`.
   - Si el modelo trae muchos clips con otros nombres (por ejemplo un personaje descargado), indicá cuál usar en `player.json > animation.clips`: `"walk": "nombre_exacto_del_clip"`. La lista completa de clips sale en la consola del navegador (F12).
   - En Blender: una acción por animación (con el escudo *Fake User* activado), el personaje sin avanzar en el lugar, y al exportar glTF: *Animation > Mode: Actions*.
   - Para que los pies no resbalen, en `player.json > animation` poné `walkAnimSpeed` / `runAnimSpeed` = la velocidad (m/s) a la que está animado cada ciclo. Con 0 no se ajusta.
 - **Modo dev:** `dev.html` arranca con la cámara libre; la tecla `C` alterna con el personaje. `index.html` arranca directo con el personaje.
+
+## Colisiones
+
+Qué objetos son sólidos se decide **en Blender**, con propiedades personalizadas (las mismas que usan las puertas). Código: `src/systems/collision.js`.
+
+**En Blender:** seleccioná el objeto > *Object Properties* > *Custom Properties* > **+** y agregá:
+
+| Propiedad | Valor | Qué hace |
+|---|---|---|
+| `colision` | `1` | Sólido: no se atraviesa y se camina sobre sus superficies |
+| `colision` | `0` | Sin colisión: se ve pero se atraviesa (pasto, carteles, humo) |
+| `colision_forma` | `caja` | Usa la caja envolvente en vez de la malla exacta (por defecto `malla`). Ideal para objetos complicados o cóncavos |
+| `colision_invisible` | `1` | El objeto no se dibuja pero sí colisiona (paredes invisibles) |
+
+Al exportar el `.glb` tildá **Include > Custom Properties** (igual que con las puertas).
+
+- **Herencia:** lo que pongas en un objeto padre (ej. un Empty) lo heredan sus hijos, salvo que el hijo tenga su propio valor.
+- **Atajo por nombre:** un objeto llamado `col_algo` o `colision_algo` es sólido e invisible.
+- **Sin propiedad:** vale el valor por defecto de la escena, en `data/scenes/<escena>.json`: `"collision": { "default": "solid" }` (todo sólido salvo lo marcado con `0`) o `"none"` (nada sólido salvo lo marcado con `1`). Los objetos `cielo_…` / `sky_…` nunca colisionan.
+- **Suelo o pared:** lo decide la pendiente de cada triángulo. Hasta `maxSlope` grados (50 por defecto) es suelo; más empinado es pared; los techos no frenan. Las **normales** tienen que mirar hacia afuera (en Blender: *Overlay > Face Orientation*, todo azul).
+- **Escalones:** el personaje sube sin saltar hasta `stepHeight` (0,5 m). Algo más alto es pared.
+- **Ajustes del cuerpo** en `data/tables/player.json > collision`: `radius`, `height`, `stepHeight`, `maxSlope`, `gravity`.
+
+**Ver las colisiones:** en `dev.html` la tecla **K** dibuja lo que el juego tomó como colisión (rojo = paredes, verde = suelo), y el inspector (**I**) muestra `Colisión: sí/no` del objeto al que apuntás. En la consola del navegador (F12) aparece un resumen por escena.
+
+Por ahora la cámara en tercera persona no choca con las paredes (atraviesa los muros).
 
 ## Puertas (cambio de escena)
 

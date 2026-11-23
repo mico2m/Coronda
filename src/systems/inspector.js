@@ -72,6 +72,7 @@ export function describeHit(hit) {
     box,
     distance: hit.distance,
     triangles: Math.round(triangles),
+    collision: mesh.userData.collision ?? null,
     materials: [...mats].map(describeMaterial),
   };
 }
@@ -124,6 +125,7 @@ export function createInspector({ scene, camera, getRoot }) {
     add('Tamaño (X·Y·Z)', `${fmt(info.size.x)} × ${fmt(info.size.y)} × ${fmt(info.size.z)} m`);
     distanceEl = add('Distancia', `${fmt(info.distance)} m`);
     add('Triángulos', info.triangles.toLocaleString('es-AR'));
+    if (info.collision) add('Colisión', info.collision.solid ? `sí (${info.collision.shape})` : 'no');
     frag.append(dl);
 
     frag.append(el('h3', 'insp-sub', info.materials.length === 1 ? 'Material' : `Materiales (${info.materials.length})`));

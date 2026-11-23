@@ -12,6 +12,13 @@
     "height": 1.5,
     "pitch": 0.3
   },
+  "collision": {
+    "radius": 0.35,
+    "height": 1.7,
+    "stepHeight": 0.5,
+    "maxSlope": 50,
+    "gravity": 25
+  },
   "animation": {
     "fade": 0.2,
     "walkAnimSpeed": 0,

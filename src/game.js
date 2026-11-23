@@ -9,6 +9,8 @@ import { createUI } from './ui/ui.js';
 import { createFade } from './systems/fade.js';
 import { createDoors } from './systems/doors.js';
 import { createPlayer } from './actors/player.js';
+import { buildCollision } from './systems/collision.js';
+import { isSkyName } from './systems/shading.js';
 
 const _focus = new THREE.Vector3();
 
@@ -51,6 +53,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
   resize();
 
   let inspector = null;
+  let collisionDebug = null;
   let doors = null;
   let player = null;
   let world = null; // gestor de escenas (para mover el cielo)
@@ -113,7 +116,17 @@ export async function startGame({ dev = false, retro = null } = {}) {
       await sceneManager.loadScene(id, { spawn });
       doors.setup(sceneManager.current, sceneManager.root);
       // El jugador aparece en el punto de inicio de la escena (sp está a la altura de los ojos)
-      player.setWorld(sceneManager.root);
+      // Colisiones: se leen las propiedades `colision` de los objetos del .glb (ver collision.js)
+      const scol = sceneManager.current.collision ?? {};
+      const cworld = buildCollision(sceneManager.root, {
+        defaultSolid: scol.default === undefined ? true : scol.default !== 'none' && scol.default !== false,
+        maxSlope: playerConfig.collision?.maxSlope,
+        ignore: (node) => isSkyName(node.name),
+      });
+      if (!cworld.hasGround) console.warn('Colisiones: la escena no tiene ninguna superficie de suelo sólida; el jugador no cambia de altura.');
+      console.info(`Colisiones de "${sceneManager.current.id}":`, cworld.stats);
+      collisionDebug?.attach(sceneManager.root, cworld);
+      player.setWorld(cworld);
       player.setShade(sceneManager.shade); // mismo tono y brillo que la escena
       const sp = sceneManager.spawn;
       if (sp) player.place([sp.position[0], sp.position[1] - EYE, sp.position[2]], sp.yaw ?? 0);
@@ -140,6 +153,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
       try {
         const { createInspector } = await import('./systems/inspector.js');
         inspector = createInspector({ scene, camera, getRoot: () => sceneManager.root });
+        const { createCollisionDebug } = await import('./systems/collision-debug.js');
+        collisionDebug = createCollisionDebug();
       } catch (err) {
         // Si el inspector no carga, el mundo igual se muestra
         console.error(err);

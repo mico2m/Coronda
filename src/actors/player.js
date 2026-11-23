@@ -18,6 +18,10 @@ const DEFAULTS = {
   // fade = segundos de transición. walkAnimSpeed/runAnimSpeed = a qué velocidad (m/s) fue animado el ciclo;
   // con eso la animación se acelera o frena para que los pies no resbalen (0 = no ajustar).
   animation: { fade: 0.2, walkAnimSpeed: 0, runAnimSpeed: 0, clips: {} },
+  // Colisiones (ver src/systems/collision.js):
+  //  radius = ancho del cuerpo · height = altura · stepHeight = escalón máximo que sube sin saltar
+  //  maxSlope = grados; más empinado que esto es pared (se lee al armar la escena) · gravity = m/s² al caer
+  collision: { radius: 0.35, height: 1.7, stepHeight: 0.5, maxSlope: 50, gravity: 25 },
 };
 
 const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
@@ -25,7 +29,7 @@ const ALIAS = { ArrowUp: 'KeyW', ArrowDown: 'KeyS', ArrowLeft: 'KeyA', ArrowRigh
 const TAU = Math.PI * 2;
 
 export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
-  const cfg = { ...DEFAULTS, ...config, camera: { ...DEFAULTS.camera, ...config.camera }, animation: { ...DEFAULTS.animation, ...config.animation } };
+  const cfg = { ...DEFAULTS, ...config, camera: { ...DEFAULTS.camera, ...config.camera }, animation: { ...DEFAULTS.animation, ...config.animation }, collision: { ...DEFAULTS.collision, ...config.collision } };
 
   const root = new THREE.Group(); // posición = pies
   root.name = 'player';
@@ -95,10 +99,8 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   let facing = 0;
   const cam = { yaw: 0, pitch: cfg.camera.pitch, dist: cfg.camera.distance };
   let keys = {};
-  let floor = [];
-  const ray = new THREE.Raycaster();
-  const down = new THREE.Vector3(0, -1, 0);
-  const tmp = new THREE.Vector3();
+  let world = null;   // mundo de colisión de la escena actual (ver collision.js)
+  let fallSpeed = 0;  // m/s hacia abajo
   const target = new THREE.Vector3();
 
   // Teclado
@@ -141,13 +143,10 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     cam.dist = THREE.MathUtils.clamp(cam.dist * (e.deltaY < 0 ? 0.9 : 1.1), cfg.camera.minDistance, cfg.camera.maxDistance);
   }, { passive: false });
 
-  // Altura del suelo bajo el jugador (raycast hacia abajo contra el mundo)
-  function groundY(x, y, z) {
-    if (!floor.length) return null;
-    ray.set(tmp.set(x, y + 1.2, z), down); // sube hasta 1,2 m (escalones)
-    ray.far = 200;
-    const hit = ray.intersectObjects(floor, false)[0];
-    return hit ? hit.point.y : null;
+  // Altura del suelo bajo el jugador: la superficie sólida más alta que esté a un escalón o menos sobre los pies
+  const col = cfg.collision;
+  function groundY(x, y, z, reach = col.stepHeight) {
+    return world ? world.groundAt(x, z, y + reach) : null;
   }
 
   // Cambia de animación con una transición suave
@@ -181,16 +180,17 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     // Ponerlo en un punto (pies) mirando hacia `yaw` (mismo criterio que la cámara)
     place([x, y, z], yaw = 0) {
       root.position.set(x, y, z);
-      const g = groundY(x, y, z);
+      const g = groundY(x, y, z, 2); // al aparecer se tolera que el punto esté hasta 2 m más abajo del suelo
       if (g !== null) root.position.y = g;
+      fallSpeed = 0;
       facing = facingFromYaw(yaw);
       pivot.rotation.y = facing;
       cam.yaw = yaw;
     },
-    // Las superficies sobre las que camina: las mallas de la escena actual
-    setWorld(worldRoot) {
-      floor = [];
-      worldRoot?.traverse((o) => { if (o.isMesh) floor.push(o); });
+    // El mundo de colisión de la escena actual (lo arma buildCollision en collision.js)
+    setWorld(collisionWorld) {
+      world = collisionWorld;
+      fallSpeed = 0;
     },
     setActive(v) {
       active = v;
@@ -222,17 +222,33 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
         playClip(running ? 'run' : 'walk');
         const animSpeed = running ? cfg.animation.runAnimSpeed : cfg.animation.walkAnimSpeed;
         if (animSpeed > 0 && currentClip) currentClip.setEffectiveTimeScale(speed / animSpeed);
-        root.position.x += dx * speed * dt;
-        root.position.z += dz * speed * dt;
+        // En pasos cortos (máx. medio radio) para no atravesar paredes finas a 20 fps
+        const dist = speed * dt;
+        const steps = Math.max(1, Math.ceil(dist / (col.radius * 0.5)));
+        for (let i = 0; i < steps; i++) {
+          root.position.x += (dx * dist) / steps;
+          root.position.z += (dz * dist) / steps;
+          world?.pushOut(root.position, col);
+        }
         facing = angleLerp(facing, Math.atan2(dx, dz), cfg.turnSpeed * dt);
         pivot.rotation.y = facing;
       }
 
       if (!moving) { playClip('idle'); }
 
-      // Pegado al suelo (suave)
+      // Suelo: sube escalones y rampas suavemente; si no hay suelo a un escalón de distancia, cae con gravedad.
+      // Si no hay suelo en absoluto debajo (fuera del mapa) se queda a esa altura.
       const g = groundY(root.position.x, root.position.y, root.position.z);
-      if (g !== null) root.position.y += (g - root.position.y) * Math.min(1, dt * 18);
+      if (g === null) {
+        fallSpeed = 0;
+      } else if (g >= root.position.y - 0.12) {   // sube, o baja un poquito (rampa / escalón)
+        root.position.y += (g - root.position.y) * Math.min(1, dt * 18);
+        fallSpeed = 0;
+      } else {                                    // vacío: caída libre hasta el suelo
+        fallSpeed = Math.min(fallSpeed + col.gravity * dt, 40);
+        root.position.y = Math.max(g, root.position.y - fallSpeed * dt);
+        if (root.position.y === g) fallSpeed = 0;
+      }
 
       // Cámara detrás del jugador
       target.copy(root.position).y += cfg.camera.height;

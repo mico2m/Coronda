@@ -1,0 +1,43 @@
+{
+  "id": "coronda_plaza",
+  "name": "Plaza de Coronda",
+  "environment": {
+    "background": "#9fc6e8",
+    "fog": {
+      "color": "#9fc6e8",
+      "near": 80,
+      "far": 400
+    },
+    "ambient": {
+      "sky": "#ffffff",
+      "ground": "#8899aa",
+      "intensity": 1.2
+    },
+    "sun": {
+      "color": "#ffffff",
+      "intensity": 2,
+      "position": [
+        30,
+        50,
+        20
+      ]
+    }
+  },
+  "music": "plaza_dia",
+  "spawn": {
+    "position": [
+      0,
+      1.7,
+      8
+    ],
+    "yaw": 0
+  },
+  "rooms": [
+    {
+      "id": "principal",
+      "model": "assets/models/worlds/coronda_plaza.glb"
+    }
+  ],
+  "objects": [],
+  "actors": []
+}

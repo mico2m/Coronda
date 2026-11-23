@@ -1,0 +1,90 @@
+// Gestor de escenas: lee data/scenes/<id>.json, arma el entorno, carga las salas (.glb) y la música.
+// Idea tomada de Ocarina of Time: una escena = ambiente + salas; los datos van aparte del código.
+import * as THREE from 'three';
+import { loadJSON, loadGLB } from '../core/assets.js';
+
+export function createSceneManager({ scene, camera, controls, audio, ui, scenesTable }) {
+  let current = null; // { data, group }
+
+  function disposeGroup(group) {
+    group.traverse((o) => {
+      o.geometry?.dispose?.();
+      const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+      mats.forEach((m) => {
+        Object.values(m).forEach((v) => v?.isTexture && v.dispose());
+        m.dispose();
+      });
+    });
+  }
+
+  function unload() {
+    if (!current) return;
+    scene.remove(current.group);
+    disposeGroup(current.group);
+    current = null;
+  }
+
+  function applyEnvironment(env = {}, group) {
+    const bg = new THREE.Color(env.background ?? '#c9d4d9');
+    scene.background = bg;
+    scene.fog = env.fog ? new THREE.Fog(env.fog.color ?? bg, env.fog.near ?? 80, env.fog.far ?? 400) : null;
+
+    if (env.ambient) {
+      const a = env.ambient;
+      group.add(new THREE.HemisphereLight(a.sky ?? '#ffffff', a.ground ?? '#888888', a.intensity ?? 1));
+    }
+    if (env.sun) {
+      const s = env.sun;
+      const sun = new THREE.DirectionalLight(s.color ?? '#ffffff', s.intensity ?? 1);
+      sun.position.set(...(s.position ?? [20, 40, 10]));
+      group.add(sun);
+    }
+  }
+
+  async function loadScene(id) {
+    const entry = scenesTable[id];
+    if (!entry) throw new Error(`La escena "${id}" no está en data/tables/scenes.json`);
+
+    ui.setStatus(`Cargando ${id}…`);
+    const data = await loadJSON(entry.file);
+    unload();
+
+    const group = new THREE.Group();
+    group.name = data.id;
+    scene.add(group);
+    current = { data, group };
+
+    applyEnvironment(data.environment, group);
+
+    // Posición inicial
+    if (data.spawn) {
+      camera.position.set(...data.spawn.position);
+      controls.setLook(data.spawn.yaw ?? 0, 0);
+    }
+
+    // Salas
+    const missing = [];
+    for (const room of data.rooms ?? []) {
+      try {
+        const gltf = await loadGLB(room.model, (p) => ui.setStatus(`Cargando sala "${room.id}"… ${Math.round(p * 100)}%`));
+        gltf.scene.name = `room:${room.id}`;
+        group.add(gltf.scene);
+      } catch {
+        missing.push(room.model);
+      }
+    }
+
+    // Si todavía no exportaste el mundo desde Blender, mostramos una cuadrícula de referencia.
+    if (missing.length) {
+      group.add(new THREE.GridHelper(40, 40, 0x555555, 0x888888));
+      ui.setStatus(`Falta exportar desde Blender: ${missing.join(', ')}`);
+    } else {
+      ui.clearStatus();
+    }
+
+    if (data.music) audio.playMusic(data.music);
+    return data;
+  }
+
+  return { loadScene, unload, get current() { return current?.data ?? null; } };
+}

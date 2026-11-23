@@ -54,20 +54,23 @@ Coronda/
 
 ## Puertas (cambio de escena)
 
-Cualquier objeto de Blender cuyo nombre empiece con `puerta_` (o `empty_puerta_`) es una puerta. Al acercarte aparece **"E Entrar"**; al apretar **E** (o tocar el aviso en celular) se hace un fundido a negro y se carga la escena destino.
+Una puerta es un objeto normal y visible al que le das la propiedad de interactuable. Al acercarte aparece **"E Entrar"**; al apretar **E** (o tocar el aviso en celular) se hace un fundido a negro y se carga la escena destino. El código no oculta ni modifica el objeto.
 
-- `puerta_casa1` lleva a la escena `scene_casa1` (se deduce del nombre: `puerta_X` → `scene_X`). No hace falta tocar ningún JSON si la escena destino está en `data/tables/scenes.json`.
-- Si existen `puerta_casa1` y `empty_puerta_casa1`, cuentan como la misma puerta. La distancia se mide hasta la superficie del objeto.
-- Para cambiar destino, radio (por defecto 3 m), texto o dónde aparecés, agregá una entrada en `doors` del JSON de la escena:
-  ```json
-  "doors": [
-    { "empty": "puerta_casa1", "target": "scene_casa1", "radius": 3, "label": "Entrar",
-      "spawn": { "position": [0, 1.7, 4], "yaw": 0 } }
-  ]
-  ```
-  Sin `spawn` aparecés en el `spawn` de la escena destino. `position` sirve si el objeto todavía no está en el `.glb`.
-- La puerta de vuelta se define igual en la escena destino (ver `scene_casa1.json`).
-- En `dev.html` cada puerta muestra una caja con su zona de activación.
+**En Blender** (forma recomendada): seleccioná el objeto > *Object Properties* > *Custom Properties* y agregá
+- `puerta` = `scene_casa1` (id de la escena destino, registrada en `data/tables/scenes.json`)
+- opcional: `puerta_radio` = `3` (metros, por defecto 3) y `puerta_texto` = `Entrar`
+
+Al exportar el `.glb` tildá **Include > Custom Properties**. Se puede poner en cualquier objeto (la puerta, un cartel, un empty).
+
+**Por nombre** (atajo): un objeto llamado `puerta_casa1` o `empty_puerta_casa1` lleva a `scene_casa1` (`puerta_X` → `scene_X`). Si existen los dos, cuentan como la misma puerta.
+
+**Ajustes en el JSON** de la escena (pisan lo anterior), útiles para dónde aparecés al llegar:
+```json
+"doors": [
+  { "empty": "puerta_casa1", "spawn": { "position": [0, 1.7, 4], "yaw": 0 } }
+]
+```
+Sin `spawn` aparecés en el `spawn` de la escena destino. `position` sirve si el objeto todavía no está en el `.glb`. La distancia se mide hasta la superficie del objeto. En `dev.html` cada puerta muestra una caja con su zona de activación.
 
 Código: `src/systems/doors.js` y `src/systems/fade.js`.
 

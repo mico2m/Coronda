@@ -1,8 +1,13 @@
-// Puertas: cualquier objeto de Blender cuyo nombre empiece con "puerta_" (o "empty_puerta_") es una puerta.
-// Al acercarte aparece "Presioná E para entrar"; al apretar E (o tocar el aviso) se hace el cambio de escena.
+// Puertas: un objeto visible y normal al que vos le das la propiedad de "interactuable".
+// Al acercarte aparece "E Entrar"; al apretar E (o tocar el aviso) se hace el cambio de escena.
+// El código no oculta ni modifica el objeto: se ve igual que cualquier otro.
 //
-//   puerta_casa1        -> lleva a la escena "scene_casa1"   (se deduce del nombre: puerta_X -> scene_X)
-//   empty_puerta_casa1  -> lo mismo; si existen los dos, cuentan como la misma puerta.
+// Cómo marcar un objeto como puerta (cualquiera de las dos formas):
+//  a) Propiedad personalizada en Blender: Object Properties > Custom Properties, agregá
+//     "puerta" = "scene_casa1" (la escena destino). Al exportar el .glb tildá "Custom Properties".
+//     Opcional: "puerta_radio" = 3 (metros), "puerta_texto" = "Entrar".
+//  b) Por nombre: un objeto llamado puerta_casa1 (o empty_puerta_casa1) lleva a "scene_casa1"
+//     (puerta_X -> scene_X). Si existen los dos, cuentan como la misma puerta.
 //
 // Para cambiar el destino, el radio o dónde aparecés, agregá una entrada en "doors" del JSON de la escena:
 //   "doors": [{ "empty": "puerta_casa1", "target": "scene_casa1", "radius": 3,
@@ -53,7 +58,8 @@ export function createDoors({ camera, stage, onEnter, dev = false }) {
   function findNodes(root) {
     const found = [];
     (function walk(o) {
-      const id = doorIdFromName(o.name);
+      const prop = o.userData?.puerta;
+      const id = prop !== undefined && prop !== false && prop !== 0 ? o.name : doorIdFromName(o.name);
       if (id) { found.push({ id, node: o }); return; }
       o.children.forEach(walk);
     })(root);
@@ -79,6 +85,11 @@ export function createDoors({ camera, stage, onEnter, dev = false }) {
       // 1) Objetos y empties del .glb
       for (const { id, node } of findNodes(root)) {
         const door = get(id);
+        const x = node.userData ?? {};
+        if (typeof x.puerta === 'string') door.target = x.puerta;
+        else if (x.puerta && !doorIdFromName(node.name)) door.target = `scene_${id}`;
+        if (x.puerta_radio !== undefined) door.radius = Number(x.puerta_radio);
+        if (x.puerta_texto !== undefined) door.label = String(x.puerta_texto);
         const box = new THREE.Box3().setFromObject(node);
         if (box.isEmpty()) { // empty: es solo un punto
           const p = node.getWorldPosition(new THREE.Vector3());

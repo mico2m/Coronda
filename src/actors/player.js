@@ -2,6 +2,16 @@
 //  WASD / flechas = mover (relativo a la cámara) · Shift = correr · arrastrar = girar cámara · rueda = zoom
 // El modelo (.glb) y los parámetros se configuran en data/tables/player.json.
 // Si el .glb todavía no existe se muestra una cápsula con una "nariz" que indica hacia dónde mira.
+//
+// ACCIONES INTERACTIVAS (acostarse, saludar, sentarse…): no hace falta tocar el código.
+// En Blender nombrá la acción `accion_<nombre>` (ej. accion_acostarse) y exportá el .glb: el juego la
+// detecta sola, crea un botón en pantalla y le asigna una tecla (1, 2, 3… en orden alfabético).
+//   accion_acostarse          se reproduce una vez y se queda en la última pose hasta que te movés
+//   accion_saludar_vuelve     se reproduce una vez y vuelve solo a quieto
+//   accion_bailar_loop        se repite hasta que te movés
+// Opcional, en player.json > actions: { "acostarse": { "key": "KeyL", "label": "Acostarse" } }
+// (también "loop": true/false y "hold": true/false para pisar lo que dice el nombre).
+// Para usar un clip que ya existe sin renombrarlo: { "caer": { "clip": "nombre_exacto_del_clip", "label": "Caerse" } }.
 import * as THREE from 'three';
 import { loadGLB } from '../core/assets.js';
 import { makeUnlit, setShade } from '../systems/shading.js';
@@ -22,7 +32,21 @@ const DEFAULTS = {
   //  radius = ancho del cuerpo · height = altura · stepHeight = escalón máximo que sube sin saltar
   //  maxSlope = grados; más empinado que esto es pared (se lee al armar la escena) · gravity = m/s² al caer
   collision: { radius: 0.35, height: 1.7, stepHeight: 0.5, maxSlope: 50, gravity: 25 },
+  // Ajustes de acciones (ver arriba); por nombre de acción: { key, label, loop, hold }. Todo es opcional.
+  actions: {},
 };
+
+const ACTION_RE = /^(?:accion|action)_(.+)$/i;
+// "accion_saludar_vuelve.001" -> { id: "saludar", mode: "vuelve" }
+function parseActionName(clipName) {
+  const m = ACTION_RE.exec(String(clipName).replace(/\.\d+$/, ''));
+  if (!m) return null;
+  let id = m[1], mode = 'hold';
+  const s = /_(loop|vuelve)$/i.exec(id);
+  if (s) { mode = s[1].toLowerCase(); id = id.slice(0, -s[0].length); }
+  return id ? { id, mode } : null;
+}
+const humanize = (id) => { const t = id.replace(/_+/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
 
 const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
 const ALIAS = { ArrowUp: 'KeyW', ArrowDown: 'KeyS', ArrowLeft: 'KeyA', ArrowRight: 'KeyD', ShiftRight: 'ShiftLeft' };
@@ -43,7 +67,9 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   let loadError = null;
   let animNotice = null;
   let mixer = null;
-  const clips = {};      // idle / walk / run -> AnimationAction
+  const clips = {};      // idle / walk / run -> AnimationAction (y "accion:<id>" para las acciones)
+  const actions = [];    // acciones interactivas detectadas: { id, label, key, hold }
+  let doing = null;      // id de la acción en curso
   let currentClip = null;
   try {
     const gltf = await loadGLB(cfg.model);
@@ -66,6 +92,30 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       }
       clips.walk ??= clips.run;
       clips.run ??= clips.walk;
+
+      // Acciones interactivas: todo clip llamado accion_<nombre> (ver el comentario de arriba)
+      const found = animations.map((c) => ({ clip: c, ...parseActionName(c.name) })).filter((a) => a.id);
+      // También se pueden enlazar clips que ya existen sin renombrarlos, desde player.json:
+      //   "actions": { "caer": { "clip": "gPlayerAnim_link_normal_back_downA", "label": "Caerse" } }
+      for (const [id, o] of Object.entries(cfg.actions ?? {})) {
+        const clip = o?.clip && byName(o.clip);
+        if (clip && !found.some((f) => f.id === id)) found.push({ clip, id, mode: 'hold' });
+        else if (o?.clip && !clip) console.warn(`Acción "${id}": no hay un clip llamado "${o.clip}" en el .glb`);
+      }
+      found.sort((a, b) => a.id.localeCompare(b.id));
+      found.forEach(({ clip, id, mode }, i) => {
+        const o = cfg.actions?.[id] ?? {};
+        const loop = o.loop ?? mode === 'loop';
+        const act = mixer.clipAction(clip);
+        act.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+        act.clampWhenFinished = true; // se queda en la última pose
+        clips[`accion:${id}`] = act;
+        actions.push({ id, label: o.label ?? humanize(id), key: o.key ?? (i < 9 ? `Digit${i + 1}` : null), hold: o.hold ?? mode !== 'vuelve' });
+      });
+      mixer.addEventListener('finished', (e) => {
+        const cur = actions.find((a) => a.id === doing);
+        if (cur && e.action === clips[`accion:${cur.id}`] && !cur.hold) doing = null; // vuelve a quieto solo
+      });
       const missing = ['idle', 'walk', 'run'].filter((k) => !pick(k));
       if (missing.length) {
         // Aviso corto: no listamos los 100+ clips, solo los que parecen de quieto / caminar / correr
@@ -121,6 +171,38 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => b.addEventListener(ev, () => { delete keys[k]; }));
   });
 
+  // Acciones: botones en pantalla (se arman solos) y teclas
+  const actionPanel = document.createElement('div');
+  actionPanel.className = 'actions';
+  actionPanel.hidden = true;
+  for (const a of actions) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    if (a.key) {
+      const k = document.createElement('kbd');
+      k.textContent = a.key.replace(/^(?:Digit|Key)/, '');
+      b.append(k, ' ');
+    }
+    b.append(a.label); // textContent-style: el nombre viene de un archivo externo
+    b.addEventListener('click', () => { triggerAction(a.id); b.blur(); });
+    actionPanel.append(b);
+  }
+  stage.parentElement.appendChild(actionPanel);
+
+  function triggerAction(id) {
+    if (!active || frozen || !clips[`accion:${id}`]) return;
+    keys = {};
+    doing = id;
+    playClip(`accion:${id}`);
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    const a = actions.find((x) => x.key === e.code);
+    if (a) triggerAction(a.id);
+  });
+
   // Cámara: arrastrar para girar, rueda para el zoom
   let dragging = false, lx = 0, ly = 0;
   stage.addEventListener('pointerdown', (e) => {
@@ -173,6 +255,8 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     loadError,
     get animNotice() { return animNotice; },
     get currentClip() { return currentName; },
+    get actions() { return actions; },
+    triggerAction,
     get position() { return root.position; },
     get active() { return active; },
     set frozen(v) { frozen = v; if (v) keys = {}; },
@@ -195,6 +279,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     setActive(v) {
       active = v;
       root.visible = v;
+      actionPanel.hidden = !v || !actions.length;
       if (v && !currentClip) playClip('idle');
       keys = {};
       dragging = false;
@@ -210,7 +295,8 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       // Movimiento relativo a la cámara
       const fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
       const side = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
-      if (!frozen && (fwd || side)) {
+      if (doing && (fwd || side)) doing = null; // moverse cancela la acción (te levantás)
+      if (!frozen && !doing && (fwd || side)) {
         const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
         let dx = -sy * fwd + cy * side;
         let dz = -cy * fwd - sy * side;
@@ -234,7 +320,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
         pivot.rotation.y = facing;
       }
 
-      if (!moving) { playClip('idle'); }
+      if (!moving && !doing) { playClip('idle'); }
 
       // Suelo: sube escalones y rampas suavemente; si no hay suelo a un escalón de distancia, cae con gravedad.
       // Si no hay suelo en absoluto debajo (fuera del mapa) se queda a esa altura.

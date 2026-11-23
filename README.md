@@ -113,6 +113,25 @@ Al exportar el `.glb` tildá **Include > Custom Properties** (igual que con las 
 
 Por ahora la cámara en tercera persona no choca con las paredes (atraviesa los muros).
 
+## Acciones interactivas (acostarse, saludar…)
+
+Agregar una acción no requiere tocar el código. En Blender creá la animación (con *Fake User*, en el lugar) y **nombrala `accion_<nombre>`**; al exportar el `.glb` con *Animation > Mode: Actions* el juego la detecta sola, crea un **botón en pantalla** y le asigna una **tecla** (1, 2, 3… en orden alfabético). Moverte la cancela (te levantás).
+
+| Nombre del clip | Comportamiento |
+|---|---|
+| `accion_acostarse` | se reproduce una vez y queda en la última pose hasta que te movés |
+| `accion_saludar_vuelve` | se reproduce una vez y vuelve solo a quieto |
+| `accion_bailar_loop` | se repite hasta que te movés |
+
+Para cambiar tecla o texto, o para enlazar un clip que ya existe sin renombrarlo, usá `data/tables/player.json > actions`:
+```json
+"actions": {
+  "acostarse": { "key": "KeyL", "label": "Acostarse" },
+  "caer": { "clip": "gPlayerAnim_link_normal_back_downA", "label": "Caerse", "hold": true }
+}
+```
+(`loop` y `hold` también se pueden poner ahí.) Si un clip no se encuentra, la consola (F12) avisa. Código: `src/actors/player.js`.
+
 ## Puertas (cambio de escena)
 
 Una puerta es un objeto normal y visible al que le das la propiedad de interactuable. Al acercarte aparece **"E Entrar"**; al apretar **E** (o tocar el aviso en celular) se hace un fundido a negro y se carga la escena destino. El código no oculta ni modifica el objeto.

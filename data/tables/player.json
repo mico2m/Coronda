@@ -19,6 +19,7 @@
     "maxSlope": 50,
     "gravity": 25
   },
+  "actions": {},
   "animation": {
     "fade": 0.2,
     "walkAnimSpeed": 0,

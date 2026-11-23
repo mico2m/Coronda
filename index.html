@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mi Mundo 3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+<div class="app">
+  <div id="stage" aria-label="Escena 3D"></div>
+
+  <aside class="panel" aria-label="Ajustes del suelo">
+    <div class="panel-head">
+      <h1>Suelo</h1>
+      <button id="toggle" type="button" aria-expanded="true" aria-controls="panelBody">Ocultar</button>
+    </div>
+    <div class="panel-body" id="panelBody">
+      <fieldset>
+        <legend>Tamaño</legend>
+        <div class="row">
+          <div class="row-top"><label for="sizeX">Ancho (X)</label><output id="sizeXOut" for="sizeX"></output></div>
+          <input id="sizeX" type="range" min="1" max="200" step="1" value="20">
+        </div>
+        <div class="row">
+          <div class="row-top"><label for="sizeZ">Largo (Z)</label><output id="sizeZOut" for="sizeZ"></output></div>
+          <input id="sizeZ" type="range" min="1" max="200" step="1" value="20">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Textura</legend>
+        <div class="row">
+          <div class="row-top"><label for="repX">Repetir en X</label><output id="repXOut" for="repX"></output></div>
+          <input id="repX" type="range" min="1" max="100" step="1" value="10">
+        </div>
+        <div class="row">
+          <div class="row-top"><label for="repZ">Repetir en Z</label><output id="repZOut" for="repZ"></output></div>
+          <input id="repZ" type="range" min="1" max="100" step="1" value="10">
+        </div>
+        <label class="check"><input id="linkRep" type="checkbox" checked> Mantener la misma repetición en X y Z</label>
+        <div class="btns">
+          <label class="filebtn primary" for="texFile">Cargar textura<input id="texFile" type="file" accept="image/png,image/jpeg,image/webp"></label>
+          <button id="texReset" type="button">Textura de prueba</button>
+        </div>
+        <p class="status" id="status" aria-live="polite">Textura de prueba.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Vista</legend>
+        <label class="check"><input id="gridOn" type="checkbox"> Mostrar cuadrícula de 1 m</label>
+      </fieldset>
+    </div>
+  </aside>
+
+  <div class="hint" id="hint">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Espacio</kbd> subir · <kbd>Shift</kbd> bajar · arrastrar para mirar · rueda para la velocidad (<b id="speedOut">6</b> m/s)
+  </div>
+
+  <div class="pad" id="pad" aria-label="Controles táctiles">
+    <button type="button" data-key="Space" aria-label="Subir">▲</button>
+    <button type="button" data-key="KeyW" aria-label="Adelante">W</button>
+    <button type="button" data-key="ShiftLeft" aria-label="Bajar">▼</button>
+    <button type="button" data-key="KeyA" aria-label="Izquierda">A</button>
+    <button type="button" data-key="KeyS" aria-label="Atrás">S</button>
+    <button type="button" data-key="KeyD" aria-label="Derecha">D</button>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -82,3 +82,9 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
         const s = (speed * dt) / len;
         camera.position.x += mx * s;
         camera.position.y += my * s;
+        camera.position.z += mz * s;
+      }
+      camera.rotation.set(pitch, yaw, 0);
+    },
+  };
+}

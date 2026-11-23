@@ -8,8 +8,9 @@ Cada tipo de elemento vive en su propia carpeta, al estilo de Ocarina of Time: l
 
 ```
 Coronda/
-├── index.html
-├── css/                    estilos
+├── index.html              versión final
+├── dev.html                modo desarrollador (inspector con mira)
+├── css/                    estilos (style.css = común, dev.css = solo modo dev)
 ├── assets/                 todo lo visual
 │   ├── models/worlds/      salas/mundos exportados de Blender (.glb)
 │   ├── models/objects/     objetos reutilizables (árboles, cofres, personajes)
@@ -25,9 +26,11 @@ Coronda/
 │   │   └── music.json      id de música → archivo
 │   └── scenes/             una escena por archivo (ambiente, spawn, salas, música)
 └── src/                    código
-    ├── main.js             punto de entrada
+    ├── main.js             arranque de la versión final
+    ├── dev.js              arranque del modo desarrollador
+    ├── game.js             motor compartido por los dos
     ├── core/               utilidades base (carga de archivos)
-    ├── systems/            cámara, audio, gestor de escenas
+    ├── systems/            cámara, audio, gestor de escenas, inspector (solo dev)
     ├── actors/             personajes y objetos con comportamiento (próximamente)
     └── ui/                 interfaz
 ```
@@ -49,6 +52,13 @@ Coronda/
 3. Registrala en `data/tables/scenes.json`.
 4. Si tiene música nueva, ponela en `audio/music/` y agregala a `data/tables/music.json`.
 
+## Versión final y modo desarrollador
+
+- `index.html`: la versión final, limpia y sin herramientas.
+- `dev.html`: el mismo mundo con un **inspector**. Hay una mira en el centro y, al apuntar a un objeto, muestra su nombre, archivo de origen, tamaño en metros, texturas, triángulos y distancia. Se activa y desactiva con la tecla **I**.
+
+Los dos usan el mismo motor (`src/game.js`). La versión final no descarga el código del inspector.
+
 ## Probar en local
 
 Los módulos y los `.glb` no cargan abriendo el `index.html` con doble clic. Usá un servidor local:
@@ -56,4 +66,4 @@ Los módulos y los `.glb` no cargan abriendo el `index.html` con doble clic. Us�
 ```
 npx serve
 ```
-o la extensión Live Server de VS Code.
+o la extensión Live Server de VS Code. Después abrí `/` para la versión final o `/dev.html` para el modo desarrollador.

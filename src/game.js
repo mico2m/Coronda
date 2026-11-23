@@ -6,6 +6,8 @@ import { createCameraControls } from './systems/camera.js';
 import { createAudio } from './systems/audio.js';
 import { createSceneManager } from './systems/scene-manager.js';
 import { createUI } from './ui/ui.js';
+import { createFade } from './systems/fade.js';
+import { createDoors } from './systems/doors.js';
 
 export async function startGame({ dev = false } = {}) {
   const stage = document.getElementById('stage');
@@ -24,6 +26,7 @@ export async function startGame({ dev = false } = {}) {
     speedOut: document.getElementById('speedOut'),
   });
   const ui = createUI();
+  const fade = createFade({ duration: 0.6 });
 
   function resize() {
     const w = stage.clientWidth || 1;
@@ -36,12 +39,14 @@ export async function startGame({ dev = false } = {}) {
   resize();
 
   let inspector = null;
+  let doors = null;
   let last = performance.now();
   function frame(now) {
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
     controls.update(dt);
     inspector?.update(dt);
+    doors?.update();
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
@@ -56,6 +61,22 @@ export async function startGame({ dev = false } = {}) {
     const audio = createAudio(musicTable);
     const sceneManager = createSceneManager({ scene, camera, controls, audio, ui, scenesTable });
 
+    // Carga una escena y deja listas sus puertas
+    async function enterScene(id, spawn) {
+      await sceneManager.loadScene(id, { spawn });
+      doors.setup(sceneManager.current, sceneManager.root);
+    }
+    // Puerta: fundido a negro -> cambiar de escena -> fundido desde negro
+    doors = createDoors({
+      camera,
+      dev,
+      onEnter: async (door) => {
+        await fade.fadeOut();
+        await enterScene(door.target, door.spawn);
+        await fade.fadeIn();
+      },
+    });
+
     if (dev) {
       try {
         const { createInspector } = await import('./systems/inspector.js');
@@ -68,7 +89,7 @@ export async function startGame({ dev = false } = {}) {
     }
 
     const startId = Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0];
-    await sceneManager.loadScene(startId);
+    await enterScene(startId);
   } catch (err) {
     console.error(err);
     ui.setStatus(String(err.message || err));

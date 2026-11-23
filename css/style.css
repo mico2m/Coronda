@@ -100,8 +100,15 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 
 /* Mensaje de estado (carga de escena) */
 .loading {
-  position: absolute; top: 12px; left: 12px; z-index: 2; max-width: calc(100% - 24px);
+  position: absolute; top: 12px; left: 12px; z-index: 4; max-width: calc(100% - 24px);
   padding: 8px 12px; border-radius: 8px; font-size: 13px;
   background: var(--panel); border: 1px solid var(--line); color: var(--fg);
 }
 .loading[hidden] { display: none; }
+
+/* Fundido a negro entre escenas (puertas) */
+.fade {
+  position: absolute; inset: 0; z-index: 3; background: #000;
+  opacity: 0; pointer-events: none; transition: opacity var(--fade-time, 0.6s) ease;
+}
+.fade.on { opacity: 1; pointer-events: all; }

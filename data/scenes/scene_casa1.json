@@ -1,0 +1,58 @@
+{
+  "id": "scene_casa1",
+  "name": "Casa 1",
+  "environment": {
+    "background": "#2a2420",
+    "ambient": {
+      "sky": "#fff2dd",
+      "ground": "#554433",
+      "intensity": 1.4
+    },
+    "sun": {
+      "color": "#ffffff",
+      "intensity": 0.6,
+      "position": [
+        5,
+        10,
+        5
+      ]
+    }
+  },
+  "music": "plaza_dia",
+  "spawn": {
+    "position": [
+      0,
+      1.7,
+      4
+    ],
+    "yaw": 0
+  },
+  "rooms": [
+    {
+      "id": "interior",
+      "model": "assets/models/worlds/scene_casa1.glb"
+    }
+  ],
+  "doors": [
+    {
+      "empty": "empty_puerta_salida",
+      "radius": 1.5,
+      "target": "coronda_plaza",
+      "position": [
+        0,
+        1.7,
+        6
+      ],
+      "spawn": {
+        "position": [
+          0,
+          1.7,
+          17
+        ],
+        "yaw": 0
+      }
+    }
+  ],
+  "objects": [],
+  "actors": []
+}

@@ -35,9 +35,29 @@
   "rooms": [
     {
       "id": "principal",
-      "model": "assets/models/worlds/coronda_plaza.glb"
+      "model": "assets/models/worlds/Coronda_Plaza.glb"
     }
   ],
   "objects": [],
-  "actors": []
+  "actors": [],
+  "doors": [
+    {
+      "empty": "empty_puerta_casa1",
+      "radius": 2.5,
+      "target": "scene_casa1",
+      "position": [
+        0,
+        1.7,
+        22
+      ],
+      "spawn": {
+        "position": [
+          0,
+          1.7,
+          0
+        ],
+        "yaw": 0
+      }
+    }
+  ]
 }

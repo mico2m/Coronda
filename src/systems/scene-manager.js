@@ -41,7 +41,7 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     }
   }
 
-  async function loadScene(id) {
+  async function loadScene(id, { spawn } = {}) {
     const entry = scenesTable[id];
     if (!entry) throw new Error(`La escena "${id}" no está en data/tables/scenes.json`);
 
@@ -57,9 +57,10 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     applyEnvironment(data.environment, group);
 
     // Posición inicial
-    if (data.spawn) {
-      camera.position.set(...data.spawn.position);
-      controls.setLook(data.spawn.yaw ?? 0, 0);
+    const sp = spawn ?? data.spawn; // spawn de la puerta, o el de la escena
+    if (sp) {
+      camera.position.set(...sp.position);
+      controls.setLook(sp.yaw ?? 0, 0);
     }
 
     // Salas

@@ -2,5 +2,8 @@
   "coronda_plaza": {
     "file": "data/scenes/coronda_plaza.json",
     "start": true
+  },
+  "scene_casa1": {
+    "file": "data/scenes/scene_casa1.json"
   }
 }

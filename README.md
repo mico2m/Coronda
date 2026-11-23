@@ -52,6 +52,25 @@ Coronda/
 3. Registrala en `data/tables/scenes.json`.
 4. Si tiene música nueva, ponela en `audio/music/` y agregala a `data/tables/music.json`.
 
+## Puertas (cambio de escena)
+
+Al acercarte a un **empty** de Blender se hace un fundido a negro y se carga otra escena.
+
+1. En Blender, poné un Empty junto a la puerta (ej. `empty_puerta_casa1`) y exportá el `.glb`.
+2. En el JSON de la escena origen agregá una puerta:
+   ```json
+   "doors": [
+     { "empty": "empty_puerta_casa1", "radius": 2.5, "target": "scene_casa1",
+       "spawn": { "position": [0, 1.7, 4], "yaw": 0 } }
+   ]
+   ```
+   - `empty`: nombre del empty en el `.glb`. `radius`: distancia (m) que dispara el cambio.
+   - `target`: id de la escena destino (registrada en `scenes.json`). `spawn`: dónde aparecés (si falta, usa el `spawn` de la escena destino).
+   - `position`: opcional, se usa si el empty todavía no está en el `.glb`.
+3. En la escena destino ponés la puerta de vuelta (ver `scene_casa1.json`).
+
+En `dev.html` cada puerta se ve como una esfera de alambre con su radio. El código está en `src/systems/doors.js` y `src/systems/fade.js`.
+
 ## Versión final y modo desarrollador
 
 - `index.html`: la versión final, limpia y sin herramientas.

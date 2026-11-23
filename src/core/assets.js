@@ -19,7 +19,7 @@ export function loadGLB(url, onProgress) {
       url,
       resolve,
       (e) => onProgress?.(e.total ? e.loaded / e.total : 0),
-      () => reject(new Error(`No se pudo cargar ${url}`))
+      (err) => reject(new Error(`No se pudo cargar ${url}${err?.message ? ` (${err.message})` : ''}`))
     );
   });
 }

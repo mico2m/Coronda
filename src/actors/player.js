@@ -31,14 +31,16 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
 
   // Modelo
   let animations = [];
+  let loadError = null;
   try {
     const gltf = await loadGLB(cfg.model);
     gltf.scene.scale.setScalar(cfg.scale);
     gltf.scene.rotation.y = THREE.MathUtils.degToRad(cfg.yawOffset);
     pivot.add(gltf.scene);
     animations = gltf.animations; // para las animaciones, más adelante
-  } catch {
-    console.warn(`Personaje: no se encontró ${cfg.model}; se usa una cápsula de reemplazo.`);
+  } catch (err) {
+    loadError = `Personaje: ${err.message}. Se muestra un cilindro de reemplazo.`;
+    console.error(loadError);
     const mat = new THREE.MeshStandardMaterial({ color: 0xe0a458 });
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 1.1, 4, 12), mat);
     body.position.y = 0.85;
@@ -118,6 +120,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
 
   return {
     animations,
+    loadError,
     get position() { return root.position; },
     get active() { return active; },
     set frozen(v) { frozen = v; if (v) keys = {}; },

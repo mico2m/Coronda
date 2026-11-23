@@ -2,6 +2,9 @@
   "id": "coronda_plaza",
   "name": "Plaza de Coronda",
   "environment": {
+    "shading": "unlit",
+    "tint": "#ffffff",
+    "brightness": 1,
     "background": "#9fc6e8",
     "fog": {
       "color": "#9fc6e8",

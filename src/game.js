@@ -53,6 +53,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
   let inspector = null;
   let doors = null;
   let player = null;
+  let world = null; // gestor de escenas (para mover el cielo)
   let mode = 'free'; // 'player' (tercera persona) o 'free' (cámara libre)
   const hintFree = document.getElementById('hintFree');
   const hintPlayer = document.getElementById('hintPlayer');
@@ -86,6 +87,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     controls.update(dt);
     player?.update(dt);
     inspector?.update(dt);
+    world?.updateSky(camera.position);
     if (doors) {
       if (mode === 'player' && player) doors.update(_focus.copy(player.position).setY(player.position.y + 1));
       else doors.update(camera.position);
@@ -104,6 +106,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     player = await createPlayer({ scene, camera, stage, pad: document.getElementById('pad'), config: playerConfig });
     const audio = createAudio(musicTable);
     const sceneManager = createSceneManager({ scene, camera, controls, audio, ui, scenesTable });
+    world = sceneManager;
 
     // Carga una escena y deja listas sus puertas
     async function enterScene(id, spawn) {
@@ -111,6 +114,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       doors.setup(sceneManager.current, sceneManager.root);
       // El jugador aparece en el punto de inicio de la escena (sp está a la altura de los ojos)
       player.setWorld(sceneManager.root);
+      player.setShade(sceneManager.shade); // mismo tono y brillo que la escena
       const sp = sceneManager.spawn;
       if (sp) player.place([sp.position[0], sp.position[1] - EYE, sp.position[2]], sp.yaw ?? 0);
     }

@@ -2,9 +2,14 @@
 // Idea tomada de Ocarina of Time: una escena = ambiente + salas; los datos van aparte del código.
 import * as THREE from 'three';
 import { loadJSON, loadGLB } from '../core/assets.js';
+import { makeUnlit, setShade, isSkyName } from './shading.js';
+
+const _v = new THREE.Vector3();
 
 export function createSceneManager({ scene, camera, controls, audio, ui, scenesTable }) {
   let current = null; // { data, group }
+  let skies = [];       // objetos "cielo": siguen a la cámara
+  let shade = { tint: '#ffffff', brightness: 1 };
   let lastSpawn = null; // { position (a la altura de los ojos), yaw } usado en la última carga
 
   function disposeGroup(group) {
@@ -30,6 +35,7 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     scene.background = bg;
     scene.fog = env.fog ? new THREE.Fog(env.fog.color ?? bg, env.fog.near ?? 80, env.fog.far ?? 400) : null;
 
+    if (env.shading !== 'lit') return; // sin luces: el aspecto lo da el tono/brillo (ver shading.js)
     if (env.ambient) {
       const a = env.ambient;
       group.add(new THREE.HemisphereLight(a.sky ?? '#ffffff', a.ground ?? '#888888', a.intensity ?? 1));
@@ -77,6 +83,9 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     current = { data, group };
 
     applyEnvironment(data.environment, group);
+    const unlit = data.environment?.shading !== 'lit';
+    shade = { tint: data.environment?.tint ?? '#ffffff', brightness: data.environment?.brightness ?? 1 };
+    skies = [];
 
     // Salas
     const missing = [];
@@ -90,6 +99,22 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
           o.userData.sourceFile = room.model;
           o.userData.roomId = room.id;
         });
+        if (unlit) {
+          makeUnlit(gltf.scene);
+          gltf.scene.traverse((o) => {
+            if (!isSkyName(o.name)) return;
+            skies.push(o);
+            o.traverse((c) => {
+              c.frustumCulled = false;
+              c.renderOrder = -1;
+              for (const m of Array.isArray(c.material) ? c.material : c.material ? [c.material] : []) {
+                m.fog = false; m.depthWrite = false; // el cielo no recibe niebla ni tapa a nada
+                m.side = THREE.DoubleSide;           // se ve desde adentro aunque las normales estén al revés
+              }
+            });
+          });
+          setShade(gltf.scene, shade);
+        }
         group.add(gltf.scene);
       } catch {
         missing.push(room.model);
@@ -124,6 +149,11 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     loadScene,
     unload,
     get spawn() { return lastSpawn; },
+    get shade() { return shade; },
+    // El cielo acompaña a la cámara para que nunca se acabe
+    updateSky(cameraPos) {
+      for (const o of skies) o.position.copy(o.parent.worldToLocal(_v.copy(cameraPos)));
+    },
     get current() { return current?.data ?? null; },
     get root() { return current?.group ?? null; },
   };

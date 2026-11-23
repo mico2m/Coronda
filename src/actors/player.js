@@ -4,6 +4,7 @@
 // Si el .glb todavía no existe se muestra una cápsula con una "nariz" que indica hacia dónde mira.
 import * as THREE from 'three';
 import { loadGLB } from '../core/assets.js';
+import { makeUnlit, setShade } from '../systems/shading.js';
 
 const DEFAULTS = {
   model: 'assets/models/objects/personaje.glb',
@@ -85,6 +86,8 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     nose.position.set(0, 1.3, 0.4);
     pivot.add(body, nose);
   }
+
+  makeUnlit(pivot); // sin luces: se ve la textura tal cual; el tono/brillo lo da la escena
 
   // Estado
   let active = false;
@@ -197,6 +200,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       dragging = false;
     },
     get yaw() { return cam.yaw; },
+    setShade(shade) { setShade(pivot, shade); },
 
     update(dt) {
       if (!active) return;

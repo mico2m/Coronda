@@ -2,6 +2,9 @@
   "id": "scene_casa1",
   "name": "Casa 1",
   "environment": {
+    "shading": "unlit",
+    "tint": "#ffffff",
+    "brightness": 1,
     "background": "#2a2420",
     "ambient": {
       "sky": "#fff2dd",

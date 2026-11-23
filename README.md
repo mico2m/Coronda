@@ -52,6 +52,18 @@ Coronda/
 3. Registrala en `data/tables/scenes.json`.
 4. Si tiene música nueva, ponela en `audio/music/` y agregala a `data/tables/music.json`.
 
+## Aspecto sin luces, tono y brillo
+
+Como en las consolas de la época, el mundo **no usa luces dinámicas**: cada superficie muestra su textura tal cual (lo que cargues como *Base Color / diffuse* en Blender). El personaje también.
+
+En `environment` de cada escena (`data/scenes/*.json`):
+- `"shading": "unlit"` (por defecto) o `"lit"` (usa las luces `ambient` y `sun`, por si alguna vez las querés).
+- `"tint": "#ffffff"`: el tono. Se multiplica por el color de todo (ej. `"#ffcc88"` = atardecer cálido, `"#8899dd"` = noche).
+- `"brightness": 1`: el brillo (0.5 = a media luz, 1.2 = más claro).
+- Para dar sombras o relieve, pintá **colores de vértice** en Blender (se exportan y se respetan), como hacía el juego original en vez de luces.
+
+**Cielo:** nombrá el objeto `cielo_…` o `sky_…` (ej. una esfera con la textura). Siempre acompaña a la cámara, no recibe niebla ni tapa a nada, y se ve desde adentro aunque las normales estén invertidas. También le afectan el tono y el brillo.
+
 ## Look retro (320x240 a 20 fps)
 
 `index.html` dibuja el mundo a **320×240** y a un máximo de **20 cuadros por segundo**, y escala la imagen a toda la pantalla con píxeles nítidos (manteniendo la proporción 4:3; en pantallas anchas quedan barras negras a los costados). La lógica del juego también avanza a esos 20 fps. La interfaz (avisos, ayuda) se ve a resolución normal.

@@ -5,6 +5,7 @@ import { loadJSON, loadGLB } from '../core/assets.js';
 
 export function createSceneManager({ scene, camera, controls, audio, ui, scenesTable }) {
   let current = null; // { data, group }
+  let lastSpawn = null; // { position (a la altura de los ojos), yaw } usado en la última carga
 
   function disposeGroup(group) {
     group.traverse((o) => {
@@ -101,6 +102,7 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     //  3) empty "empty_spawn" del .glb
     //  4) "spawn" del JSON de la escena
     const sp = spawn ?? findSpawn(group, fromId) ?? data.spawn;
+    lastSpawn = sp ?? null;
     if (sp) {
       camera.position.set(...sp.position);
       controls.setLook(sp.yaw ?? 0, 0);
@@ -121,6 +123,7 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
   return {
     loadScene,
     unload,
+    get spawn() { return lastSpawn; },
     get current() { return current?.data ?? null; },
     get root() { return current?.group ?? null; },
   };

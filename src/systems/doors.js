@@ -22,7 +22,7 @@ export const doorIdFromName = (name) => NAME_RE.exec(name ?? '')?.[1] ?? null;
 
 const _p = new THREE.Vector3();
 
-export function createDoors({ camera, stage, onEnter, dev = false }) {
+export function createDoors({ stage, onEnter, dev = false }) {
   let doors = [];
   let helpers = null;
   let busy = false;
@@ -129,9 +129,10 @@ export function createDoors({ camera, stage, onEnter, dev = false }) {
       }
     },
 
-    update() {
+    // `focus`: punto del jugador (o de la cámara libre) que se compara con cada puerta
+    update(focus) {
       if (busy) return;
-      camera.getWorldPosition(_p);
+      _p.copy(focus);
       let best = null, bestD = Infinity;
       for (const d of doors) {
         for (const b of d.shapes) {

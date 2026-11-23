@@ -52,6 +52,18 @@ Coronda/
 3. Registrala en `data/tables/scenes.json`.
 4. Si tiene música nueva, ponela en `audio/music/` y agregala a `data/tables/music.json`.
 
+## Personaje (jugador)
+
+El jugador se mueve en tercera persona con la cámara siguiéndolo. Código en `src/actors/player.js`; parámetros en `data/tables/player.json`.
+
+- **Controles:** `W A S D` (o flechas) mover relativo a la cámara · `Shift` correr · arrastrar para girar la cámara · rueda para el zoom · `E` interactuar (puertas).
+- **Modelo:** exportá el personaje a `assets/models/objects/personaje.glb` (o cambiá `model` en `player.json`). Hasta que exista se ve una cápsula con una "nariz" que marca el frente.
+- **Origen y orientación en Blender:** el origen del personaje en los **pies**; el frente hacia **-Y** de Blender (vista frontal, que es lo normal), que en el juego queda como +Z. Si en el juego camina de espaldas, poné `"yawOffset": 180` en `player.json`.
+- **Tamaño:** se respeta el de Blender (1 unidad = 1 m). Si hace falta, `scale` en `player.json`.
+- **Suelo:** el personaje se pega a la altura de las superficies de la escena (también sirve para escalones y rampas). Todavía **no hay colisiones con paredes**.
+- **Animaciones:** quedan para la próxima etapa; las que traiga el `.glb` ya se cargan en `player.animations`.
+- **Modo dev:** `dev.html` arranca con la cámara libre; la tecla `C` alterna con el personaje. `index.html` arranca directo con el personaje.
+
 ## Puertas (cambio de escena)
 
 Una puerta es un objeto normal y visible al que le das la propiedad de interactuable. Al acercarte aparece **"E Entrar"**; al apretar **E** (o tocar el aviso en celular) se hace un fundido a negro y se carga la escena destino. El código no oculta ni modifica el objeto.

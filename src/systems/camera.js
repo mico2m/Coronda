@@ -9,12 +9,14 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
   let pitch = -0.2;
   let speed = 6; // metros por segundo
   let keys = {};
+  let enabled = true;
 
   // Mirar arrastrando
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
   stage.addEventListener('pointerdown', (e) => {
+    if (!enabled) return;
     dragging = true;
     lastX = e.clientX;
     lastY = e.clientY;
@@ -22,7 +24,7 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
     try { stage.setPointerCapture(e.pointerId); } catch {}
   });
   stage.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
+    if (!enabled || !dragging) return;
     yaw -= (e.clientX - lastX) * 0.004;
     pitch -= (e.clientY - lastY) * 0.004;
     pitch = Math.max(-1.5, Math.min(1.5, pitch));
@@ -36,7 +38,7 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
   // Teclado
   const normalize = (code) => (code === 'ShiftRight' ? 'ShiftLeft' : code);
   window.addEventListener('keydown', (e) => {
-    if (!MOVE_KEYS.has(e.code)) return;
+    if (!enabled || !MOVE_KEYS.has(e.code)) return;
     const a = document.activeElement;
     if (a && a !== document.body && a.blur) a.blur();
     keys[normalize(e.code)] = true;
@@ -47,6 +49,7 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
 
   // Velocidad con la rueda
   stage.addEventListener('wheel', (e) => {
+    if (!enabled) return;
     e.preventDefault();
     speed = Math.max(1, Math.min(60, speed * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
     if (speedOut) speedOut.textContent = speed < 10 ? speed.toFixed(1) : Math.round(speed);
@@ -56,7 +59,7 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
   pad?.querySelectorAll('button').forEach((b) => {
     const k = b.dataset.key;
     b.addEventListener('pointerdown', (e) => {
-      keys[k] = true;
+      if (enabled) keys[k] = true;
       try { b.setPointerCapture(e.pointerId); } catch {}
     });
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => {
@@ -66,7 +69,10 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
 
   return {
     setLook(y, p = 0) { yaw = y; pitch = p; },
+    getYaw() { return yaw; },
+    setEnabled(v) { enabled = v; keys = {}; dragging = false; stage.classList.remove('dragging'); },
     update(dt) {
+      if (!enabled) return;
       const cp = Math.cos(pitch), sp = Math.sin(pitch);
       const sy = Math.sin(yaw), cy = Math.cos(yaw);
       const fx = -sy * cp, fy = sp, fz = -cy * cp; // hacia donde mira

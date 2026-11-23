@@ -86,8 +86,13 @@ export function createDoors({ camera, stage, onEnter, dev = false }) {
       for (const { id, node } of findNodes(root)) {
         const door = get(id);
         const x = node.userData ?? {};
-        if (typeof x.puerta === 'string') door.target = x.puerta;
-        else if (x.puerta && !doorIdFromName(node.name)) door.target = `scene_${id}`;
+        // Un valor como 1, 1.0, true o vacío (el que Blender pone por defecto) no es un destino:
+        // en ese caso se deduce del nombre del objeto (puerta_casa1 -> scene_casa1).
+        const v = typeof x.puerta === 'string' ? x.puerta.trim() : '';
+        if (v && !/^(?:[\d.]+|true|false)$/i.test(v)) door.target = v;
+        else if (!doorIdFromName(node.name)) {
+          console.warn(`Objeto "${node.name}": la propiedad "puerta" no tiene una escena destino (vale "${x.puerta}"). Usando "scene_${id}".`);
+        }
         if (x.puerta_radio !== undefined) door.radius = Number(x.puerta_radio);
         if (x.puerta_texto !== undefined) door.label = String(x.puerta_texto);
         const box = new THREE.Box3().setFromObject(node);

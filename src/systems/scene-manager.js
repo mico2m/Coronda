@@ -41,7 +41,28 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     }
   }
 
+  const EYE_HEIGHT = 1.7; // el empty va en el suelo; la cámara se pone a esta altura
+  const spawnName = (n) => THREE.PropertyBinding.sanitizeNodeName(n);
+
+  // Busca un empty de spawn en la escena y devuelve { position, yaw }. Mira hacia donde apunta
+  // la flecha verde (eje Y) del empty en Blender.
+  function findSpawn(group, fromId) {
+    group.updateMatrixWorld(true);
+    const names = [];
+    if (fromId) names.push(`empty_spawn_${fromId.replace(/^scene_/, '')}`);
+    names.push('empty_spawn');
+    for (const n of names) {
+      const node = group.getObjectByName(spawnName(n));
+      if (!node) continue;
+      const p = node.getWorldPosition(new THREE.Vector3());
+      const f = new THREE.Vector3(0, 0, -1).applyQuaternion(node.getWorldQuaternion(new THREE.Quaternion()));
+      return { position: [p.x, p.y + EYE_HEIGHT, p.z], yaw: Math.atan2(-f.x, -f.z) };
+    }
+    return null;
+  }
+
   async function loadScene(id, { spawn } = {}) {
+    const fromId = current?.data.id ?? null; // escena de la que venimos (para empty_spawn_<origen>)
     const entry = scenesTable[id];
     if (!entry) throw new Error(`La escena "${id}" no está en data/tables/scenes.json`);
 
@@ -55,13 +76,6 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     current = { data, group };
 
     applyEnvironment(data.environment, group);
-
-    // Posición inicial
-    const sp = spawn ?? data.spawn; // spawn de la puerta, o el de la escena
-    if (sp) {
-      camera.position.set(...sp.position);
-      controls.setLook(sp.yaw ?? 0, 0);
-    }
 
     // Salas
     const missing = [];
@@ -79,6 +93,17 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
       } catch {
         missing.push(room.model);
       }
+    }
+
+    // Posición inicial, por orden de prioridad:
+    //  1) "spawn" de la puerta por la que entraste (JSON)
+    //  2) empty "empty_spawn_<origen>" del .glb (solo cuando venís de esa escena; ej. empty_spawn_casa1)
+    //  3) empty "empty_spawn" del .glb
+    //  4) "spawn" del JSON de la escena
+    const sp = spawn ?? findSpawn(group, fromId) ?? data.spawn;
+    if (sp) {
+      camera.position.set(...sp.position);
+      controls.setLook(sp.yaw ?? 0, 0);
     }
 
     // Si todavía no exportaste el mundo desde Blender, mostramos una cuadrícula de referencia.

@@ -70,9 +70,19 @@ Al exportar el `.glb` tildá **Include > Custom Properties**. Se puede poner en 
   { "empty": "puerta_casa1", "spawn": { "position": [0, 1.7, 4], "yaw": 0 } }
 ]
 ```
-Sin `spawn` aparecés en el `spawn` de la escena destino. `position` sirve si el objeto todavía no está en el `.glb`. La distancia se mide hasta la superficie del objeto. En `dev.html` cada puerta muestra una caja con su zona de activación.
+Sin `spawn` se usa el empty de spawn de la escena destino (ver más abajo). `position` sirve si el objeto todavía no está en el `.glb`. La distancia se mide hasta la superficie del objeto. En `dev.html` cada puerta muestra una caja con su zona de activación.
 
 Código: `src/systems/doors.js` y `src/systems/fade.js`.
+
+## Punto de aparición (spawn)
+
+En el `.glb` de cada escena poné un Empty llamado **`empty_spawn`** (el mismo nombre en todas las escenas). Al entrar a la escena, el jugador aparece ahí.
+
+- Poné el empty **en el suelo**: la cámara se ubica 1,7 m más arriba.
+- Mira hacia donde apunta la **flecha verde (eje Y)** del empty en Blender. Rotalo sobre Z para girar la vista.
+- Opcional: `empty_spawn_casa1` se usa solo cuando llegás **desde** `scene_casa1` (se quita el `scene_` del nombre). Sirve para reaparecer afuera de la puerta correcta. Si no existe, se usa `empty_spawn`.
+
+Orden de prioridad: `spawn` de la puerta en el JSON → `empty_spawn_<origen>` → `empty_spawn` → `spawn` del JSON de la escena (que queda como respaldo si el `.glb` no tiene empty).
 
 ## Versión final y modo desarrollador
 

@@ -119,7 +119,7 @@ Agregar una acción no requiere tocar el código. En Blender creá la animación
 
 | Nombre del clip | Comportamiento |
 |---|---|
-| `accion_acostarse` | se reproduce una vez y queda en la última pose hasta que te movés |
+| `accion_acostarse` o `accion_acostarse_quieto` | se reproduce una vez y queda en la última pose hasta que te movés |
 | `accion_saludar_vuelve` | se reproduce una vez y vuelve solo a quieto |
 | `accion_bailar_loop` | se repite hasta que te movés |
 
@@ -131,6 +131,31 @@ Para cambiar tecla o texto, o para enlazar un clip que ya existe sin renombrarlo
 }
 ```
 (`loop` y `hold` también se pueden poner ahí.) Si un clip no se encuentra, la consola (F12) avisa. Código: `src/actors/player.js`.
+
+## NPC (personajes con animación)
+
+Un NPC es un modelo `.glb` con su animación, puesto en la escena con un Empty de Blender. Código: `src/actors/npc.js`.
+
+1. Exportá el modelo a `assets/models/objects/vecino.glb` (origen en los pies, frente hacia -Y de Blender) con una animación en bucle, por ejemplo una acción llamada `idle`.
+2. En el `.glb` de la escena poné un **Empty llamado `npc_vecino`** en el suelo, donde va a estar. El NPC mira hacia donde apunta la **flecha verde (eje Y)** del Empty, igual que `empty_spawn`. Duplicá el Empty para tener más de uno (`npc_vecino.001` sigue siendo "vecino"; el modelo se descarga una sola vez).
+3. Opcional, en *Custom Properties* del Empty (tildá *Include > Custom Properties* al exportar):
+
+| Propiedad | Qué hace |
+|---|---|
+| `npc_modelo` | otro archivo: `gato` usa `assets/models/objects/gato.glb` (o una ruta completa) |
+| `npc_anim` | el clip que reproduce en bucle (por defecto `idle`; acepta que el nombre empiece así) |
+| `npc_escala` | tamaño (1 por defecto) |
+| `npc_radio` | ancho para que el jugador no lo atraviese, en metros (0,4 por defecto) |
+| `npc_giro` | grados extra de giro |
+
+También se puede ajustar o crear desde `data/scenes/<escena>.json > "actors"`:
+```json
+"actors": [
+  { "empty": "npc_vecino", "animation": "idle", "scale": 1 },
+  { "id": "gato", "model": "gato", "position": [3, 0, 5], "yaw": 90 }
+]
+```
+La primera línea ajusta un NPC que viene del `.glb`; la segunda crea uno que no está en el `.glb` (`yaw` en grados). Si un clip no existe, la consola (F12) lista los que trae el archivo. Por ahora los NPC están quietos en su lugar y el jugador los rodea; hablarles y que caminen es el paso siguiente.
 
 ## Puertas (cambio de escena)
 

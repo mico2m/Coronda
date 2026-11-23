@@ -7,6 +7,7 @@
 // En Blender nombrá la acción `accion_<nombre>` (ej. accion_acostarse) y exportá el .glb: el juego la
 // detecta sola, crea un botón en pantalla y le asigna una tecla (1, 2, 3… en orden alfabético).
 //   accion_acostarse          se reproduce una vez y se queda en la última pose hasta que te movés
+//   accion_acostarse_quieto   igual que el anterior (es el comportamiento por defecto, solo más explícito)
 //   accion_saludar_vuelve     se reproduce una vez y vuelve solo a quieto
 //   accion_bailar_loop        se repite hasta que te movés
 // Opcional, en player.json > actions: { "acostarse": { "key": "KeyL", "label": "Acostarse" } }
@@ -42,8 +43,8 @@ function parseActionName(clipName) {
   const m = ACTION_RE.exec(String(clipName).replace(/\.\d+$/, ''));
   if (!m) return null;
   let id = m[1], mode = 'hold';
-  const s = /_(loop|vuelve)$/i.exec(id);
-  if (s) { mode = s[1].toLowerCase(); id = id.slice(0, -s[0].length); }
+  const s = /_(loop|vuelve|quieto)$/i.exec(id);
+  if (s) { mode = s[1].toLowerCase() === 'quieto' ? 'hold' : s[1].toLowerCase(); id = id.slice(0, -s[0].length); }
   return id ? { id, mode } : null;
 }
 const humanize = (id) => { const t = id.replace(/_+/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
@@ -151,6 +152,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   let keys = {};
   let world = null;   // mundo de colisión de la escena actual (ver collision.js)
   let fallSpeed = 0;  // m/s hacia abajo
+  let obstacles = []; // círculos { x, z, r } que no se atraviesan (NPC)
   const target = new THREE.Vector3();
 
   // Teclado
@@ -271,6 +273,8 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       pivot.rotation.y = facing;
       cam.yaw = yaw;
     },
+    // NPC u otros obstáculos redondos: lista de { x, z, r } (se lee en cada cuadro, puede cambiar)
+    setObstacles(list) { obstacles = list ?? []; },
     // El mundo de colisión de la escena actual (lo arma buildCollision en collision.js)
     setWorld(collisionWorld) {
       world = collisionWorld;
@@ -314,6 +318,15 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
         for (let i = 0; i < steps; i++) {
           root.position.x += (dx * dist) / steps;
           root.position.z += (dz * dist) / steps;
+          for (const o of obstacles) { // NPC: círculo en el piso (las paredes tienen la última palabra)
+            const ox = root.position.x - o.x, oz = root.position.z - o.z, min = o.r + col.radius;
+            const d2 = ox * ox + oz * oz;
+            if (d2 >= min * min) continue;
+            const d = Math.sqrt(d2);
+            const nx = d > 1e-4 ? ox / d : 1, nz = d > 1e-4 ? oz / d : 0;
+            root.position.x = o.x + nx * min;
+            root.position.z = o.z + nz * min;
+          }
           world?.pushOut(root.position, col);
         }
         facing = angleLerp(facing, Math.atan2(dx, dz), cfg.turnSpeed * dt);

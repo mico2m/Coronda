@@ -10,6 +10,7 @@ import { createFade } from './systems/fade.js';
 import { createDoors } from './systems/doors.js';
 import { createPlayer } from './actors/player.js';
 import { buildCollision } from './systems/collision.js';
+import { createNpcs } from './actors/npc.js';
 import { isSkyName } from './systems/shading.js';
 
 const _focus = new THREE.Vector3();
@@ -54,6 +55,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
 
   let inspector = null;
   let collisionDebug = null;
+  const npcs = createNpcs();
   let doors = null;
   let player = null;
   let world = null; // gestor de escenas (para mover el cielo)
@@ -89,6 +91,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     last = now;
     controls.update(dt);
     player?.update(dt);
+    npcs.update(dt);
     inspector?.update(dt);
     world?.updateSky(camera.position);
     if (doors) {
@@ -127,6 +130,10 @@ export async function startGame({ dev = false, retro = null } = {}) {
       console.info(`Colisiones de "${sceneManager.current.id}":`, cworld.stats);
       collisionDebug?.attach(sceneManager.root, cworld);
       player.setWorld(cworld);
+      // NPC: Empties npc_* del .glb + "actors" del JSON (ver src/actors/npc.js). Van después de armar las colisiones.
+      const npcInfo = await npcs.setup(sceneManager.root, sceneManager.current, sceneManager.shade);
+      player.setObstacles(npcs.obstacles);
+      if (npcInfo.missing.length) ui.setStatus(`NPC: no se pudo cargar ${npcInfo.missing.join(', ')}`);
       player.setShade(sceneManager.shade); // mismo tono y brillo que la escena
       const sp = sceneManager.spawn;
       if (sp) player.place([sp.position[0], sp.position[1] - EYE, sp.position[2]], sp.yaw ?? 0);

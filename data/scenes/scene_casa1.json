@@ -35,7 +35,7 @@
   ],
   "doors": [
     {
-      "empty": "empty_puerta_salida",
+      "empty": "puerta_salida",
       "radius": 1.5,
       "target": "coronda_plaza",
       "position": [

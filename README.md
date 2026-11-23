@@ -54,22 +54,22 @@ Coronda/
 
 ## Puertas (cambio de escena)
 
-Al acercarte a un **empty** de Blender se hace un fundido a negro y se carga otra escena.
+Cualquier objeto de Blender cuyo nombre empiece con `puerta_` (o `empty_puerta_`) es una puerta. Al acercarte aparece **"E Entrar"**; al apretar **E** (o tocar el aviso en celular) se hace un fundido a negro y se carga la escena destino.
 
-1. En Blender, poné un Empty junto a la puerta (ej. `empty_puerta_casa1`) y exportá el `.glb`.
-2. En el JSON de la escena origen agregá una puerta:
-   ```json
-   "doors": [
-     { "empty": "empty_puerta_casa1", "radius": 2.5, "target": "scene_casa1",
-       "spawn": { "position": [0, 1.7, 4], "yaw": 0 } }
-   ]
-   ```
-   - `empty`: nombre del empty en el `.glb`. `radius`: distancia (m) que dispara el cambio.
-   - `target`: id de la escena destino (registrada en `scenes.json`). `spawn`: dónde aparecés (si falta, usa el `spawn` de la escena destino).
-   - `position`: opcional, se usa si el empty todavía no está en el `.glb`.
-3. En la escena destino ponés la puerta de vuelta (ver `scene_casa1.json`).
+- `puerta_casa1` lleva a la escena `scene_casa1` (se deduce del nombre: `puerta_X` → `scene_X`). No hace falta tocar ningún JSON si la escena destino está en `data/tables/scenes.json`.
+- Si existen `puerta_casa1` y `empty_puerta_casa1`, cuentan como la misma puerta. La distancia se mide hasta la superficie del objeto.
+- Para cambiar destino, radio (por defecto 3 m), texto o dónde aparecés, agregá una entrada en `doors` del JSON de la escena:
+  ```json
+  "doors": [
+    { "empty": "puerta_casa1", "target": "scene_casa1", "radius": 3, "label": "Entrar",
+      "spawn": { "position": [0, 1.7, 4], "yaw": 0 } }
+  ]
+  ```
+  Sin `spawn` aparecés en el `spawn` de la escena destino. `position` sirve si el objeto todavía no está en el `.glb`.
+- La puerta de vuelta se define igual en la escena destino (ver `scene_casa1.json`).
+- En `dev.html` cada puerta muestra una caja con su zona de activación.
 
-En `dev.html` cada puerta se ve como una esfera de alambre con su radio. El código está en `src/systems/doors.js` y `src/systems/fade.js`.
+Código: `src/systems/doors.js` y `src/systems/fade.js`.
 
 ## Versión final y modo desarrollador
 

@@ -1,24 +1,46 @@
-// Puertas: al acercarte a un empty de Blender se dispara el cambio de escena.
+// Puertas: cualquier objeto de Blender cuyo nombre empiece con "puerta_" (o "empty_puerta_") es una puerta.
+// Al acercarte aparece "Presioná E para entrar"; al apretar E (o tocar el aviso) se hace el cambio de escena.
 //
-// En Blender: poné un Empty cerca de la puerta (ej. empty_puerta_casa1) y exportá a .glb;
-// los empties salen como nodos vacíos con su nombre.
-// En data/scenes/<escena>.json, la lista "doors" dice qué empty es cada puerta y a dónde lleva:
+//   puerta_casa1        -> lleva a la escena "scene_casa1"   (se deduce del nombre: puerta_X -> scene_X)
+//   empty_puerta_casa1  -> lo mismo; si existen los dos, cuentan como la misma puerta.
 //
-//   "doors": [
-//     { "empty": "empty_puerta_casa1", "radius": 2.5, "target": "scene_casa1" }
-//   ]
-//
-// Opcionales: "spawn": { "position": [x,y,z], "yaw": n } (dónde aparecés en la escena destino;
-// si falta se usa el spawn de la escena destino) y "position": [x,y,z] (si el empty todavía no
-// está en el .glb, se usa esta posición en lugar de buscarlo).
+// Para cambiar el destino, el radio o dónde aparecés, agregá una entrada en "doors" del JSON de la escena:
+//   "doors": [{ "empty": "puerta_casa1", "target": "scene_casa1", "radius": 3,
+//               "label": "Entrar", "spawn": { "position": [0,1.7,4], "yaw": 0 } }]
+// ("empty" acepta cualquiera de los nombres de la puerta). Si el objeto todavía no está en el .glb,
+// se puede dar "position": [x,y,z] y funciona como un punto.
+// La distancia se mide hasta la superficie del objeto (caja envolvente), no hasta su centro.
 import * as THREE from 'three';
+
+const NAME_RE = /^(?:empty_)?puerta_(.+)$/;
+export const doorIdFromName = (name) => NAME_RE.exec(name ?? '')?.[1] ?? null;
 
 const _p = new THREE.Vector3();
 
-export function createDoors({ camera, onEnter, dev = false }) {
+export function createDoors({ camera, stage, onEnter, dev = false }) {
   let doors = [];
   let helpers = null;
   let busy = false;
+  let near = null;
+
+  // Aviso "Presioná E"
+  const prompt = document.createElement('button');
+  prompt.type = 'button';
+  prompt.className = 'door-prompt';
+  prompt.hidden = true;
+  prompt.addEventListener('click', () => trigger());
+  stage.parentElement.appendChild(prompt);
+
+  function trigger() {
+    if (!near || busy) return;
+    const door = near;
+    busy = true;
+    prompt.hidden = true;
+    Promise.resolve(onEnter(door)).catch((err) => console.error(err)).finally(() => { busy = false; });
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyE' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) trigger();
+  });
 
   function clearHelpers() {
     if (!helpers) return;
@@ -27,35 +49,66 @@ export function createDoors({ camera, onEnter, dev = false }) {
     helpers = null;
   }
 
+  // Busca las puertas en la escena: no entra dentro de una puerta ya encontrada (sus piezas no cuentan aparte).
+  function findNodes(root) {
+    const found = [];
+    (function walk(o) {
+      const id = doorIdFromName(o.name);
+      if (id) { found.push({ id, node: o }); return; }
+      o.children.forEach(walk);
+    })(root);
+    return found;
+  }
+
   return {
     // Llamar después de cargar cada escena.
     setup(data, root) {
       clearHelpers();
-      busy = false;
+      near = null;
+      prompt.hidden = true;
       doors = [];
       if (dev) { helpers = new THREE.Group(); helpers.name = 'door-helpers'; root.add(helpers); }
-
       root.updateMatrixWorld(true);
-      for (const d of data.doors ?? []) {
-        const pos = new THREE.Vector3();
-        // GLTFLoader quita puntos de los nombres (Puerta.001 -> Puerta001), igual que acá.
-        const node = d.empty ? root.getObjectByName(THREE.PropertyBinding.sanitizeNodeName(d.empty)) : null;
-        if (node) node.getWorldPosition(pos);
-        else if (d.position) pos.set(...d.position);
-        else { console.warn(`Puerta "${d.empty}": no está en el .glb ni tiene "position" en el JSON.`); continue; }
 
-        const radius = d.radius ?? 2.5;
-        // "armed": la puerta no dispara hasta que salgas de su radio (así no rebotás al aparecer encima).
-        const door = { ...d, pos, radius, armed: false };
-        doors.push(door);
+      const byId = new Map();
+      const get = (id) => {
+        if (!byId.has(id)) byId.set(id, { id, target: `scene_${id}`, radius: 3, label: 'Entrar', spawn: undefined, shapes: [] });
+        return byId.get(id);
+      };
 
-        if (helpers) {
-          const m = new THREE.Mesh(
-            new THREE.SphereGeometry(radius, 16, 12),
-            new THREE.MeshBasicMaterial({ color: 0x2dd4bf, wireframe: true, transparent: true, opacity: 0.4 })
-          );
-          m.position.copy(pos);
-          helpers.add(m);
+      // 1) Objetos y empties del .glb
+      for (const { id, node } of findNodes(root)) {
+        const door = get(id);
+        const box = new THREE.Box3().setFromObject(node);
+        if (box.isEmpty()) { // empty: es solo un punto
+          const p = node.getWorldPosition(new THREE.Vector3());
+          box.set(p.clone(), p.clone());
+        }
+        door.shapes.push(box);
+      }
+
+      // 2) Ajustes del JSON (o puertas que solo existen ahí, con "position")
+      for (const cfg of data.doors ?? []) {
+        const name = cfg.empty ?? cfg.object ?? cfg.name;
+        const id = doorIdFromName(name) ?? name;
+        const exists = byId.has(id);
+        if (!exists && !cfg.position) {
+          console.warn(`Puerta "${name}": no está en el .glb ni tiene "position" en el JSON.`);
+          continue;
+        }
+        const door = get(id);
+        if (!door.shapes.length && cfg.position) {
+          const p = new THREE.Vector3(...cfg.position);
+          door.shapes.push(new THREE.Box3(p.clone(), p.clone()));
+        }
+        for (const k of ['target', 'radius', 'label', 'spawn']) if (cfg[k] !== undefined) door[k] = cfg[k];
+      }
+
+      doors = [...byId.values()].filter((d) => d.shapes.length);
+      if (helpers) {
+        for (const d of doors) for (const b of d.shapes) {
+          const h = new THREE.Box3Helper(b.clone().expandByScalar(d.radius), 0x2dd4bf);
+          helpers.add(h);
         }
       }
     },
@@ -63,14 +116,17 @@ export function createDoors({ camera, onEnter, dev = false }) {
     update() {
       if (busy) return;
       camera.getWorldPosition(_p);
+      let best = null, bestD = Infinity;
       for (const d of doors) {
-        const inside = _p.distanceTo(d.pos) < d.radius;
-        if (!inside) d.armed = true;
-        else if (d.armed) {
-          busy = true;
-          Promise.resolve(onEnter(d)).catch((err) => { console.error(err); busy = false; });
-          return;
+        for (const b of d.shapes) {
+          const dist = b.distanceToPoint(_p);
+          if (dist < d.radius && dist < bestD) { best = d; bestD = dist; }
         }
+      }
+      if (best !== near) {
+        near = best;
+        prompt.hidden = !near;
+        if (near) prompt.innerHTML = `<kbd>E</kbd> ${near.label ?? 'Entrar'}`;
       }
     },
   };

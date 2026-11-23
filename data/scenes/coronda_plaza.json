@@ -42,7 +42,7 @@
   "actors": [],
   "doors": [
     {
-      "empty": "empty_puerta_casa1",
+      "empty": "puerta_casa1",
       "radius": 2.5,
       "target": "scene_casa1",
       "position": [

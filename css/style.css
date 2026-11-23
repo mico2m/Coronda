@@ -112,3 +112,12 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
   opacity: 0; pointer-events: none; transition: opacity var(--fade-time, 0.6s) ease;
 }
 .fade.on { opacity: 1; pointer-events: all; }
+
+/* Aviso de puerta: "E Entrar" */
+.door-prompt {
+  position: absolute; left: 50%; bottom: 18%; transform: translateX(-50%); z-index: 2;
+  display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 15px;
+  background: var(--panel); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.door-prompt[hidden] { display: none; }
+.door-prompt kbd { font: 600 13px var(--font-body); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 7px; }

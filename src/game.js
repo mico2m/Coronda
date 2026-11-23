@@ -66,13 +66,19 @@ export async function startGame({ dev = false } = {}) {
       await sceneManager.loadScene(id, { spawn });
       doors.setup(sceneManager.current, sceneManager.root);
     }
-    // Puerta: fundido a negro -> cambiar de escena -> fundido desde negro
+    // Puerta (se activa con la tecla E): fundido a negro -> cambiar de escena -> fundido desde negro
     doors = createDoors({
       camera,
+      stage,
       dev,
       onEnter: async (door) => {
         await fade.fadeOut();
-        await enterScene(door.target, door.spawn);
+        try {
+          await enterScene(door.target, door.spawn);
+        } catch (err) { // destino inexistente: nos quedamos donde estábamos, sin pantalla negra eterna
+          console.error(err);
+          ui.setStatus(String(err.message || err));
+        }
         await fade.fadeIn();
       },
     });

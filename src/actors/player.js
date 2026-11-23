@@ -16,7 +16,7 @@ const DEFAULTS = {
   // Animaciones: se buscan por nombre en el .glb (idle, walk, run).
   // fade = segundos de transición. walkAnimSpeed/runAnimSpeed = a qué velocidad (m/s) fue animado el ciclo;
   // con eso la animación se acelera o frena para que los pies no resbalen (0 = no ajustar).
-  animation: { fade: 0.2, walkAnimSpeed: 0, runAnimSpeed: 0 },
+  animation: { fade: 0.2, walkAnimSpeed: 0, runAnimSpeed: 0, clips: {} },
 };
 
 const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
@@ -50,7 +50,11 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     // Animaciones por nombre (sin distinguir mayúsculas; acepta sufijos como "walk.001" o "Walk_loop")
     if (animations.length) {
       mixer = new THREE.AnimationMixer(gltf.scene);
-      const pick = (word) => animations.find((c) => c.name.toLowerCase() === word) ?? animations.find((c) => c.name.toLowerCase().startsWith(word));
+      // 1) el nombre que pusiste en player.json > animation.clips (ej. "walk": "gPlayerAnim_link_normal_walk")
+      // 2) un clip llamado igual (idle/walk/run), 3) uno que empiece con ese nombre
+      const byName = (n) => animations.find((c) => c.name.toLowerCase() === String(n).toLowerCase());
+      const pick = (word) => (cfg.animation.clips?.[word] && byName(cfg.animation.clips[word])) || byName(word)
+        || animations.find((c) => c.name.toLowerCase().startsWith(word));
       for (const key of ['idle', 'walk', 'run']) {
         const clip = pick(key);
         if (clip) { clips[key] = mixer.clipAction(clip); clips[key].setLoop(THREE.LoopRepeat, Infinity); }
@@ -58,7 +62,15 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       clips.walk ??= clips.run;
       clips.run ??= clips.walk;
       const missing = ['idle', 'walk', 'run'].filter((k) => !pick(k));
-      if (missing.length) animNotice = `Animaciones del personaje: faltan ${missing.join(', ')}. Clips en el .glb: ${animations.map((c) => c.name).join(', ')}.`;
+      if (missing.length) {
+        // Aviso corto: no listamos los 100+ clips, solo los que parecen de quieto / caminar / correr
+        const likely = animations.map((c) => c.name).filter((n) => /idle|wait|stand|walk|run|dash|jog/i.test(n));
+        const shown = likely.slice(0, 12);
+        animNotice = `Animaciones: faltan ${missing.join(', ')}. El .glb trae ${animations.length} clips`
+          + (shown.length ? `; posibles: ${shown.join(', ')}${likely.length > shown.length ? ', …' : ''}` : '')
+          + '. Elegí cuál usar en data/tables/player.json > animation.clips.';
+        console.info('Clips del personaje:', animations.map((c) => c.name));
+      }
     } else {
       animNotice = 'El .glb del personaje no trae animaciones (exportá con Animation > Actions).';
     }

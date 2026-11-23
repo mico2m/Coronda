@@ -15,6 +15,11 @@
   "animation": {
     "fade": 0.2,
     "walkAnimSpeed": 0,
-    "runAnimSpeed": 0
+    "runAnimSpeed": 0,
+    "clips": {
+      "idle": "",
+      "walk": "",
+      "run": ""
+    }
   }
 }

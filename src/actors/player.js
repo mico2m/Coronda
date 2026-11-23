@@ -13,6 +13,10 @@ const DEFAULTS = {
   runSpeed: 6.5,    // m/s con Shift
   turnSpeed: 12,    // qué rápido gira hacia donde camina
   camera: { distance: 4.5, minDistance: 1.5, maxDistance: 12, height: 1.5, pitch: 0.3 },
+  // Animaciones: se buscan por nombre en el .glb (idle, walk, run).
+  // fade = segundos de transición. walkAnimSpeed/runAnimSpeed = a qué velocidad (m/s) fue animado el ciclo;
+  // con eso la animación se acelera o frena para que los pies no resbalen (0 = no ajustar).
+  animation: { fade: 0.2, walkAnimSpeed: 0, runAnimSpeed: 0 },
 };
 
 const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
@@ -20,7 +24,7 @@ const ALIAS = { ArrowUp: 'KeyW', ArrowDown: 'KeyS', ArrowLeft: 'KeyA', ArrowRigh
 const TAU = Math.PI * 2;
 
 export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
-  const cfg = { ...DEFAULTS, ...config, camera: { ...DEFAULTS.camera, ...config.camera } };
+  const cfg = { ...DEFAULTS, ...config, camera: { ...DEFAULTS.camera, ...config.camera }, animation: { ...DEFAULTS.animation, ...config.animation } };
 
   const root = new THREE.Group(); // posición = pies
   root.name = 'player';
@@ -32,12 +36,32 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   // Modelo
   let animations = [];
   let loadError = null;
+  let animNotice = null;
+  let mixer = null;
+  const clips = {};      // idle / walk / run -> AnimationAction
+  let currentClip = null;
   try {
     const gltf = await loadGLB(cfg.model);
     gltf.scene.scale.setScalar(cfg.scale);
     gltf.scene.rotation.y = THREE.MathUtils.degToRad(cfg.yawOffset);
     pivot.add(gltf.scene);
-    animations = gltf.animations; // para las animaciones, más adelante
+    animations = gltf.animations;
+
+    // Animaciones por nombre (sin distinguir mayúsculas; acepta sufijos como "walk.001" o "Walk_loop")
+    if (animations.length) {
+      mixer = new THREE.AnimationMixer(gltf.scene);
+      const pick = (word) => animations.find((c) => c.name.toLowerCase() === word) ?? animations.find((c) => c.name.toLowerCase().startsWith(word));
+      for (const key of ['idle', 'walk', 'run']) {
+        const clip = pick(key);
+        if (clip) { clips[key] = mixer.clipAction(clip); clips[key].setLoop(THREE.LoopRepeat, Infinity); }
+      }
+      clips.walk ??= clips.run;
+      clips.run ??= clips.walk;
+      const missing = ['idle', 'walk', 'run'].filter((k) => !pick(k));
+      if (missing.length) animNotice = `Animaciones del personaje: faltan ${missing.join(', ')}. Clips en el .glb: ${animations.map((c) => c.name).join(', ')}.`;
+    } else {
+      animNotice = 'El .glb del personaje no trae animaciones (exportá con Animation > Actions).';
+    }
   } catch (err) {
     loadError = `Personaje: ${err.message}. Se muestra un cilindro de reemplazo.`;
     console.error(loadError);
@@ -111,6 +135,18 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     return hit ? hit.point.y : null;
   }
 
+  // Cambia de animación con una transición suave
+  function playClip(name) {
+    const next = clips[name] ?? clips.idle;
+    if (!next || next === currentClip) return;
+    const fade = cfg.animation.fade;
+    next.reset().setEffectiveWeight(1).fadeIn(fade).play();
+    currentClip?.fadeOut(fade);
+    currentClip = next;
+    currentName = name;
+  }
+  let currentName = null;
+
   const angleLerp = (a, b, t) => {
     let d = ((b - a + Math.PI) % TAU + TAU) % TAU - Math.PI;
     return a + d * Math.min(t, 1);
@@ -121,6 +157,8 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   return {
     animations,
     loadError,
+    get animNotice() { return animNotice; },
+    get currentClip() { return currentName; },
     get position() { return root.position; },
     get active() { return active; },
     set frozen(v) { frozen = v; if (v) keys = {}; },
@@ -142,6 +180,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     setActive(v) {
       active = v;
       root.visible = v;
+      if (v && !currentClip) playClip('idle');
       keys = {};
       dragging = false;
     },
@@ -149,6 +188,8 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
 
     update(dt) {
       if (!active) return;
+      mixer?.update(dt);
+      let moving = false;
 
       // Movimiento relativo a la cámara
       const fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
@@ -159,12 +200,19 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
         let dz = -cy * fwd - sy * side;
         const len = Math.hypot(dx, dz);
         dx /= len; dz /= len;
-        const speed = keys.ShiftLeft ? cfg.runSpeed : cfg.walkSpeed;
+        const running = !!keys.ShiftLeft;
+        const speed = running ? cfg.runSpeed : cfg.walkSpeed;
+        moving = true;
+        playClip(running ? 'run' : 'walk');
+        const animSpeed = running ? cfg.animation.runAnimSpeed : cfg.animation.walkAnimSpeed;
+        if (animSpeed > 0 && currentClip) currentClip.setEffectiveTimeScale(speed / animSpeed);
         root.position.x += dx * speed * dt;
         root.position.z += dz * speed * dt;
         facing = angleLerp(facing, Math.atan2(dx, dz), cfg.turnSpeed * dt);
         pivot.rotation.y = facing;
       }
+
+      if (!moving) { playClip('idle'); }
 
       // Pegado al suelo (suave)
       const g = groundY(root.position.x, root.position.y, root.position.z);

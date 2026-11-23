@@ -5,5 +5,16 @@
   "walkSpeed": 3,
   "runSpeed": 6.5,
   "turnSpeed": 12,
-  "camera": { "distance": 4.5, "minDistance": 1.5, "maxDistance": 12, "height": 1.5, "pitch": 0.3 }
+  "camera": {
+    "distance": 4.5,
+    "minDistance": 1.5,
+    "maxDistance": 12,
+    "height": 1.5,
+    "pitch": 0.3
+  },
+  "animation": {
+    "fade": 0.2,
+    "walkAnimSpeed": 0,
+    "runAnimSpeed": 0
+  }
 }

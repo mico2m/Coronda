@@ -134,7 +134,9 @@ export async function startGame({ dev = false } = {}) {
     const startId = Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0];
     await enterScene(startId);
     setMode(dev ? 'free' : 'player');
-    if (player.loadError) ui.setStatus(player.loadError); // si el personaje no cargó, se avisa en pantalla
+    // si el personaje o sus animaciones tienen problemas, se avisa en pantalla
+    const notice = player.loadError ?? player.animNotice;
+    if (notice) ui.setStatus(notice);
   } catch (err) {
     console.error(err);
     ui.setStatus(String(err.message || err));

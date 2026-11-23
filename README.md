@@ -52,6 +52,14 @@ Coronda/
 3. Registrala en `data/tables/scenes.json`.
 4. Si tiene música nueva, ponela en `audio/music/` y agregala a `data/tables/music.json`.
 
+## Look retro (320x240 a 20 fps)
+
+`index.html` dibuja el mundo a **320×240** y a un máximo de **20 cuadros por segundo**, y escala la imagen a toda la pantalla con píxeles nítidos (manteniendo la proporción 4:3; en pantallas anchas quedan barras negras a los costados). La lógica del juego también avanza a esos 20 fps. La interfaz (avisos, ayuda) se ve a resolución normal.
+
+- Para cambiarlo, editá la línea `startGame({ retro: { width: 320, height: 240, fps: 20 } })` en `src/main.js`. Con `retro: null` se ve a resolución y fps completos.
+- `dev.html` no usa el modo retro, para que el inspector sea cómodo.
+- Sin antialiasing en modo retro, a propósito.
+
 ## Personaje (jugador)
 
 El jugador se mueve en tercera persona con la cámara siguiéndolo. Código en `src/actors/player.js`; parámetros en `data/tables/player.json`.

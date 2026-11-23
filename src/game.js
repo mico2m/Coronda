@@ -12,13 +12,16 @@ import { createPlayer } from './actors/player.js';
 
 const _focus = new THREE.Vector3();
 
-export async function startGame({ dev = false } = {}) {
+// retro: { width, height, fps } -> se dibuja a esa resolución fija y se escala a toda la pantalla,
+// con un máximo de fps cuadros por segundo (estilo consola vieja). null = resolución y fps completos.
+export async function startGame({ dev = false, retro = null } = {}) {
   const stage = document.getElementById('stage');
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: !retro });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(retro ? 1 : Math.min(window.devicePixelRatio || 1, 2));
   stage.appendChild(renderer.domElement);
+  if (retro) stage.classList.add('retro');
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 2000);
@@ -32,6 +35,12 @@ export async function startGame({ dev = false } = {}) {
   const fade = createFade({ duration: 0.6 });
 
   function resize() {
+    if (retro) { // resolución interna fija; el navegador escala la imagen (ver css .retro)
+      renderer.setSize(retro.width, retro.height, false);
+      camera.aspect = retro.width / retro.height;
+      camera.updateProjectionMatrix();
+      return;
+    }
     const w = stage.clientWidth || 1;
     const h = stage.clientHeight || 1;
     renderer.setSize(w, h);
@@ -67,7 +76,11 @@ export async function startGame({ dev = false } = {}) {
   if (dev) window.addEventListener('keydown', (e) => { if (e.code === 'KeyC' && !e.repeat && player) setMode(mode === 'player' ? 'free' : 'player'); });
 
   let last = performance.now();
+  const interval = retro?.fps ? 1000 / retro.fps : 0;
   function frame(now) {
+    requestAnimationFrame(frame);
+    // Límite de cuadros: se salta el cuadro si todavía no pasó el intervalo (2 ms de margen por el redondeo del navegador)
+    if (interval && now - last < interval - 2) return;
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
     controls.update(dt);
@@ -78,7 +91,6 @@ export async function startGame({ dev = false } = {}) {
       else doors.update(camera.position);
     }
     renderer.render(scene, camera);
-    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 

@@ -19,10 +19,14 @@
 <div class="app">
   <div id="stage" aria-label="Escena 3D"></div>
 
+  <button id="inspectToggle" class="inspect-toggle" type="button" aria-pressed="true">Inspector: activado (I)</button>
+  <div class="crosshair" id="crosshair" aria-hidden="true"></div>
+  <aside class="inspector" id="inspector" aria-live="polite" aria-label="Información del objeto"></aside>
+
   <div class="loading" id="loading" aria-live="polite" hidden></div>
 
   <div class="hint" id="hint">
-    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Espacio</kbd> subir · <kbd>Shift</kbd> bajar · arrastrar para mirar · rueda para la velocidad (<b id="speedOut">6</b> m/s)
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Espacio</kbd> subir · <kbd>Shift</kbd> bajar · arrastrar para mirar · <kbd>I</kbd> inspector · rueda para la velocidad (<b id="speedOut">6</b> m/s)
   </div>
 
   <div class="pad" id="pad" aria-label="Controles táctiles">

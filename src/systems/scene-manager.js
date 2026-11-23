@@ -68,6 +68,12 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
       try {
         const gltf = await loadGLB(room.model, (p) => ui.setStatus(`Cargando sala "${room.id}"… ${Math.round(p * 100)}%`));
         gltf.scene.name = `room:${room.id}`;
+        // Para el inspector: de qué archivo y sala viene cada objeto
+        gltf.scene.userData.isRoomRoot = true;
+        gltf.scene.traverse((o) => {
+          o.userData.sourceFile = room.model;
+          o.userData.roomId = room.id;
+        });
         group.add(gltf.scene);
       } catch {
         missing.push(room.model);
@@ -86,5 +92,10 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     return data;
   }
 
-  return { loadScene, unload, get current() { return current?.data ?? null; } };
+  return {
+    loadScene,
+    unload,
+    get current() { return current?.data ?? null; },
+    get root() { return current?.group ?? null; },
+  };
 }

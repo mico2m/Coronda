@@ -57,8 +57,14 @@ export async function startGame({ dev = false } = {}) {
     const sceneManager = createSceneManager({ scene, camera, controls, audio, ui, scenesTable });
 
     if (dev) {
-      const { createInspector } = await import('./systems/inspector.js');
-      inspector = createInspector({ scene, camera, getRoot: () => sceneManager.root });
+      try {
+        const { createInspector } = await import('./systems/inspector.js');
+        inspector = createInspector({ scene, camera, getRoot: () => sceneManager.root });
+      } catch (err) {
+        // Si el inspector no carga, el mundo igual se muestra
+        console.error(err);
+        ui.setStatus('No se pudo cargar el inspector (falta src/systems/inspector.js).');
+      }
     }
 
     const startId = Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0];

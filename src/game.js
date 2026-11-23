@@ -12,12 +12,12 @@ import { createPlayer } from './actors/player.js';
 
 const _focus = new THREE.Vector3();
 
-// retro: { width, height, fps } -> se dibuja a esa resolución fija y se escala a toda la pantalla,
+// retro: { width, height, fps, antialias } -> se dibuja a esa resolución fija y se escala a toda la pantalla,
 // con un máximo de fps cuadros por segundo (estilo consola vieja). null = resolución y fps completos.
 export async function startGame({ dev = false, retro = null } = {}) {
   const stage = document.getElementById('stage');
 
-  const renderer = new THREE.WebGLRenderer({ antialias: !retro });
+  const renderer = new THREE.WebGLRenderer({ antialias: retro?.antialias ?? true });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setPixelRatio(retro ? 1 : Math.min(window.devicePixelRatio || 1, 2));
   stage.appendChild(renderer.domElement);

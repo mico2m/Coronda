@@ -58,7 +58,7 @@ Coronda/
 
 - Para cambiarlo, editá la línea `startGame({ retro: { width: 320, height: 240, fps: 20 } })` en `src/main.js`. Con `retro: null` se ve a resolución y fps completos.
 - `dev.html` no usa el modo retro, para que el inspector sea cómodo.
-- Sin antialiasing en modo retro, a propósito.
+- `antialias: true` suaviza los bordes dentro de los 320×240 (con `false` quedan dentados, más crudo).
 
 ## Personaje (jugador)
 

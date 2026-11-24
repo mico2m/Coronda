@@ -223,12 +223,15 @@ export function createTextbox({ renderer, retro = null }) {
 
     // Opciones
     if (state.choicesVisible) {
+      let budget = state.choiceShown ?? Infinity; // letras ya escritas de las opciones
+      const picking = state.picking ?? true;
       choices.forEach((c, i) => {
         const l = layoutLine(c);
         const cx = b.x + STYLE.padX + 12;
-        drawRun(l.chars, cx, y, STYLE.choice);
-        hits.push({ i, x: b.x, y: y - 1, w: b.w, h: STYLE.lineHeight });
-        if (i === state.sel) { // flechita ►
+        if (budget > 0) drawRun(l.chars, cx, y, STYLE.choice, budget);
+        budget -= l.chars.length;
+        if (picking) hits.push({ i, x: b.x, y: y - 1, w: b.w, h: STYLE.lineHeight });
+        if (picking && i === state.sel) { // flechita ►
           const ax = b.x + STYLE.padX + (reduceMotion() ? 0 : Math.round(Math.sin(blink * 8) + 1) - 1);
           for (let k = 0; k < 4; k++) px(ax + k, y + 2 + k, 1, 7 - k * 2, STYLE.cursor);
         }

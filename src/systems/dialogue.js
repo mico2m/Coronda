@@ -36,6 +36,7 @@ import { flags } from './flags.js';
 
 const DIR = 'data/dialogues/';
 const CPS = 45; // letras por segundo de la máquina de escribir
+const CHOICE_PAUSE = 0.35; // segundos de pausa entre la pregunta y las opciones (que después se escriben como el texto)
 const reduceMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const dialoguePath = (id) => (/[\\/]/.test(id) ? id : `${DIR}${id.replace(/\.json$/i, '')}.json`);
 
@@ -193,6 +194,9 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
     s.shown = reduceMotion() ? s.count : 0;
     s.picking = false;
     s.choices = [];
+    s.choiceTotal = 0;
+    s.choiceShown = 0;
+    s.choiceWait = 0;
     s.sel = 0;
     s.name = s.node.speaker ?? s.entry.talk.speaker ?? s.script.speaker ?? s.entry.talk.defaultSpeaker;
     sr.textContent = pg.text.replace(/\n/g, ' ');
@@ -203,14 +207,16 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
   // Le pasa a la caja lo que tiene que dibujar
   function paint() {
     const done = s.shown >= s.count;
-    const more = !done || s.picking ? null
+    const more = !done || s.choices.length ? null
       : s.page < s.pages.length - 1 || s.node.next ? 'next' : 'end';
     textbox.show({
       name: s.name,
       page: s.pages[s.page],
       shown: Math.floor(s.shown),
       choices: s.choices.map((c) => c.text),
-      choicesVisible: s.picking,
+      choicesVisible: s.choices.length > 0,
+      choiceShown: s.picking ? Infinity : Math.floor(s.choiceShown), // letras de las opciones ya escritas
+      picking: s.picking, // la flechita aparece recién cuando se puede elegir
       reserve: s.page === s.pages.length - 1 ? s.node.choices.length : 0, // lugar para las opciones que vienen
       sel: s.sel,
       more,
@@ -221,8 +227,12 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
   function pageDone() {
     const last = s.page >= s.pages.length - 1;
     if (last && s.node.choices.length) {
-      s.picking = true;
+      // Las opciones se escriben después de la pregunta, con una pausita antes (como en Ocarina)
       s.choices = s.node.choices;
+      s.choiceTotal = s.choices.reduce((a, c) => a + [...c.text].length, 0);
+      s.choiceShown = 0;
+      s.choiceWait = reduceMotion() ? 0 : CHOICE_PAUSE;
+      if (reduceMotion()) { s.choiceShown = s.choiceTotal; s.picking = true; }
       sr.textContent = `${s.pages[s.page].text.replace(/\n/g, ' ')} Opciones: ${s.choices.map((c, i) => `${i + 1}. ${c.text}`).join('. ')}`;
     }
     paint();
@@ -237,6 +247,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
   function advance() {
     if (!s) return;
     if (s.shown < s.count) { s.shown = s.count; pageDone(); return; } // completa la página
+    if (s.choices.length && !s.picking) { s.choiceShown = s.choiceTotal; s.picking = true; paint(); return; } // completa las opciones
     if (s.picking) { choose(s.sel); return; }
     if (s.page < s.pages.length - 1) { s.page++; showPage(); return; }
     if (s.node.next) goto(s.node.next); else end();
@@ -306,6 +317,14 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
           s.shown = Math.min(s.count, s.shown + CPS * dt);
           if (s.shown >= s.count) pageDone();
           else if (Math.floor(s.shown) !== before) paint();
+        } else if (s.choices.length && !s.picking) { // escribiendo las opciones
+          if (s.choiceWait > 0) s.choiceWait -= dt;
+          else {
+            const before = Math.floor(s.choiceShown);
+            s.choiceShown = Math.min(s.choiceTotal, s.choiceShown + CPS * dt);
+            if (s.choiceShown >= s.choiceTotal) s.picking = true;
+            if (s.picking || Math.floor(s.choiceShown) !== before) paint();
+          }
         }
         return;
       }

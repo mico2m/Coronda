@@ -29,7 +29,8 @@ export const STYLE = {
   choice: '#6be36b',     // opciones (verdes, como en Ocarina)
   cursor: '#58d6ff',     // flechita de la opción elegida
   more: '#58e070',       // triángulo "sigue" / cuadrado "terminó"
-  baseHeight: 240,       // sin modo retro: alto virtual de la pantalla (se usa un múltiplo entero del tamaño real)
+  baseHeight: 240,       // la caja se dibuja como si la pantalla tuviera este alto, sea cual sea la resolución del juego.
+                         // Más chico = caja y letra más grandes (ej. 200); más grande = más chicas (ej. 300)
 };
 
 // Letras que la fuente no tiene: se reemplazan por parecidas
@@ -85,16 +86,13 @@ export function createTextbox({ renderer, retro = null }) {
   let boxRect = null;
   const reduceMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-  // Resolución virtual: la del modo retro, o un múltiplo entero de la pantalla real (para que los píxeles sean parejos)
+  // Resolución de la caja: siempre STYLE.baseHeight (240) de alto y el ancho que corresponda a la pantalla, sin importar
+  // a qué resolución corre el juego (320x240, 800x600 o pantalla completa). Así la caja y la letra miden siempre lo mismo
+  // en proporción a la pantalla, como en Ocarina. Después se estira a la imagen del juego con píxeles nítidos.
   function fit() {
-    let w, h;
-    if (retro) { w = retro.width; h = retro.height; }
-    else {
-      const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-      const k = Math.max(1, Math.round(size.y / STYLE.baseHeight));
-      w = Math.max(1, Math.floor(size.x / k));
-      h = Math.max(1, Math.floor(size.y / k));
-    }
+    const size = retro ? { x: retro.width, y: retro.height } : renderer.getDrawingBufferSize(new THREE.Vector2());
+    const h = STYLE.baseHeight;
+    const w = Math.max(1, Math.round((size.x * h) / Math.max(1, size.y)));
     if (w !== W || h !== H) {
       W = canvas.width = w;
       H = canvas.height = h;

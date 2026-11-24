@@ -194,6 +194,8 @@ Se arma igual que las puertas y las colisiones: con **propiedades personalizadas
 
 **La caja de texto es parte de la imagen del juego**, como en Ocarina: se dibuja a la misma resolución (320×240), con letra de píxeles, y se escala y recorta junto con el mundo. Código: `src/ui/textbox.js` (dibujo) y `src/ui/pixel-font.js` (la fuente, Spleen 6×12 con acentos, ñ, ¿ y ¡).
 - Los renglones se cortan solos según el ancho de la caja, y si un texto no entra en **4 renglones** sigue en otra caja (no hace falta partirlo a mano). La última caja deja lugar a las opciones.
+- Las opciones no aparecen de golpe: después de la pregunta hay una pausita y se escriben letra por letra; recién ahí aparece la flechita para elegir (`E` las completa al instante). La pausa se cambia en `CHOICE_PAUSE`, arriba de `src/systems/dialogue.js`.
+- La caja mide lo mismo en proporción a la pantalla aunque el juego corra a otra resolución (ej. 800×600): se dibuja como si la pantalla tuviera 240 de alto. Para agrandarla o achicarla, cambiá `baseHeight` en `STYLE` (menos = más grande).
 - El nombre del que habla va en una pestañita arriba; las opciones en verde con una flechita ▶; abajo a la derecha, **▼** = sigue y **■** = termina.
 - La caja mide siempre lo mismo (4 renglones); si el texto es corto queda **centrado en el medio**, como en Ocarina.
 - Colores, tamaño, renglones por caja y márgenes, y la alineación (`valign`: `center`/`top`; `align`: `left`/`center`) se cambian en `STYLE`, arriba de `src/ui/textbox.js`.

@@ -1,0 +1,33 @@
+{
+  "speed": 1.4,
+  "start": "inicio",
+  "nodes": {
+    "inicio": {
+      "point": "npc_tokse",
+      "wait": 2,
+      "next": "fuente"
+    },
+    "fuente": {
+      "point": "ruta_tokse_1",
+      "wait": 2,
+      "waitMax": 1,
+      "anim": "saludar"
+    }
+  },
+  "editor": {
+    "nodes": {
+      "inicio": {
+        "x": 380,
+        "y": 30
+      },
+      "fuente": {
+        "x": 720,
+        "y": 30
+      }
+    },
+    "start": {
+      "x": 20,
+      "y": 40
+    }
+  }
+}

@@ -132,3 +132,46 @@
 .de-hl-input:focus { box-shadow: inset 0 0 0 2px var(--accent); }
 .de-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--muted); font-size: 12px; }
 .de-count { margin-left: auto; }
+
+/* Panel de NPC (systems/npc-editor.js) */
+.ne-toggle {
+  position: absolute; top: 92px; left: 12px; z-index: 3;
+  padding: 8px 12px; border-radius: 8px; font: 500 13px var(--font-body);
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line); cursor: pointer;
+}
+.ne-toggle[aria-pressed="true"] { border-color: var(--accent); }
+.ne {
+  position: absolute; top: 132px; left: 12px; z-index: 3; width: 340px; max-width: calc(100% - 24px);
+  max-height: calc(100% - 200px); display: flex; flex-direction: column;
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 10px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font: 13px/1.4 var(--font-body);
+}
+.ne[hidden] { display: none; }
+.ne-head, .ne-foot { display: flex; align-items: center; gap: 6px; padding: 8px 10px; }
+.ne-head { border-bottom: 1px solid var(--line); }
+.ne-foot { border-top: 1px solid var(--line); flex-wrap: wrap; }
+.ne-title { font: 600 15px var(--font-display); }
+.ne-sel { flex: 1; min-width: 0; padding: 5px 6px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; }
+.ne-btn { padding: 6px 10px; border-radius: 7px; font: 500 13px var(--font-body); background: var(--bg); color: var(--fg); border: 1px solid var(--line); cursor: pointer; }
+.ne-btn:hover:not(:disabled) { border-color: var(--accent); }
+.ne-btn:disabled { opacity: .45; cursor: default; }
+.ne-primary.dirty { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.ne-info { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.ne-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; overflow-wrap: anywhere; }
+.ne-k { width: 52px; color: var(--muted); flex: none; }
+.ne-muted { color: var(--muted); font-size: 12px; }
+.ne-body { flex: 1; overflow-y: auto; padding: 4px 6px; min-height: 60px; }
+.ne-empty, .ne-note { margin: 8px 4px; color: var(--muted); font-size: 12px; }
+.ne-row { display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 7px; }
+.ne-row:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.ne-row.is-idle { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ne-row.is-junk { opacity: .55; }
+.ne-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ne-clip { overflow-wrap: anywhere; font-weight: 500; }
+.ne-meta { color: var(--muted); font-size: 11px; }
+.ne-mini { width: 28px; height: 28px; padding: 0; flex: none; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); cursor: pointer; font-size: 13px; }
+.ne-mini:hover:not(:disabled) { border-color: var(--accent); color: var(--fg); }
+.ne-mini.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.ne-mini:disabled { opacity: .35; cursor: default; }
+.ne-status { flex: 1 1 100%; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.ne-status.err { color: #d4543a; }

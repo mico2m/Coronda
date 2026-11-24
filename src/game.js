@@ -193,4 +193,6 @@ export async function startGame({ dev = false, retro = null } = {}) {
     console.error(err);
     ui.setStatus(String(err.message || err));
   }
+  // Para las herramientas del modo desarrollador (panel de NPC, etc.)
+  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null };
 }

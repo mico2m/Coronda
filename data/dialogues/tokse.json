@@ -3,7 +3,7 @@
   "start": [
     {
       "if": {
-        "veces_tokse": ">=2"
+        "veces_tokse": ">=3"
       },
       "goto": "pesado"
     },
@@ -28,7 +28,7 @@
     },
     "pesado": {
       "text": "No rompas los cocos.",
-      "next": "chau"
+      "next": "menu"
     },
     "menu": {
       "text": "¿Necesitás algo?",
@@ -92,8 +92,8 @@
         "y": 268
       },
       "chau": {
-        "x": 1130,
-        "y": 464
+        "x": 1121,
+        "y": 516
       }
     },
     "start": {

@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Coronda Studio</title>
+<style>
+:root { --bg:#1e1f22; --pn:#25262a; --bd:#34363b; --tx:#d7d9dd; --mu:#8a8f98; --ac:#4f9cf9; }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--tx); font: 13px system-ui, sans-serif; }
+#app { display: grid; grid-template-columns: 230px minmax(0,1fr) 6px var(--pw, 45%); height: 100%; }
+#side, #main, #prev { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#side { background: var(--pn); border-right: 1px solid var(--bd); }
+.bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--bd); background: var(--pn); }
+.bar b { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button, select { background: #2f3136; color: var(--tx); border: 1px solid var(--bd); border-radius: 4px; padding: 3px 8px; font: inherit; cursor: pointer; }
+button:hover { border-color: var(--ac); }
+label { display: flex; align-items: center; gap: 4px; color: var(--mu); white-space: nowrap; }
+#tree { flex: 1; overflow: auto; padding: 4px 0 20px; }
+details > summary { cursor: pointer; padding: 2px 8px; list-style: none; color: var(--mu); }
+details > summary::before { content: '▸ '; } details[open] > summary::before { content: '▾ '; }
+details > div { padding-left: 12px; }
+.file { padding: 2px 8px 2px 16px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file:hover { background: #2f3136; } .file.active { background: #34425a; }
+.file.bin { color: var(--mu); opacity: .55; cursor: default; } .file.dirty::after { content: ' ●'; color: #e5c07b; }
+#tabs { display: flex; overflow-x: auto; background: var(--pn); border-bottom: 1px solid var(--bd); min-height: 31px; }
+.tab { display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-right: 1px solid var(--bd); cursor: pointer; white-space: nowrap; color: var(--mu); }
+.tab.active { color: var(--tx); background: var(--bg); box-shadow: inset 0 2px var(--ac); }
+.tab.dirty .t::after { content: ' ●'; color: #e5c07b; } .tab .x { opacity: .5; } .tab .x:hover { opacity: 1; }
+#ed { flex: 1; min-height: 0; }
+#split { cursor: col-resize; background: var(--bd); } #split:hover { background: var(--ac); }
+#prev { background: #000; } #pv { flex: 1; border: 0; background: #fff; width: 100%; }
+#toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: #2f3136; border: 1px solid var(--bd); padding: 6px 12px; border-radius: 6px; opacity: 0; transition: opacity .15s; pointer-events: none; max-width: 70vw; }
+#toast.show { opacity: 1; } #toast.err { border-color: #e06c75; color: #ffb3ba; }
+#empty { margin: auto; color: var(--mu); }
+#modes { display: flex; } #modes button { border-radius: 0; } #modes button:first-child { border-radius: 4px 0 0 4px; } #modes button:last-child { border-radius: 0 4px 4px 0; }
+#modes button.on { border-color: var(--ac); color: var(--ac); }
+#nodes[hidden], #rnodes[hidden] { display: none; }
+
+/* Panel de NPC */
+#app { grid-template-columns: 300px minmax(0,1fr) 6px var(--pw, 45%); }
+#sideTabs { display: flex; border-bottom: 1px solid var(--bd); } #sideTabs button { flex: 1; border: 0; border-radius: 0; background: transparent; padding: 7px; color: var(--mu); border-bottom: 2px solid transparent; }
+#sideTabs button.on { color: var(--tx); border-bottom-color: var(--ac); }
+#filesPane, #npcPane { flex: 1; min-height: 0; display: flex; flex-direction: column; } #npcPane[hidden], #filesPane[hidden] { display: none; }
+#npcHead { display: flex; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--bd); } #npcSel { flex: 1; min-width: 0; }
+#npcInfo { padding: 6px 10px; border-bottom: 1px solid var(--bd); display: grid; gap: 3px; }
+#npcInfo .k { color: var(--mu); display: inline-block; width: 64px; } #npcInfo .m { color: var(--mu); } #npcInfo code { color: var(--ac); }
+#npcClips { flex: 1; overflow: auto; padding: 4px 0 20px; }
+.clip { display: flex; align-items: center; gap: 6px; padding: 3px 8px; } .clip:hover { background: #2f3136; } .clip.idle { background: #2c3a2f; } .clip.junk { opacity: .5; }
+.clip .nm { flex: 1; min-width: 0; } .clip .nm b { display: block; overflow: hidden; text-overflow: ellipsis; font-weight: 500; } .clip .nm span { color: var(--mu); font-size: 11px; }
+.clip button { width: 26px; padding: 2px 0; text-align: center; } .clip button.on { border-color: var(--ac); color: var(--ac); } .clip button:disabled { opacity: .35; cursor: default; }
+#npcFoot { padding: 6px 10px; border-top: 1px solid var(--bd); color: var(--mu); font-size: 12px; min-height: 30px; } #npcFoot.err { color: #ffb3ba; }
+.note { padding: 8px 10px; color: var(--mu); font-size: 12px; }
+.de-clips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.de-clips > span { color: var(--muted); font-size: 12px; }
+.de-barfield { display: flex; align-items: center; gap: 4px; color: var(--muted); } .de-barfield input { width: 90px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: inherit; } .de-barfield input[type=number] { width: 64px; }
+/* Modificadores de ruta: tarjetas de color que se conectan a las paradas */
+.rt-mod { width: 230px; border-color: var(--mc); }
+.rt-mod .de-head { background: color-mix(in srgb, var(--mc) 16%, transparent); border-radius: 9px 9px 0 0; }
+.rt-ico { font-size: 15px; } .rt-kind { color: var(--mc); font: 600 12px var(--font-body); letter-spacing: .04em; text-transform: uppercase; }
+.rt-mod .de-port { border-color: var(--mc); } .rt-mod .de-port.on { background: var(--mc); }
+.de-link.modlink { stroke-width: 2.5; stroke-dasharray: 7 4; opacity: .9; }
+.rt-modrow { padding-left: 14px; } .rt-sock { position: absolute; left: -7px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 3px; background: var(--bg); border: 2px dashed var(--muted); }
+.rt-chips { display: flex; flex-wrap: wrap; gap: 4px; } .rt-none { color: var(--muted); font-size: 12px; }
+.rt-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 4px 1px 8px; border-radius: 999px; border: 1px solid var(--mc); background: color-mix(in srgb, var(--mc) 14%, transparent); font-size: 12px; }
+.rt-chip button { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0 4px; font-size: 13px; } .rt-chip button:hover { color: var(--fg); }
+.de-btn.on { border-color: var(--accent); color: var(--accent); }
+.de-row input[type=number], .de-row .de-field input { min-width: 0; } .de-row .de-field { flex: 1; min-width: 0; margin-top: 0; }
+.de-field select { width: 100%; padding: 5px 7px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: inherit; }
+.de-chip { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--hl-anim); cursor: pointer; font: 12px var(--font-body); }
+.de-chip:hover { border-color: var(--hl-anim); }
+/* Editor de diálogos por nodos (studio/dialogue-editor.js) */
+/* Editor de diálogos por nodos (systems/dialogue-editor.js) */
+.de { --bg:#1e1f22; --scene:#17181a; --panel:#25262a; --fg:#d7d9dd; --muted:#8a8f98; --line:#34363b; --accent:#2dd4bf;
+  --font-body: system-ui, sans-serif; --font-display: system-ui, sans-serif;
+  position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); font: 13px/1.4 var(--font-body); outline: none; }
+.de[hidden] { display: none; }
+.de-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.de-btn { padding: 6px 10px; border-radius: 7px; font: 500 13px var(--font-body); background: var(--bg); color: var(--fg); border: 1px solid var(--line); cursor: pointer; }
+.de-btn:hover { border-color: var(--accent); }
+.de-status { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.de-status.err { color: #d4543a; }
+.de-spacer { flex: 1; }
+.de-canvas { position: relative; flex: 1; overflow: hidden; cursor: grab; touch-action: none;
+  background-color: var(--scene); background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 24px 24px; }
+.de-canvas.panning { cursor: grabbing; }
+.de-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.de-links { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.de-link { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.de-link.tmp { stroke-dasharray: 6 5; opacity: .8; }
+.de-link.broken { stroke: #d4543a; stroke-dasharray: 5 4; }
+.de-empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--muted); pointer-events: none; }
+.de-empty[hidden] { display: none; }
+.de-node { position: absolute; width: 280px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .12); cursor: default; }
+.de-startnode { border-color: var(--accent); }
+.de-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line); cursor: move; position: relative; }
+.de-badge { font: 600 12px var(--font-display); letter-spacing: .06em; color: var(--accent); }
+.de-in { position: absolute; left: -7px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: var(--bg); border: 2px solid var(--accent); }
+.de-id { flex: 1; min-width: 0; font: 600 13px var(--font-display); background: transparent; color: var(--fg); border: 1px solid transparent; border-radius: 5px; padding: 2px 4px; }
+.de-id:hover, .de-id:focus { border-color: var(--line); background: var(--bg); }
+.de-body { padding: 8px; display: grid; gap: 6px; }
+.de-body input, .de-body textarea, .de-body summary { font: 13px/1.4 var(--font-body); }
+.de-body input, .de-body textarea { width: 100%; box-sizing: border-box; padding: 5px 7px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
+.de-body textarea { resize: none; overflow: hidden; min-height: 60px; }
+.de-body input:focus, .de-body textarea:focus, .de-id:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.de-row { display: flex; align-items: center; gap: 6px; position: relative; padding-right: 14px; }
+.de-row > span:first-child { color: var(--muted); flex: 1; }
+.de-rule { display: flex; align-items: center; gap: 4px; position: relative; padding-right: 14px; }
+.de-choice { display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--scene); }
+.de-cond { font-size: 12px; color: var(--muted); }
+.de-hint { margin: 0; color: var(--muted); font-size: 12px; }
+.de-port { position: absolute; right: -7px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%;
+  background: var(--bg); border: 2px solid var(--muted); cursor: crosshair; }
+.de-port.on { background: var(--accent); border-color: var(--accent); }
+.de-port:hover { border-color: var(--accent); }
+.de-mini { flex: none; width: 24px; height: 24px; padding: 0; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; line-height: 1; }
+.de-mini:hover:not(:disabled) { border-color: var(--accent); }
+.de-mini:disabled { opacity: .35; cursor: default; }
+.de-add { justify-self: start; padding: 3px 8px; border-radius: 6px; border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer; font: 12px var(--font-body); }
+.de-add:hover { color: var(--accent); border-color: var(--accent); }
+.de-more summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.de-more { display: grid; gap: 6px; }
+.de-field { display: grid; gap: 2px; margin-top: 4px; }
+.de-field > span { color: var(--muted); font-size: 12px; }
+
+/* Texto de los nodos: vista con colores y caja grande para escribir */
+.de {
+  --hl-anim: #c084fc; --hl-nl: #fbbf24; --hl-page: #60a5fa;
+}
+.hl-anim { color: var(--hl-anim); background: color-mix(in srgb, var(--hl-anim) 16%, transparent); border-radius: 3px; font-weight: 600; }
+.hl-lit { color: var(--hl-nl); background: color-mix(in srgb, var(--hl-nl) 22%, transparent); border-radius: 3px; font-weight: 600; }
+.hl-nl, .hl-page { position: relative; display: inline-block; width: 0; height: 1.2em; vertical-align: top; }
+.hl-nl::after { content: "\21B5"; position: absolute; left: 2px; top: 0; color: var(--hl-nl); font-weight: 700; }
+.hl-page::after { content: "\00B6"; position: absolute; left: 2px; top: 0; color: var(--hl-page); font-weight: 700; }
+.hl-nl-demo { color: var(--hl-nl); font-weight: 700; }
+.hl-page-demo { color: var(--hl-page); font-weight: 700; }
+
+.de-preview { min-height: 56px; max-height: 160px; overflow: hidden; padding: 6px 8px; box-sizing: border-box; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--panel); cursor: text; white-space: pre-wrap; overflow-wrap: anywhere; position: relative; }
+.de-preview:hover, .de-preview:focus-visible { border-color: var(--accent); outline: none; }
+.de-ph { color: var(--muted); }
+
+.de-modal { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(0, 0, 0, .45); padding: 16px; }
+.de-modal[hidden] { display: none; }
+.de-modal-card { width: min(920px, 100%); height: min(680px, 100%); display: flex; flex-direction: column; gap: 10px; padding: 14px;
+  background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); box-sizing: border-box; }
+.de-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 600 15px var(--font-display); }
+.de-hl-wrap { position: relative; flex: 1; min-height: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.de-hl, .de-hl-input { position: absolute; inset: 0; margin: 0; padding: 12px 14px; box-sizing: border-box; border: 0; border-radius: 8px;
+  font: 17px/1.6 var(--font-body); letter-spacing: 0; white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; tab-size: 4;
+  scrollbar-gutter: stable; }
+.de-hl { overflow: hidden; pointer-events: none; color: var(--fg); }
+.de-hl-input { overflow-y: auto; resize: none; background: transparent; color: transparent; caret-color: var(--fg); outline: none; }
+.de-hl-input::placeholder { color: var(--muted); }
+.de-hl-input:focus { box-shadow: inset 0 0 0 2px var(--accent); }
+.de-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--muted); font-size: 12px; }
+.de-count { margin-left: auto; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <div id="sideTabs"><button id="tFiles" class="on">Archivos</button><button id="tNpc">NPC</button></div>
+    <div id="filesPane">
+      <div class="bar"><b id="proj">Proyecto</b><button id="bDlg" title="Diálogo nuevo">+ Diálogo</button><button id="bRoute" title="Ruta de NPC nueva">+ Ruta</button><button id="bNew" title="Archivo nuevo">+</button><button id="bRef" title="Actualizar árbol">⟳</button></div>
+      <div id="tree"></div>
+    </div>
+    <div id="npcPane" hidden>
+      <div id="npcHead"><select id="npcSel" title="NPC de la escena"></select><button id="bNpcGo" title="Lleva la cámara libre frente al NPC">Ir</button><button id="bNpcRef" title="Actualizar la lista (al cambiar de escena)">⟳</button></div>
+      <div id="npcInfo"></div>
+      <div id="npcClips"></div>
+      <div id="npcFoot"></div>
+    </div>
+  </div>
+  <div id="main">
+    <div class="bar"><b>Editor</b><span id="modes" hidden><button id="mNodes">Nodos</button><button id="mCode">Código</button></span><label><input type="checkbox" id="auto"> Autoguardar</label><button id="bSave">Guardar (Ctrl+S)</button></div>
+    <div id="tabs"></div>
+    <div id="ed"></div>
+    <div id="nodes" hidden></div>
+    <div id="rnodes" hidden></div>
+  </div>
+  <div id="split"></div>
+  <div id="prev">
+    <div class="bar">
+      <b>Vista previa</b>
+      <select id="page"><option value="/dev.html">dev.html</option><option value="/index.html">index.html</option></select>
+      <label><input type="checkbox" id="live" checked> Recarga auto</label>
+      <button id="bFlags" title="Borra lo que los NPC recuerdan (hablo_, veces_ y tus flags)">Reiniciar flags</button><button id="bReload" title="Recargar">⟳</button>
+    </div>
+    <iframe id="pv"></iframe>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const MON = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min';
+const LANG = { js: 'javascript', mjs: 'javascript', json: 'json', html: 'html', css: 'css', md: 'markdown', svg: 'xml' };
+const DLG = (n) => `{\n  "speaker": "${n.charAt(0).toUpperCase() + n.slice(1).replace(/_+/g, ' ')}",\n  "start": "inicio",\n  "nodes": {\n    "inicio": { "text": "Hola." }\n  }\n}\n`;
+const isDlg = (p) => /^data\/dialogues\/[^/]+\.json$/.test(p);
+const isRt = (p) => /^data\/routes\/[^/]+\.json$/.test(p);
+const isGraph = (p) => isDlg(p) || isRt(p); // se editan por nodos
+const RT = (n) => `{\n  "speed": 1.4,\n  "start": "a",\n  "nodes": {\n    "a": { "point": "", "wait": 2 }\n  }\n}\n`;
+const dlgName = (p) => p.split('/').pop().replace(/\.json$/i, '');
+const ext = (p) => (p.split('.').pop() || '').toLowerCase();
+const api = (p) => '/__api/file?p=' + encodeURIComponent(p);
+const expanded = new Set(['data', 'src', 'data/dialogues', 'data/scenes']);
+const quiet = new Map(); // archivos que guardó el propio Studio y ya están aplicados en vivo
+let files = [], open = new Map(), tabs = [], active = null, ed = null, nodeEd = null, routeEd = null;
+const graphEd = (p) => (isRt(p) ? routeEd : nodeEd);
+
+function toast(m, err) {
+  const t = $('#toast'); t.textContent = m; t.className = err ? 'show err' : 'show';
+  clearTimeout(toast.t); toast.t = setTimeout(() => (t.className = ''), err ? 4500 : 1200);
+}
+
+// ---------- Árbol ----------
+async function loadTree() {
+  const r = await (await fetch('/__api/tree')).json();
+  files = r.files; $('#proj').textContent = r.name;
+  const root = new Map();
+  for (const f of files) {
+    let m = root; const parts = f.p.split('/');
+    for (const d of parts.slice(0, -1)) { if (!m.has(d)) m.set(d, new Map()); m = m.get(d); }
+    m.set(parts.at(-1), f);
+  }
+  $('#tree').replaceChildren(build(root, ''));
+  mark();
+}
+function build(m, base) {
+  const frag = document.createDocumentFragment();
+  const isDir = (k) => m.get(k) instanceof Map;
+  const keys = [...m.keys()].sort((a, b) => (isDir(a) !== isDir(b) ? (isDir(a) ? -1 : 1) : a.localeCompare(b)));
+  for (const k of keys) {
+    const v = m.get(k);
+    if (v instanceof Map) {
+      const p = base + k, d = document.createElement('details'), s = document.createElement('summary'), box = document.createElement('div');
+      s.textContent = k; d.open = expanded.has(p);
+      d.addEventListener('toggle', () => (d.open ? expanded.add(p) : expanded.delete(p)));
+      box.appendChild(build(v, p + '/')); d.append(s, box); frag.appendChild(d);
+    } else {
+      const e = document.createElement('div');
+      e.className = 'file' + (v.t ? '' : ' bin'); e.textContent = k; e.dataset.p = v.p;
+      e.onclick = () => (v.t ? openFile(v.p) : toast('Archivo binario: se edita con Blender, Photoshop, etc.'));
+      frag.appendChild(e);
+    }
+  }
+  return frag;
+}
+function mark() {
+  document.querySelectorAll('.file').forEach((e) => {
+    e.classList.toggle('active', e.dataset.p === active);
+    e.classList.toggle('dirty', !!open.get(e.dataset.p)?.dirty);
+  });
+  const t = $('#tabs'); t.replaceChildren();
+  if (!tabs.length) { const e = document.createElement('span'); e.id = 'empty'; e.textContent = 'Elegí un archivo del árbol'; t.appendChild(e); }
+  for (const p of tabs) {
+    const el = document.createElement('div');
+    el.className = 'tab' + (p === active ? ' active' : '') + (open.get(p).dirty ? ' dirty' : '');
+    const n = document.createElement('span'); n.className = 't'; n.textContent = p.split('/').pop(); n.title = p;
+    const x = document.createElement('span'); x.className = 'x'; x.textContent = '×';
+    x.onclick = (e) => { e.stopPropagation(); closeTab(p); };
+    el.onclick = () => openFile(p); el.append(n, x); t.appendChild(el);
+  }
+}
+
+// ---------- Archivos abiertos (cada uno conserva su propio historial de Ctrl+Z) ----------
+async function openFile(p) {
+  if (active && open.has(active)) open.get(active).view = ed.saveViewState();
+  if (!open.has(p)) {
+    const r = await fetch(api(p));
+    if (!r.ok) return toast('No se pudo abrir ' + p, true);
+    const text = await r.text();
+    const model = monaco.editor.createModel(text, LANG[ext(p)] || 'plaintext', monaco.Uri.file('/' + p));
+    const o = { model, saved: text, dirty: false, view: null, t: 0, mode: isGraph(p) ? 'nodes' : 'code', self: false };
+    model.onDidChangeContent(() => {
+      o.dirty = model.getValue() !== o.saved; mark();
+      if ($('#auto').checked && o.dirty) { clearTimeout(o.t); o.t = setTimeout(() => save(p), 700); }
+      // Deshacer/rehacer o un cambio desde afuera: el editor de nodos se vuelve a dibujar (si el cambio lo hizo él mismo, no)
+      if (!o.self && p === active && o.mode === 'nodes') graphEd(p).load(model.getValue(), dlgName(p));
+    });
+    open.set(p, o);
+  }
+  if (!tabs.includes(p)) tabs.push(p);
+  active = p; const o = open.get(p);
+  ed.setModel(o.model); if (o.view) ed.restoreViewState(o.view);
+  ed.focus(); localStorage.setItem('studio:last', p); mark(); applyMode();
+}
+function closeTab(p) {
+  const o = open.get(p);
+  if (o.dirty && !confirm(`${p} tiene cambios sin guardar. ¿Cerrar igual?`)) return;
+  const i = tabs.indexOf(p); tabs.splice(i, 1); o.model.dispose(); open.delete(p);
+  if (active === p) { active = null; tabs.length ? openFile(tabs[Math.min(i, tabs.length - 1)]) : (ed.setModel(null), mark(), applyMode()); } else mark();
+}
+
+// ---------- Nodos / Código (solo para data/dialogues/*.json) ----------
+// Los dos modos editan el MISMO texto: el historial (Ctrl+Z) es uno solo, y guardar siempre guarda ese texto.
+function applyMode() {
+  const o = open.get(active), g = !!o && isGraph(active), nodes = g && o.mode === 'nodes', rt = g && isRt(active);
+  $('#modes').hidden = !g; $('#nodes').hidden = !(nodes && !rt); $('#rnodes').hidden = !(nodes && rt); $('#ed').style.display = nodes ? 'none' : '';
+  $('#mNodes').classList.toggle('on', nodes); $('#mCode').classList.toggle('on', g && !nodes);
+  if (nodes) { const e = graphEd(active); e.load(o.model.getValue(), dlgName(active)); e.show(); if (rt) collectFlags().then(() => routeEd.refresh()); }
+  else if (o) { ed.layout(); ed.focus(); }
+  if (!(nodes && rt)) routeEd?.hideRoute();
+}
+const setMode = (m) => { const o = open.get(active); if (o) { o.mode = m; applyMode(); } };
+const undoRedo = (k) => ed.trigger('studio', k, null);
+
+// ---------- Guardar ----------
+async function save(p = active) {
+  const o = open.get(p); if (!o) return;
+  const v = o.model.getValue();
+  if (ext(p) === 'json') { try { JSON.parse(v); } catch (e) { return toast('JSON inválido, no se guardó: ' + e.message, true); } }
+  const r = await fetch(api(p), { method: 'PUT', body: v });
+  if (!r.ok) return toast('Error al guardar: ' + (await r.text()), true);
+  o.saved = v; o.dirty = o.model.getValue() !== v; mark(); toast('Guardado ' + p);
+  if (!files.some((f) => f.p === p)) loadTree();
+}
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.code === 'KeyS') { e.preventDefault(); e.stopPropagation(); save(); return; }
+  // En el editor de nodos, Ctrl+Z / Ctrl+Y usan el historial del archivo (dentro de un campo de texto vale el deshacer del campo)
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.code === 'KeyZ' || e.code === 'KeyY') && (!$('#nodes').hidden || !$('#rnodes').hidden) && !e.target.closest?.('input,textarea')) {
+    e.preventDefault(); e.stopPropagation(); undoRedo(e.code === 'KeyY' || e.shiftKey ? 'redo' : 'undo');
+  }
+}, true);
+window.addEventListener('beforeunload', (e) => { if ([...open.values()].some((o) => o.dirty)) e.preventDefault(); });
+
+async function newFile() {
+  const q = (prompt('Ruta del archivo nuevo (ej: data/dialogues/maria.json)') || '').trim().replace(/^\/+/, '');
+  if (!q) return;
+  if (files.some((f) => f.p === q)) return toast('Ese archivo ya existe', true);
+  const body = isDlg(q) ? DLG(dlgName(q)) : ext(q) === 'json' ? '{}\n' : '';
+  const r = await fetch(api(q), { method: 'PUT', body });
+  if (!r.ok) return toast('No se pudo crear', true);
+  await loadTree(); openFile(q);
+}
+
+async function newRoute() {
+  const n = (prompt('Nombre de la ruta (el mismo que va en npc_ruta). Ej: tokse') || '').trim().replace(/\s+/g, '_').replace(/\.json$/i, '').replace(/[^\p{L}\p{N}_-]/gu, '');
+  if (!n) return;
+  const q = `data/routes/${n}.json`;
+  if (files.some((f) => f.p === q)) return toast('Ya existe esa ruta', true);
+  const r = await fetch(api(q), { method: 'PUT', body: RT(n) });
+  if (!r.ok) return toast('No se pudo crear', true);
+  expanded.add('data/routes'); await loadTree(); openFile(q);
+}
+
+async function newDialogue() {
+  const n = (prompt('Nombre del diálogo (el mismo que va en npc_dialogo). Ej: maria') || '').trim().replace(/\s+/g, '_').replace(/\.json$/i, '').replace(/[^\p{L}\p{N}_-]/gu, '');
+  if (!n) return;
+  const q = `data/dialogues/${n}.json`;
+  if (files.some((f) => f.p === q)) return toast('Ya existe ese diálogo', true);
+  const r = await fetch(api(q), { method: 'PUT', body: DLG(n) });
+  if (!r.ok) return toast('No se pudo crear', true);
+  await loadTree(); openFile(q);
+}
+
+// ---------- Vista previa ----------
+const pv = $('#pv');
+const setPreview = () => (pv.src = $('#page').value);
+function reload(path) {
+  if (Date.now() - (quiet.get(path) || 0) < 2500) return; // lo guardó el panel de NPC: ya está aplicado en vivo
+  if (isRt(path)) { // una ruta: los NPC la vuelven a leer sin recargar la vista previa
+    try { pv.contentWindow.coronda.npcs.reloadRoute(dlgName(path)); return; } catch { /* recarga completa */ }
+  }
+  if (/^data\/dialogues\/[^/]+\.json$/.test(path)) { // un diálogo: el juego lo lee al hablar, no hace falta recargar (se pierde el lugar en el mundo)
+    try { pv.contentWindow.coronda.forgetJSON(path); return; } catch { /* recarga completa */ }
+  }
+  if (!$('#live').checked || /\.(md|txt)$/i.test(path)) return;
+  if (/\.css$/i.test(path)) { // los estilos se cambian sin recargar: no perdés tu lugar en el mundo
+    try { pv.contentDocument.querySelectorAll('link[rel=stylesheet]').forEach((l) => { const u = new URL(l.href); u.searchParams.set('_', Date.now()); l.href = u; }); return; } catch { /* recarga completa */ }
+  }
+  try { pv.contentWindow.location.reload(); } catch { setPreview(); }
+}
+function listen() {
+  const es = new EventSource('/__events');
+  es.onmessage = async (e) => {
+    const m = JSON.parse(e.data);
+    if (m.ext) {
+      if (!files.some((f) => f.p === m.path)) loadTree();
+      const o = open.get(m.path);
+      if (o && !o.dirty) { const t = await (await fetch(api(m.path))).text(); if (t !== o.saved) { o.saved = t; o.model.setValue(t); } }
+    }
+    reload(m.path);
+  };
+}
+
+
+// ---------- NPC y animaciones ----------
+// Todo se ve en vivo en la vista previa. Idle (★) y animación al hablar (💬) se guardan por modelo en data/tables/npcs.json.
+const game = () => { try { return pv.contentWindow.coronda || null; } catch { return null; } };
+const NPC_TABLE = 'data/tables/npcs.json';
+const KIND_LABEL = { idle: 'idle', talk: 'habla', greet: 'saludo', walk: 'camina', run: 'corre', junk: 'basura', other: 'otro' };
+let npcTab = false, npcSel = null, npcListRef = null, npcTable = null, npcSaveT = 0, previewing = null;
+const npcFoot = (m, err) => { const f = $('#npcFoot'); f.textContent = m; f.classList.toggle('err', !!err); };
+
+function showTab(which) {
+  npcTab = which === 'npc';
+  $('#filesPane').hidden = npcTab; $('#npcPane').hidden = !npcTab;
+  $('#tFiles').classList.toggle('on', !npcTab); $('#tNpc').classList.toggle('on', npcTab);
+  if (npcTab) refreshNpc(true); else stopPreview(true);
+}
+async function loadNpcTable() {
+  try { const r = await fetch(api(NPC_TABLE)); npcTable = r.ok ? JSON.parse(await r.text()) : {}; } catch { npcTable = {}; }
+}
+function refreshNpc(force) {
+  const g = game();
+  if (!g?.npcs) { $('#npcInfo').textContent = 'Esperando la vista previa…'; $('#npcClips').replaceChildren(); return; }
+  if (!force && g.npcs.list === npcListRef) return;
+  npcListRef = g.npcs.list;
+  const keep = npcSel && g.npcs.list.includes(npcSel) ? npcSel : null;
+  const sel = $('#npcSel'); sel.replaceChildren();
+  g.npcs.list.forEach((n, i) => sel.append(new Option(n.id + (g.npcs.list.filter((o) => o.id === n.id).length > 1 ? ` #${i + 1}` : ''), String(i))));
+  npcSel = keep ?? g.npcs.list[0] ?? null;
+  if (npcSel) sel.value = String(g.npcs.list.indexOf(npcSel));
+  drawNpc();
+}
+function line(parent, k, ...rest) { const d = document.createElement('div'); const kk = document.createElement('span'); kk.className = 'k'; kk.textContent = k; d.append(kk, ...rest); parent.appendChild(d); return d; }
+const tag = (t, text, cls) => { const e = document.createElement(t); e.textContent = text; if (cls) e.className = cls; return e; };
+function drawNpc() {
+  stopPreview(false);
+  const g = game(), info = $('#npcInfo'), box = $('#npcClips'); info.replaceChildren(); box.replaceChildren();
+  if (!g?.npcs || !npcSel) { info.appendChild(tag('div', 'No hay NPC en esta escena (empties npc_… en el .glb o "actors" en el JSON).', 'note')); return; }
+  const n = npcSel;
+  const src = { npc: 'fijado en este NPC (npc_anim): pisa la tabla', modelo: 'definido para el modelo', auto: 'detectado solo' }[n.idleSource] ?? '';
+  line(info, 'Modelo', tag('code', n.modelKey));
+  line(info, 'Idle', tag('b', n.idleName ?? '(ninguno)'), tag('span', n.idleName ? ' · ' + src : '', 'm'));
+  const d = line(info, 'Diálogo');
+  if (n.talk?.dialogue) {
+    const path = `data/dialogues/${String(n.talk.dialogue).replace(/\.json$/i, '')}.json`;
+    const b = tag('button', 'Abrir «' + n.talk.dialogue + '»'); b.onclick = () => (files.some((f) => f.p === path) ? openFile(path) : toast('No existe ' + path, true)); d.appendChild(b);
+  } else d.appendChild(tag('span', n.talk ? '(texto simple: npc_texto)' : '(sin diálogo)', 'm'));
+  const rr = line(info, 'Ruta');
+  if (n.routeName) {
+    const rp = `data/routes/${n.routeName.replace(/\.json$/i, '')}.json`;
+    const b = tag('button', 'Abrir «' + n.routeName + '»'); b.onclick = () => (files.some((f) => f.p === rp) ? openFile(rp) : toast('No existe ' + rp + ' (creala con + Ruta)', true)); rr.appendChild(b);
+    if (n.route) rr.appendChild(tag('span', ` · ${n.route.state === 'walk' ? 'caminando' : n.route.state === 'wait' ? 'esperando' : 'detenido'}`, 'm'));
+  } else rr.appendChild(tag('span', '(no camina: npc_ruta)', 'm'));
+  line(info, 'Al hablar', tag('b', n.talk ? (n.talk.talkAnim ?? '(sigue en idle)') : '—'));
+  line(info, 'Caminar', tag('b', n.walkName ?? '(automático)'));
+  const clips = g.npcs.clipsOf(n);
+  if (!clips.length) { box.appendChild(tag('div', 'El .glb no trae animaciones (exportá con Animation > Actions).', 'note')); return; }
+  for (const c of clips) {
+    const row = document.createElement('div'); row.className = 'clip' + (c.isIdle ? ' idle' : '') + (c.kind === 'junk' ? ' junk' : '');
+    const play = tag('button', '▶'); play.title = 'Probar'; play.dataset.clip = c.name; play.onclick = () => togglePreview(c.name, play);
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.append(tag('b', c.name), tag('span', `${KIND_LABEL[c.kind] ?? c.kind} · ${c.duration}s${c.once ? ' · una vez' : ''}`));
+    const star = tag('button', '★', c.isIdle ? 'on' : ''); star.title = c.isIdle ? 'Es el idle (clic: volver a detectarlo solo)' : 'Usar como idle (todos los NPC con este modelo)';
+    star.onclick = () => setRole(n.modelKey, 'idle', c.isIdle ? '' : c.name);
+    const on = !!n.talk && n.talk.talkAnim === c.name;
+    const talk = tag('button', '💬', on ? 'on' : ''); talk.disabled = !n.talk;
+    talk.title = !n.talk ? 'Este NPC no tiene diálogo' : on ? 'Es la animación de hablar (clic: quitarla)' : 'Usar al hablar (todos los NPC con este modelo y diálogo)';
+    talk.onclick = () => setRole(n.modelKey, 'talk', on ? '' : c.name);
+    const wOn = n.walkName === c.name;
+    const walk = tag('button', '🚶', wOn ? 'on' : ''); walk.title = wOn ? 'Es la animación de caminar (clic: detectarla sola)' : 'Usar al caminar por una ruta (todos los NPC con este modelo)';
+    walk.onclick = () => setRole(n.modelKey, 'walk', wOn ? '' : c.name);
+    row.append(play, nm, star, talk, walk); box.appendChild(row);
+  }
+  if (n.idleSource === 'npc') box.appendChild(tag('div', 'Este NPC tiene su idle fijado con npc_anim (o "animation" en la escena): ★ no lo cambia. Quitá ese valor para que mande la tabla.', 'note'));
+}
+function togglePreview(name, btn) {
+  const g = game(); if (!g || !npcSel) return;
+  if (previewing === name) return stopPreview(true);
+  stopPreview(false); g.npcs.play(npcSel, name); previewing = name; btn.textContent = '■'; btn.classList.add('on');
+}
+function stopPreview(restore) {
+  const g = game();
+  if (previewing && restore && npcSel && g) g.npcs.play(npcSel, null);
+  previewing = null;
+  document.querySelectorAll('#npcClips [data-clip]').forEach((b) => { b.textContent = '▶'; b.classList.remove('on'); });
+}
+function setRole(key, role, name) {
+  const g = game(); if (!g) return;
+  if (!npcTable) npcTable = {};
+  if (!npcTable[key] || typeof npcTable[key] !== 'object') npcTable[key] = {};
+  if (name) npcTable[key][role] = name; else delete npcTable[key][role];
+  if (!Object.keys(npcTable[key]).length) delete npcTable[key];
+  const n = g.npcs.setModelRole(key, role, name);
+  npcFoot(`${{ idle: 'Idle', talk: 'Al hablar', walk: 'Caminar' }[role]} de «${key}»: ${name || '(automático)'} · ${n} NPC. Guardando…`);
+  drawNpc();
+  clearTimeout(npcSaveT);
+  npcSaveT = setTimeout(async () => {
+    quiet.set(NPC_TABLE, Date.now());
+    const r = await fetch(api(NPC_TABLE), { method: 'PUT', body: JSON.stringify(npcTable, null, 2) + '\n' });
+    quiet.set(NPC_TABLE, Date.now());
+    g.forgetJSON?.(NPC_TABLE); // la próxima escena lee la tabla nueva
+    r.ok ? npcFoot('Guardado en data/tables/npcs.json ✓') : npcFoot('No se pudo guardar npcs.json', true);
+    if (!files.some((f) => f.p === NPC_TABLE)) loadTree();
+  }, 400);
+}
+// Animaciones disponibles para el diálogo abierto (las usa el editor de nodos para ofrecer la lista de clips)
+function clipsForDialogue() {
+  const g = game(); if (!g?.npcs || !active || !isDlg(active)) return { npc: null, clips: [] };
+  const name = dlgName(active);
+  const list = g.npcs.list;
+  const n = list.find((x) => x.talk?.dialogue && String(x.talk.dialogue).replace(/\.json$/i, '') === name) ?? null;
+  return n ? { npc: n.id, clips: g.npcs.clipsOf(n).filter((c) => c.kind !== 'junk').map((c) => ({ name: c.name, kind: c.kind, duration: c.duration })) } : { npc: null, clips: [] };
+}
+// Flags conocidos (para sugerirlos en las condiciones): los "set" de los diálogos y hablo_/veces_ de cada NPC con diálogo
+let flagNames = [];
+async function collectFlags() {
+  const names = new Set();
+  const g = game();
+  for (const n of g?.npcs?.list ?? []) if (n.talk) { names.add(`hablo_${n.id}`); names.add(`veces_${n.id}`); }
+  for (const f of files.filter((f) => /^data\/dialogues\/[^/]+\.json$/.test(f.p))) {
+    try {
+      const d = JSON.parse(await (await fetch(api(f.p))).text());
+      names.add(`hablo_${dlgName(f.p)}`); names.add(`veces_${dlgName(f.p)}`);
+      for (const n of Object.values(d.nodes ?? {})) if (n?.set && typeof n.set === 'object') Object.keys(n.set).forEach((k) => names.add(k));
+    } catch { /* un diálogo con error: se ignora */ }
+  }
+  flagNames = [...names].sort();
+}
+// Animaciones del NPC que usa la ruta abierta (npc_ruta = nombre de la ruta)
+function clipsForRoute() {
+  const g = game(); if (!g?.npcs || !active || !isRt(active)) return { npc: null, clips: [] };
+  const n = g.npcs.list.find((x) => x.routeName === dlgName(active));
+  return n ? { npc: n.id, clips: g.npcs.clipsOf(n).filter((c) => c.kind !== 'junk').map((c) => ({ name: c.name, kind: c.kind, duration: c.duration })) } : { npc: null, clips: [] };
+}
+$('#tFiles').onclick = () => showTab('files'); $('#tNpc').onclick = async () => { await loadNpcTable(); showTab('npc'); };
+$('#npcSel').onchange = () => { const g = game(); npcSel = g?.npcs.list[Number($('#npcSel').value)] ?? null; drawNpc(); };
+$('#bNpcRef').onclick = () => refreshNpc(true);
+$('#bNpcGo').onclick = () => {
+  const g = game(); if (!g || !npcSel) return;
+  const r = npcSel.holder.rotation.y, p = npcSel.holder.position; // frente al NPC, a 3 m y a la altura de la cabeza
+  g.camera.position.set(p.x + Math.sin(r) * 3, p.y + 1.4, p.z + Math.cos(r) * 3); g.controls?.setLook(r, -0.1);
+};
+pv.addEventListener('load', () => { npcSel = null; npcListRef = null; if (npcTab) setTimeout(() => refreshNpc(true), 800); for (const t of [1500, 4000]) setTimeout(() => routeEd?.refresh(), t); });
+setInterval(() => { if (npcTab) refreshNpc(false); }, 800);
+
+// ---------- Arranque ----------
+$('#bNew').onclick = newFile; $('#bDlg').onclick = newDialogue; $('#bRoute').onclick = newRoute; $('#mNodes').onclick = () => setMode('nodes'); $('#mCode').onclick = () => setMode('code'); $('#bRef').onclick = loadTree; $('#bSave').onclick = () => save();
+$('#bFlags').onclick = () => { try { pv.contentWindow.flags.reset(); toast('Flags reiniciados'); } catch { toast('La vista previa todavía no cargó', true); } };
+$('#bReload').onclick = setPreview; $('#page').onchange = setPreview;
+const sp = $('#split');
+sp.onpointerdown = (e) => {
+  sp.setPointerCapture(e.pointerId); pv.style.pointerEvents = 'none';
+  sp.onpointermove = (ev) => $('#app').style.setProperty('--pw', Math.max(240, Math.min(innerWidth - 500, innerWidth - ev.clientX)) + 'px');
+  sp.onpointerup = () => { sp.onpointermove = null; pv.style.pointerEvents = ''; };
+};
+self.MonacoEnvironment = { getWorkerUrl: () => URL.createObjectURL(new Blob([`self.MonacoEnvironment={baseUrl:'${MON}/'};importScripts('${MON}/vs/base/worker/workerMain.js');`], { type: 'text/javascript' })) };
+require.config({ paths: { vs: MON + '/vs' } });
+require(['vs/editor/editor.main'], async () => {
+  ed = monaco.editor.create($('#ed'), { theme: 'vs-dark', automaticLayout: true, minimap: { enabled: false }, fontSize: 13, tabSize: 2, scrollBeyondLastLine: false, model: null });
+  const { createNodeEditor } = await import('/studio/dialogue-editor.js');
+  nodeEd = createNodeEditor($('#nodes'), {
+    // Cada edición en los nodos reescribe el texto del archivo (así Ctrl+Z, guardar y el modo Código siempre coinciden)
+    onChange(text, newStep) {
+      const o = open.get(active); if (!o) return;
+      o.self = true;
+      if (newStep) o.model.pushStackElement();
+      o.model.pushEditOperations([], [{ range: o.model.getFullModelRange(), text }], () => null);
+      o.self = false;
+    },
+    onUndo: () => undoRedo('undo'), onRedo: () => undoRedo('redo'),
+    clips: clipsForDialogue, // animaciones reales del NPC que usa este diálogo
+  });
+  const { createRouteEditor } = await import('/studio/route-editor.js');
+  routeEd = createRouteEditor($('#rnodes'), {
+    onChange(text, newStep) {
+      const o = open.get(active); if (!o) return;
+      o.self = true;
+      if (newStep) o.model.pushStackElement();
+      o.model.pushEditOperations([], [{ range: o.model.getFullModelRange(), text }], () => null);
+      o.self = false;
+    },
+    onUndo: () => undoRedo('undo'), onRedo: () => undoRedo('redo'),
+    points: () => { try { return pv.contentWindow.coronda.routePoints() || []; } catch { return []; } },
+    clips: clipsForRoute,
+    flags: () => flagNames,
+    onShow: (on, json) => { try { pv.contentWindow.coronda.showRoute(on ? json : null); } catch { /* la vista previa no cargó */ } },
+  });
+  await loadTree(); setPreview(); listen();
+  const last = localStorage.getItem('studio:last');
+  if (last && files.some((f) => f.p === last && f.t)) openFile(last); else mark();
+});
+</script>
+</body>
+</html>

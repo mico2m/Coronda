@@ -142,6 +142,7 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
     s = { entry, script, node: null, pages: [], page: 0, text: '', shown: 0, choices: [], sel: 0, picking: false };
     box.hidden = false;
     onStart?.(entry);
+    npcs.hold?.(entry); // si el NPC está caminando, se frena
     if (entry.talk.look) npcs.faceTowards(entry, focus.x, focus.z);
     if (entry.talk.talkAnim) npcs.play(entry, entry.talk.talkAnim);
     goto(script.start);

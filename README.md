@@ -144,7 +144,7 @@ Un NPC es un modelo `.glb` con su animación, puesto en la escena con un Empty d
 | Propiedad | Qué hace |
 |---|---|
 | `npc_modelo` | otro archivo: `gato` usa `assets/models/objects/gato.glb` (o una ruta completa) |
-| `npc_anim` | el clip que reproduce en bucle (por defecto `idle`; acepta que el nombre empiece así) |
+| `npc_anim` | qué clip es el idle. Si no lo ponés, el motor lo **detecta solo** (ver **Animación idle del NPC**) |
 | `npc_escala` | tamaño (1 por defecto) |
 | `npc_radio` | ancho para que el jugador no lo atraviese, en metros (0,4 por defecto) |
 | `npc_giro` | grados extra de giro |
@@ -157,6 +157,27 @@ También se puede ajustar o crear desde `data/scenes/<escena>.json > "actors"`:
 ]
 ```
 La primera línea ajusta un NPC que viene del `.glb`; la segunda crea uno que no está en el `.glb` (`yaw` en grados). Si un clip no existe, la consola (F12) lista los que trae el archivo. Los NPC están quietos en su lugar y el jugador los rodea. Para hablarles, ver **Diálogos con NPC** (abajo); que caminen es un paso que viene después.
+
+### Animación idle del NPC (detección automática)
+
+El motor lee los clips del `.glb` del NPC y elige el idle solo (`src/actors/npc-anim.js`). Orden de prioridad:
+
+1. **Definido en el NPC:** `npc_anim` en el Empty, o `"animation"` en `data/scenes/<escena>.json > actors`.
+2. **Definido por modelo:** `data/tables/npcs.json`, por ejemplo `{ "npc_tokse": { "idle": "idle" } }` (clave = nombre del `.glb` sin extensión; vale para todos los NPC con ese modelo).
+3. **Automático:** puntúa los nombres (`idle` > `idle_algo` > `espera`/`reposo`/`respirar` > `wait`/`stand`), descarta transiciones (`walk2wait`), clips de una sola vez (`_vuelve`) y los que Blender crea solos (`Action`, `PlaneAction`…). Si no hay ninguno que parezca idle pero hay un único clip real, usa ese.
+
+Si lo que definiste no existe, usa el automático y avisa. Si no encuentra nada, el NPC queda sin animación y la consola (F12) muestra la lista de clips con su tipo (`idle`, `talk`, `greet`, `walk`, `run`, `junk`, `other`). Para el studio: `npcs.clipsOf(npc)` devuelve esa lista y `npcs.setIdle(npc, "clip")` cambia el idle en vivo.
+
+### Panel de NPC (modo desarrollador)
+
+En `dev.html`, el botón **NPC** (arriba a la izquierda, debajo de *Diálogos*) abre un panel para hacer lo mismo sin tocar archivos:
+
+- Elegí un NPC de la lista (**Ir** lleva la cámara libre frente a él, **↻** actualiza la lista después de cambiar de escena).
+- Se ven todos los clips de su `.glb` con el tipo que detectó el motor y su duración. **▶** lo prueba en el NPC (**■** para volver), **★** lo marca como idle y **💬** como la animación al hablar. Un clic más en ★ / 💬 lo quita (el idle vuelve a detectarse solo).
+- Los cambios se aplican en vivo a todos los NPC que usan ese modelo. Los que tienen `npc_anim` / `npc_anim_hablar` propios (en Blender o en el JSON de la escena) no se tocan: esos mandan.
+- **Guardar** (o `Ctrl+S`) escribe `data/tables/npcs.json`. En Chrome/Edge, **Carpeta** te deja elegir `data/tables` y guarda directo; en otros navegadores descarga el archivo para copiarlo.
+
+`data/tables/npcs.json` guarda por modelo `{ "tokse": { "idle": "idle", "talk": "saludar" } }`. Código: `src/systems/npc-editor.js`.
 
 ## Diálogos con NPC
 

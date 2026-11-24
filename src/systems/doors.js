@@ -51,7 +51,6 @@
 // encima de otro teleport (ida y vuelta) sin rebotar para siempre.
 import * as THREE from 'three';
 import { collectSpawns, normSpawnKey, spawnFromNode } from './spawns.js';
-import { promptHTML, uiText, getUI } from '../ui/theme.js';
 
 const NAME_RE = /^(?:empty_)?puerta_(.+)$/;
 // Empty donde se para el jugador para abrir la puerta: pos_jugador, pos_jugador_1, pos_jugador.001…
@@ -198,7 +197,7 @@ export function createDoors({ stage, onEnter, dev = false, blocked = () => false
 
       const byId = new Map();
       const get = (id) => {
-        if (!byId.has(id)) byId.set(id, { id, target: `scene_${id}`, mode: 'E', radius: 3, label: undefined, spawn: undefined, anim: undefined, wait: undefined, objectAnim: undefined, nodes: [], points: [], shapes: [] });
+        if (!byId.has(id)) byId.set(id, { id, target: `scene_${id}`, mode: 'E', radius: 3, label: 'Entrar', spawn: undefined, anim: undefined, wait: undefined, objectAnim: undefined, nodes: [], points: [], shapes: [] });
         return byId.get(id);
       };
 
@@ -326,7 +325,7 @@ export function createDoors({ stage, onEnter, dev = false, blocked = () => false
       if (best !== near) {
         near = best;
         prompt.hidden = !near;
-        if (near) prompt.innerHTML = promptHTML({ label: near.label || uiText('door'), icon: getUI().icons.door });
+        if (near) prompt.innerHTML = `<kbd>E</kbd> ${near.label ?? 'Entrar'}`;
       }
     },
   };

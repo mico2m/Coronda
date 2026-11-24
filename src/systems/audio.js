@@ -4,7 +4,6 @@ export function createAudio(musicTable = {}) {
   const el = new Audio();
   let master = 0.6;
   let currentId = null;
-  let trackVol = 1; // volumen propio de la pista (music.json)
   let unlocked = false;
   let wantsPlay = false;
 
@@ -23,8 +22,7 @@ export function createAudio(musicTable = {}) {
       currentId = id;
       el.src = entry.file;
       el.loop = entry.loop !== false;
-      trackVol = entry.volume ?? 1;
-      el.volume = master * trackVol;
+      el.volume = master * (entry.volume ?? 1);
       wantsPlay = true;
       if (unlocked) tryPlay();
     },
@@ -35,7 +33,6 @@ export function createAudio(musicTable = {}) {
     },
     setVolume(v) {
       master = Math.max(0, Math.min(1, v));
-      el.volume = master * trackVol; // también la que ya está sonando
     },
   };
 }

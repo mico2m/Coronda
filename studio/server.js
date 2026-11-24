@@ -1,6 +1,6 @@
 // Coronda Studio: servidor local sin dependencias (solo Node 18+).
 // Uso, desde la carpeta del proyecto:   node studio/server.js        (o:  node studio/server.js ruta/al/proyecto)
-// Después abrí  http://localhost:5173/__studio
+// Después abrí  http://localhost:5173/__studio   (diálogos con nodos: http://localhost:5173/__dialogos)
 const http = require('http'), fs = require('fs'), path = require('path');
 
 const ROOT = path.resolve(process.argv[2] || path.join(__dirname, '..'));
@@ -11,7 +11,6 @@ const MIME = {
   html: 'text/html; charset=utf-8', js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8',
   css: 'text/css; charset=utf-8', json: 'application/json; charset=utf-8', svg: 'image/svg+xml',
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif',
-  ttf: 'font/ttf', otf: 'font/otf', woff: 'font/woff', woff2: 'font/woff2',
   glb: 'model/gltf-binary', gltf: 'model/gltf+json', mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav',
   txt: 'text/plain; charset=utf-8', md: 'text/plain; charset=utf-8',
 };
@@ -53,7 +52,7 @@ http.createServer((req, res) => {
     return;
   }
   if (pathname === '/__studio') return serve(res, path.join(__dirname, 'studio.html'));
-  if (pathname === '/__motor') { res.writeHead(302, { Location: '/studio/editor/' }); return res.end(); } // el motor (editor de escenas)
+  if (pathname === '/__dialogos') { res.writeHead(302, { Location: '/studio/dialogos/' }); return res.end(); } // editor de diálogos (nodos + probar + variables)
 
   if (pathname.startsWith('/__api/')) {
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host || '')) return send(res, 403, 'Host no permitido');
@@ -90,7 +89,7 @@ http.createServer((req, res) => {
   try { if (fs.statSync(f).isDirectory()) f = path.join(f, 'index.html'); } catch { /* 404 abajo */ }
   serve(res, f);
 }).listen(PORT, '127.0.0.1', () => {
-  console.log(`Coronda Studio\n  Proyecto: ${ROOT}\n  Motor:    http://localhost:${PORT}/__motor\n  Studio:   http://localhost:${PORT}/__studio  (diálogos y rutas)\n  (Ctrl+C para cerrar)`);
+  console.log(`Coronda Studio\n  Proyecto: ${ROOT}\n  Abrí:     http://localhost:${PORT}/__studio\n  Diálogos: http://localhost:${PORT}/__dialogos\n  (Ctrl+C para cerrar)`);
 });
 
 // Cambios hechos desde afuera (Blender exportando un .glb, VS Code, etc.) también refrescan la vista

@@ -21,7 +21,6 @@
 import * as THREE from 'three';
 import { loadGLB } from '../core/assets.js';
 import { makeUnlit, setShade } from '../systems/shading.js';
-import { iconHTML, actionIcon } from '../ui/theme.js';
 
 const DEFAULTS = {
   model: 'assets/models/objects/personaje.glb',
@@ -45,9 +44,9 @@ const DEFAULTS = {
 
 const ACTION_RE = /^(?:accion|action)_(.+)$/i;
 // Clip por defecto para abrir puertas (con o sin accion_, con o sin guion bajo, sufijos .001 incluidos)
-export const DOOR_CLIP_RE = /^(?:(?:accion|action)_)?abrir_?puerta(?:[._]\d+)?$/i;
+const DOOR_CLIP_RE = /^(?:(?:accion|action)_)?abrir_?puerta(?:[._]\d+)?$/i;
 // "accion_saludar_vuelve.001" -> { id: "saludar", mode: "vuelve" }
-export function parseActionName(clipName) {
+function parseActionName(clipName) {
   const m = ACTION_RE.exec(String(clipName).replace(/\.\d+$/, ''));
   if (!m) return null;
   let id = m[1], mode = 'hold';
@@ -55,7 +54,7 @@ export function parseActionName(clipName) {
   if (s) { mode = s[1].toLowerCase() === 'quieto' ? 'hold' : s[1].toLowerCase(); id = id.slice(0, -s[0].length); }
   return id ? { id, mode } : null;
 }
-export const humanize = (id) => { const t = id.replace(/_+/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
+const humanize = (id) => { const t = id.replace(/_+/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
 
 const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
 const ALIAS = { ArrowUp: 'KeyW', ArrowDown: 'KeyS', ArrowLeft: 'KeyA', ArrowRight: 'KeyD', ShiftRight: 'ShiftLeft' };
@@ -198,11 +197,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       k.textContent = a.key.replace(/^(?:Digit|Key)/, '');
       b.append(k, ' ');
     }
-    const ic = actionIcon(a.id); // ícono elegido en la pestaña Interfaz del motor (data/ui.json)
-    if (ic) b.insertAdjacentHTML('beforeend', iconHTML(ic));
-    const tx = document.createElement('span');
-    tx.textContent = a.label; // el nombre viene de un archivo externo
-    b.append(tx);
+    b.append(a.label); // textContent-style: el nombre viene de un archivo externo
     b.addEventListener('click', () => { triggerAction(a.id); b.blur(); });
     actionPanel.append(b);
   }

@@ -1,7 +1,7 @@
 // Probador de diálogos: reproduce una charla con las mismas reglas que src/systems/dialogue.js, sin abrir el juego.
 // (Como el modo "test" de Yarn Spinner / Twine.) Los flags son de prueba: no tocan los guardados del juego.
 import { esc } from './ws-common.js';
-import { icon } from './components.js';
+import { icon } from './icons.js';
 
 const CMP = /^(>=|<=|==|!=|>|<)\s*(-?\d+(?:\.\d+)?)$/;
 function check(cond, data) {

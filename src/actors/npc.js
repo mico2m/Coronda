@@ -185,7 +185,7 @@ export function createNpcs() {
           repeatPages: Array.isArray(d.repeatText) ? d.repeatText.map(String) : splitPages(d.repeatText), // 2ª vez en adelante
           sets: (Array.isArray(d.setFlag) ? d.setFlag : String(d.setFlag ?? '').split(',')).map((f) => String(f).trim()).filter(Boolean),
           radius: num(d.talkRadius, 2.5),
-          label: String(d.talkLabel ?? '').trim(), // vacío = el texto de data/ui.json ("Hablar")
+          label: String(d.talkLabel ?? '').trim() || 'Hablar',
           look: flag(d.look, true),
           talkAnim: String(d.talkAnim ?? '').trim() || tableTalk || null, // animación mientras habla (npc_anim_hablar, o la del modelo en npcs.json)
         } : null;

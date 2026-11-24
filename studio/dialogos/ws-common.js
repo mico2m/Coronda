@@ -1,5 +1,5 @@
 // Piezas compartidas por los espacios de trabajo (Diálogos, Rutas, Música, Menús, Proyecto)
-import { icon } from './components.js';
+import { icon } from './icons.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const baseName = (p) => p.split('/').pop().replace(/\.[^.]+$/, '');

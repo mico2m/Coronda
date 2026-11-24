@@ -14,8 +14,6 @@ import { createNpcs } from './actors/npc.js';
 import { createDialogue } from './systems/dialogue.js';
 import { createTextbox } from './ui/textbox.js';
 import { isSkyName } from './systems/shading.js';
-import { createMenus } from './ui/menus.js';
-import { applyUI } from './ui/theme.js';
 
 const _focus = new THREE.Vector3();
 
@@ -66,8 +64,6 @@ export async function startGame({ dev = false, retro = null } = {}) {
   let player = null;
   let world = null; // gestor de escenas (para mover el cielo)
   let mode = 'free'; // 'player' (tercera persona) o 'free' (cámara libre)
-  let menus = null; // título, pausa y opciones (ver ui/menus.js); mientras hay uno abierto el mundo se congela
-  let titleT = 0;   // giro de la cámara detrás del título
   const hintFree = document.getElementById('hintFree');
   const hintPlayer = document.getElementById('hintPlayer');
   const EYE = 1.7; // altura de los ojos de la cámara libre sobre el suelo
@@ -110,17 +106,6 @@ export async function startGame({ dev = false, retro = null } = {}) {
     if (interval && now - last < interval - 2) return;
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
-    if (menus?.paused) {
-      // detrás del título la cámara gira despacio alrededor del punto de aparición (como en los juegos de la época)
-      if (menus.isTitle && world?.spawn) {
-        titleT += dt * 0.08;
-        const [sx, sy, sz] = world.spawn.position;
-        camera.position.set(sx + Math.sin(titleT) * 14, sy + 4.5, sz + Math.cos(titleT) * 14);
-        camera.lookAt(sx, sy - 0.6, sz);
-        world.updateSky(camera.position);
-      }
-      renderer.render(scene, camera); textbox.render(); return;
-    }
     controls.update(dt);
     player?.update(dt);
     npcs.update(dt);
@@ -142,9 +127,6 @@ export async function startGame({ dev = false, retro = null } = {}) {
       loadJSON('data/tables/scenes.json'),
       loadJSON('data/tables/music.json'),
     ]);
-    // Diseño de la interfaz (data/ui.json, pestaña Interfaz del motor): letras, colores, íconos y caja de diálogo
-    const uiTheme = await applyUI(await loadJSON('data/ui.json').catch(() => ({})), { scope: '.app' });
-    textbox.setStyle(uiTheme.textbox);
     const playerConfig = await loadJSON('data/tables/player.json').catch(() => ({}));
     player = await createPlayer({ scene, camera, stage, pad: document.getElementById('pad'), config: playerConfig });
     const audio = createAudio(musicTable);
@@ -244,40 +226,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
       }
     }
 
-    // ?scene=<id> (el botón Play del editor), &play=1 (arranca con el personaje), &from=x,y,z,yaw (aparece ahí)
-    const q = new URLSearchParams(location.search);
-    const asked = q.get('scene');
-    if (asked && !scenesTable[asked]) ui.setStatus(`La escena "${asked}" no está en data/tables/scenes.json`);
-    const startId = (asked && scenesTable[asked] ? asked : null)
-      ?? Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0];
+    const startId = Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0];
     await enterScene(startId);
-    // Menús (data/menus.json): título al abrir el juego, Esc = pausa
-    const menuDefs = await loadJSON('data/menus.json').catch(() => null);
-    const hint = document.getElementById('hint');
-    menus = createMenus({
-      host: stage.parentElement, defs: menuDefs, audio,
-      onStart: () => {
-        if (hint) hint.hidden = false;
-        if (sceneManager.current?.music) audio.playMusic(sceneManager.current.music);
-        else audio.stopMusic();
-      },
-      onScene: async (id) => { if (scenesTable[id]) { await fade.fadeOut(); await enterScene(id); await fade.fadeIn(); } },
-      onPauseChange: (on) => { if (hint) hint.hidden = on; },
-    });
-    window.addEventListener('keydown', (e) => {
-      if (e.code !== 'Escape' || e.repeat || menus.open || !menus.canPause || dialogue?.active || dialogue?.blocked) return;
-      if (mode !== 'player' && !dev) return;
-      menus.pause();
-    });
-    const showTitle = !dev && !q.get('play') && !q.get('scene') && menus.titleOnStart;
-    if (showTitle && menus.showTitle() && hint) hint.hidden = true;
-    const from = (q.get('from') ?? '').split(',').map(Number);
-    if (from.length >= 3 && from.slice(0, 3).every(Number.isFinite)) {
-      player.place([from[0], from[1], from[2]], (from[3] || 0) * Math.PI / 180);
-      camera.position.set(from[0], from[1] + EYE, from[2]);
-      controls.setLook((from[3] || 0) * Math.PI / 180, 0);
-    }
-    setMode(q.get('play') === '1' ? 'player' : dev ? 'free' : 'player');
+    setMode(dev ? 'free' : 'player');
     // si el personaje o sus animaciones tienen problemas, se avisa en pantalla
     const notice = player.loadError ?? player.animNotice;
     if (notice) ui.setStatus(notice);

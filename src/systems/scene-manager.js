@@ -14,7 +14,6 @@ import * as THREE from 'three';
 import { loadJSON, loadGLB } from '../core/assets.js';
 import { makeUnlit, setShade, isSkyName } from './shading.js';
 import { findSpawn } from './spawns.js';
-import { buildEntities } from './entities.js';
 
 const _v = new THREE.Vector3();
 
@@ -101,25 +100,6 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     if (failed.size) ui.setStatus(`Objetos: no se encontró ${[...failed].join(', ')}`);
   }
 
-  // El cielo acompaña a la cámara, no recibe niebla, no tapa a nada y se ve desde adentro
-  function markSky(o) {
-    skies.push(o);
-    o.traverse((c) => {
-      c.frustumCulled = false;
-      c.renderOrder = -1;
-      for (const m of Array.isArray(c.material) ? c.material : c.material ? [c.material] : []) {
-        m.fog = false; m.depthWrite = false;
-        m.side = THREE.DoubleSide; // aunque las normales estén al revés
-      }
-    });
-  }
-  // Aspecto "sin luces" + tono/brillo de la escena (sala del .glb o modelo de una entidad)
-  function prepareLook(root) {
-    makeUnlit(root);
-    root.traverse((o) => { if (isSkyName(o.name)) markSky(o); });
-    setShade(root, shade);
-  }
-
   async function loadScene(id, { spawn, spawnName } = {}) {
     const fromId = current?.data.id ?? null; // escena de la que venimos (para spawn_<origen>)
     const entry = scenesTable[id];
@@ -152,29 +132,26 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
           o.userData.sourceFile = room.model;
           o.userData.roomId = room.id;
         });
-        if (unlit) prepareLook(gltf.scene);
+        if (unlit) {
+          makeUnlit(gltf.scene);
+          gltf.scene.traverse((o) => {
+            if (!isSkyName(o.name)) return;
+            skies.push(o);
+            o.traverse((c) => {
+              c.frustumCulled = false;
+              c.renderOrder = -1;
+              for (const m of Array.isArray(c.material) ? c.material : c.material ? [c.material] : []) {
+                m.fog = false; m.depthWrite = false; // el cielo no recibe niebla ni tapa a nada
+                m.side = THREE.DoubleSide;           // se ve desde adentro aunque las normales estén al revés
+              }
+            });
+          });
+          setShade(gltf.scene, shade);
+        }
         group.add(gltf.scene);
       } catch {
         missing.push(room.model);
       }
-    }
-
-    // Entidades (escenas armadas en el editor del motor, ver entities.js)
-    if (data.entities?.length) {
-      const ents = new THREE.Group();
-      ents.name = 'entities';
-      ents.userData.isRoomRoot = true;
-      ents.userData.animations = [];
-      group.add(ents);
-      const { missing: miss } = await buildEntities(ents, data.entities, {
-        onModel: (inst) => {
-          inst.traverse((o) => { o.userData.roomId = 'entidades'; });
-          if (unlit) prepareLook(inst);
-        },
-      });
-      missing.push(...miss);
-      // el cielo puede ser la entidad misma (sky / cielo) aunque su modelo se llame distinto
-      ents.traverse((o) => { if (o.userData.entityId && isSkyName(o.name) && !skies.includes(o)) markSky(o); });
     }
 
     // Objetos reutilizables (Empties con "objeto"): se cargan antes de las colisiones, puertas y NPC

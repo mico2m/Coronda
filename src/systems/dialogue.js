@@ -34,10 +34,8 @@
 import { loadJSON } from '../core/assets.js';
 import { flags } from './flags.js';
 
-import { STYLE } from '../ui/textbox-paint.js';
-import { promptHTML, uiText, getUI, blip } from '../ui/theme.js';
 const DIR = 'data/dialogues/';
-const cps = () => Math.max(1, Number(STYLE.cps) || 45); // letras por segundo de la máquina de escribir (data/ui.json)
+const CPS = 45; // letras por segundo de la máquina de escribir
 const CHOICE_PAUSE = 0.35; // segundos de pausa entre la pregunta y las opciones (que después se escriben como el texto)
 const reduceMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const dialoguePath = (id) => (/[\\/]/.test(id) ? id : `${DIR}${id.replace(/\.json$/i, '')}.json`);
@@ -284,21 +282,16 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
     }
   });
 
-  // "Bip" de las letras (data/ui.json > textbox.blip): uno cada 2 letras que no sean espacios, como en los juegos de la época
-  function letterSound(from, to) {
-    if (!STYLE.blip || STYLE.blip === 'ninguno') return;
-    const pg = s.pages[s.page];
-    const flat = pg.lines.flat();
-    for (let i = from; i < to; i++) if (i % 2 === 0 && flat[i] && flat[i].ch.trim()) { blip(STYLE.blip, STYLE.blipPitch ?? 1); break; }
-  }
-
   // ---- Aviso de cercanía ----
   function setNear(entry) {
     if (entry === near) return;
     near = entry;
     prompt.hidden = !near;
     if (near) {
-      prompt.innerHTML = promptHTML({ label: near.talk.label || uiText('talk'), icon: getUI().icons.talk });
+      prompt.replaceChildren();
+      const k = el('kbd', '', prompt);
+      k.textContent = 'E';
+      prompt.append(' ', near.talk.label);
     }
   }
 
@@ -321,15 +314,14 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
         textbox.update(dt);
         if (s.shown < s.count) {
           const before = Math.floor(s.shown);
-          s.shown = Math.min(s.count, s.shown + cps() * dt);
-          if (Math.floor(s.shown) !== before) letterSound(before, Math.floor(s.shown));
+          s.shown = Math.min(s.count, s.shown + CPS * dt);
           if (s.shown >= s.count) pageDone();
           else if (Math.floor(s.shown) !== before) paint();
         } else if (s.choices.length && !s.picking) { // escribiendo las opciones
           if (s.choiceWait > 0) s.choiceWait -= dt;
           else {
             const before = Math.floor(s.choiceShown);
-            s.choiceShown = Math.min(s.choiceTotal, s.choiceShown + cps() * dt);
+            s.choiceShown = Math.min(s.choiceTotal, s.choiceShown + CPS * dt);
             if (s.choiceShown >= s.choiceTotal) s.picking = true;
             if (s.picking || Math.floor(s.choiceShown) !== before) paint();
           }

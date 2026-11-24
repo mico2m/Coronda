@@ -1,10 +1,9 @@
-// Espacios "Diálogos" y "Rutas": lista de archivos + editor de nodos (los mismos editores del Studio clásico)
+// Editor de diálogos: lista de archivos + editor de nodos (el del Studio clásico) + Probar + Variables
 import { listPane, fileDoc, esc, baseName } from './ws-common.js';
 import { projectIndex, clipsOf } from './project-index.js';
 import { createDialogueTester } from './dlg-tester.js';
-import { createRouteMap } from './route-map.js';
-import { openVariables } from './palette.js';
-import { icon } from './components.js';
+import { openVariables } from './variables.js';
+import { icon } from './icons.js';
 
 const DLG = (n) => `{\n  "speaker": "${n.charAt(0).toUpperCase() + n.slice(1).replace(/_+/g, ' ')}",\n  "start": "inicio",\n  "nodes": {\n    "inicio": { "text": "Hola." }\n  }\n}\n`;
 const RT = () => `{\n  "speed": 1.4,\n  "start": "a",\n  "nodes": {\n    "a": { "point": "", "wait": 2 }\n  }\n}\n`;
@@ -54,45 +53,7 @@ export async function createGraphWorkspace(app, el, mode) {
     onShow: (on) => { if (on) app.toast('Para ver el recorrido, probalo con ▶ Jugar'); },
   });
 
-  // Mapa (solo rutas): la escena del NPC que usa el recorrido, vista desde arriba
-  let map = null;
-  const mapEl = el.querySelector('.rmap');
-  const mapScene = () => (curName && users(curName)[0]?.scene) || app.sceneId;
-  if (mapEl) {
-    map = createRouteMap(mapEl, {
-      app,
-      getData: dataOf,
-      getScene: mapScene,
-      getPoints: () => (index?.points ?? []).filter((p) => p.scene === mapScene() && !/^(col_|pos_jugador)/i.test(p.name)), // las colisiones no son lugares
-      getNpc: () => (curName ? users(curName)[0] ?? null : null),
-      onAddStop: addStop,
-    });
-    el.querySelector('[data-act="map"]').addEventListener('click', (e) => {
-      const on = mapEl.hidden; mapEl.hidden = !on; el.classList.toggle('has-right', on); e.currentTarget.classList.toggle('on', on);
-      if (on) map.render();
-    });
-  }
-  function addStop(point) {
-    if (!cur) return;
-    const d = dataOf();
-    d.nodes ??= {};
-    const nodes = d.nodes;
-    const nx = (n) => (typeof n?.next === 'string' ? n.next : Array.isArray(n?.next) ? null : '');
-    const order = [], seen = new Set();
-    let c = d.start && nodes[d.start] ? d.start : Object.keys(nodes)[0];
-    while (c && nodes[c] && !seen.has(c)) { seen.add(c); order.push(c); c = nx(nodes[c]) || null; }
-    const base = (point.replace(/^(ruta|npc)_/i, '') || 'parada').replace(/[^\p{L}\p{N}_-]/gu, '_');
-    let id = base, i = 1; while (nodes[id]) id = `${base}_${++i}`;
-    nodes[id] = { point, wait: 2 };
-    const last = order[order.length - 1];
-    if (!last) { d.start = id; }
-    else {
-      const ln = nodes[last], to = nx(ln);
-      if (to === null) app.toast(`La parada ${last} tiene un "Después" personalizado: conectá ${id} a mano`, true);
-      else { if (to && to === order[0]) nodes[id].next = to; ln.next = id; }
-    }
-    if (cur.set(`${JSON.stringify(d, null, 2)}\n`)) { ed.load(cur.text, curName); renderList(); app.wsChanged(); map.render(); app.toast(`Parada ${id} agregada en ${point}`); }
-  }
+  const map = null, mapEl = null;
 
   const files = () => app.files.filter((p) => p.startsWith(`${dir}/`) && p.endsWith('.json')).sort();
   function users(name) {

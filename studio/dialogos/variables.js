@@ -1,21 +1,6 @@
-// Paleta de comandos (Ctrl+K) y panel de Variables (los flags que leen y escriben diálogos y recorridos).
+// Panel de Variables: los flags que leen y escriben diálogos y recorridos, con un clic para ir a cada lugar.
 import { esc, baseName } from './ws-common.js';
-import { icon } from './components.js';
-
-// Coincidencia aproximada: las letras de la búsqueda, en orden (más puntos si van seguidas o al principio de palabra)
-function score(q, text) {
-  if (!q) return 1;
-  const t = text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  let s = 0, i = 0, run = 0;
-  for (const ch of q) {
-    const j = t.indexOf(ch, i);
-    if (j < 0) return 0;
-    run = j === i ? run + 1 : 0;
-    s += 1 + run * 2 + (j === 0 || /[\s_·/-]/.test(t[j - 1]) ? 3 : 0);
-    i = j + 1;
-  }
-  return s - t.length * 0.02;
-}
+import { icon } from './icons.js';
 
 function overlay(cls) {
   const o = document.createElement('div');
@@ -24,38 +9,6 @@ function overlay(cls) {
   const close = () => o.remove();
   o.addEventListener('mousedown', (e) => { if (e.target === o) close(); });
   return { o, close };
-}
-
-// commands(): [{ label, sub, icon, group, run }]
-export function openPalette(commands) {
-  const { o, close } = overlay('pal');
-  o.innerHTML = `<div class="pal-box" role="dialog" aria-label="Comandos"><div class="pal-in">${icon('search', { size: 15 })}<input placeholder="Buscar comandos, escenas, objetos, diálogos…" spellcheck="false"><kbd>Esc</kbd></div><div class="pal-list"></div></div>`;
-  const input = o.querySelector('input'), list = o.querySelector('.pal-list');
-  const all = commands();
-  let shown = [], sel = 0;
-  function render() {
-    const q = input.value.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    shown = all.map((c) => ({ c, s: score(q, `${c.label} ${c.sub ?? ''} ${c.group ?? ''}`) })).filter((x) => x.s > 0)
-      .sort((a, b) => b.s - a.s).slice(0, 60).map((x) => x.c);
-    sel = Math.min(sel, Math.max(0, shown.length - 1));
-    list.innerHTML = shown.length ? shown.map((c, i) => `<div class="pal-it${i === sel ? ' on' : ''}" data-i="${i}">
-        <span class="pal-ic">${icon(c.icon ?? 'chevron', { size: 14 })}</span><span class="pal-tx"><b>${esc(c.label)}</b>${c.sub ? `<small>${esc(c.sub)}</small>` : ''}</span>
-        <span class="pal-g">${esc(c.group ?? '')}</span></div>`).join('') : '<div class="empty">Nada coincide.</div>';
-    list.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
-  }
-  function run(i) { const c = shown[i]; if (!c) return; close(); setTimeout(() => c.run(), 0); }
-  input.addEventListener('input', () => { sel = 0; render(); });
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(shown.length - 1, sel + 1); render(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(0, sel - 1); render(); }
-    else if (e.key === 'Enter') { e.preventDefault(); run(sel); }
-    else if (e.key === 'Escape') { e.preventDefault(); close(); }
-    e.stopPropagation();
-  });
-  list.addEventListener('mousemove', (e) => { const it = e.target.closest('.pal-it'); if (it && +it.dataset.i !== sel) { sel = +it.dataset.i; list.querySelectorAll('.pal-it').forEach((x) => x.classList.toggle('on', +x.dataset.i === sel)); } });
-  list.addEventListener('click', (e) => { const it = e.target.closest('.pal-it'); if (it) run(+it.dataset.i); });
-  render();
-  input.focus();
 }
 
 // ---------- Variables ----------
@@ -111,7 +64,7 @@ export async function openVariables(app) {
   list.addEventListener('click', (e) => {
     const b = e.target.closest('.var-loc'); if (!b) return;
     close();
-    app.openWsFile(b.dataset.kind === 'dialogue' ? 'dialogues' : 'routes', b.dataset.path);
+    if (b.dataset.kind === 'dialogue') app.openFile(b.dataset.path); else window.open('/__studio', '_blank', 'noopener'); // los recorridos siguen en el Studio clásico
   });
   render();
   input.focus();

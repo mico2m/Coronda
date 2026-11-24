@@ -55,9 +55,16 @@ export function findPath(world, a, b, opts = {}) {
     return state[k] === 1;
   };
   // ¿el tramo recto entre dos puntos está libre?
+  // Mira las 4 celdas alrededor de cada punto (no solo la más cercana) para no cortar esquinas al suavizar
   const clear = (ax, az, bx, bz) => {
     const d = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(d / (cell * 0.5)));
-    for (let s = 1; s < n; s++) { const t = s / n; if (!free(ci(ax + (bx - ax) * t), cj(az + (bz - az) * t))) return false; }
+    for (let s = 1; s < n; s++) {
+      const t = s / n, fx = (ax + (bx - ax) * t - x0) / cell, fz = (az + (bz - az) * t - z0) / cell;
+      const i0 = Math.floor(fx), j0 = Math.floor(fz);
+      for (let di = 0; di < 2; di++) for (let dj = 0; dj < 2; dj++) {
+        if (!free(Math.min(W - 1, Math.max(0, i0 + di)), Math.min(H - 1, Math.max(0, j0 + dj)))) return false;
+      }
+    }
     return true;
   };
   if (clear(a.x, a.z, b.x, b.z)) return direct;
@@ -97,5 +104,12 @@ export function findPath(world, a, b, opts = {}) {
     for (let k = raw.length - 1; k > at + 1; k--) if (clear(raw[at].x, raw[at].z, raw[k].x, raw[k].z)) { nx = k; break; }
     out.push(raw[nx]); at = nx;
   }
-  return { points: out, found: true };
+  // une los puntos que quedan sobre la misma recta
+  const pts = [];
+  for (const q of out) {
+    const a2 = pts.length > 1 ? pts[pts.length - 2] : pts.length ? { x: a.x, z: a.z } : null, b2 = pts[pts.length - 1];
+    if (a2 && b2 && Math.abs((b2.x - a2.x) * (q.z - a2.z) - (b2.z - a2.z) * (q.x - a2.x)) < 1e-3) pts[pts.length - 1] = q;
+    else pts.push(q);
+  }
+  return { points: pts, found: true };
 }

@@ -12,9 +12,11 @@ import * as THREE from 'three';
 import { GLYPHS, FONT_HEIGHT, FONT_BASELINE } from './pixel-font.js';
 
 export const STYLE = {
-  lines: 4,              // renglones por caja (Ocarina usa 4)
+  lines: 4,              // renglones por caja (Ocarina usa 4). La caja mide siempre esto, aunque el texto sea corto
+  valign: 'center',      // 'center' = el texto corto queda en el medio de la caja (como Ocarina) · 'top' = arriba
+  align: 'left',         // 'left' = alineado a la izquierda (como Ocarina) · 'center' = cada renglón centrado
   lineHeight: 13,        // píxeles entre renglones
-  maxWidth: 272,         // ancho máximo de la caja (a 320 de ancho deja un margen a los costados)
+  maxWidth: 256,         // ancho máximo de la caja (como en Ocarina; a 320 de ancho deja margen a los costados)
   padX: 12, padY: 7,     // margen interno
   padBottom: 10,         // margen de abajo (ahí va el triángulo, sin pisar el texto)
   bottom: 10,            // distancia al borde de abajo
@@ -188,8 +190,17 @@ export function createTextbox({ renderer, retro = null }) {
     boxRect = null;
     if (!state) return;
     const { page, choices = [] } = state;
-    const lineCount = page.lines.length + (state.choicesVisible ? choices.length : 0);
+    // Renglones que ocupa esta caja: el texto + las opciones (aunque todavía no se vean, así el texto no salta)
+    const lineCount = page.lines.length + Math.max(state.reserve ?? 0, state.choicesVisible ? choices.length : 0);
     const b = boxGeom(W, H, lineCount);
+    const boxLines = Math.max(STYLE.lines, lineCount);
+    const top = b.y + STYLE.padY + (STYLE.valign === 'center' ? Math.floor(((boxLines - lineCount) * STYLE.lineHeight) / 2) : 0);
+    const inner = b.w - STYLE.padX * 2;
+    const offsetX = (chars) => { // para align 'center'
+      if (STYLE.align !== 'center' || !chars.length) return 0;
+      const last = chars[chars.length - 1];
+      return Math.floor((inner - (last.x + advance(last.ch) - 1)) / 2);
+    };
     boxRect = b;
     roundRect(b.x, b.y, b.w, b.h, STYLE.radius, STYLE.box);
 
@@ -203,9 +214,9 @@ export function createTextbox({ renderer, retro = null }) {
 
     // Texto (solo las letras ya "escritas")
     let left = state.shown;
-    let y = b.y + STYLE.padY;
+    let y = top;
     for (const line of page.lines) {
-      if (left > 0) drawRun(line, b.x + STYLE.padX, y, STYLE.text, left);
+      if (left > 0) drawRun(line, b.x + STYLE.padX + offsetX(line), y, STYLE.text, left);
       left -= line.length;
       y += STYLE.lineHeight;
     }

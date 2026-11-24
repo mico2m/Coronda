@@ -94,7 +94,16 @@ export function createRoute(entry, data, sceneRoot, api, { name = '' } = {}) {
   let paused = false;
   const from = new THREE.Vector3(), to = new THREE.Vector3();
   let pts = [], segEnd = [], seg = 0; // camino a seguir: puntos (x,z) y distancia acumulada al final de cada tramo
-  let dist = 0, walked = 0, speed = 1.4, timer = 0, turning = 0, walking = false;
+  let dist = 0, walked = 0, speed = 1.4, timer = 0, turning = 0, walking = false, stuck = 0;
+
+  // ¿Ese punto (pies) choca con algo sólido de la escena? Con medio radio de tolerancia: el A* ya deja el margen
+  // completo, esto solo evita que se meta ADENTRO de un objeto si el camino salió mal.
+  const probe = { x: 0, y: 0, z: 0 };
+  const hits = (x, y, z) => {
+    if (data.avoid === false || !api.world?.pushOut) return false;
+    probe.x = x; probe.y = y; probe.z = z;
+    return api.world.pushOut(probe, { radius: Math.max(0.12, (entry.obstacle?.r ?? 0.4) * 0.5), height: 1.6, stepHeight: 0.4 });
+  };
 
   function stopAt(why) { state = 'done'; if (why) warn('stop', why); api.play(entry, null); walking = false; }
 
@@ -131,7 +140,7 @@ export function createRoute(entry, data, sceneRoot, api, { name = '' } = {}) {
     if (data.avoid !== false && api.world) {
       const r = findPath(api.world, h.position, target, { radius: entry.obstacle?.r ?? 0.4, extra });
       ok = r.found;
-      if (!r.found && !extra.length) warn(`nav:${cur}`, `no encontré camino hasta "${cur}" esquivando colisiones: va en línea recta (¿el Empty queda dentro de un objeto sólido?).`);
+      if (!r.found && !extra.length) warn(`nav:${cur}`, `no encontré camino hasta "${cur}" esquivando colisiones: espera y vuelve a intentar (¿el Empty queda dentro de un objeto sólido?).`);
       pts.push(...r.points);
     } else pts.push({ x: target.x, z: target.z });
     segEnd = []; dist = 0;
@@ -164,7 +173,7 @@ export function createRoute(entry, data, sceneRoot, api, { name = '' } = {}) {
     speed = num(nodes[id].speed, num(data.speed, 1.4));
     if (Math.hypot(to.x - from.x, to.z - from.z) < 0.15) return arrive(id);
     state = 'walk';
-    plan(to);
+    if (!plan(to) && data.avoid !== false && api.world) { state = 'blocked'; timer = 1; api.play(entry, null); } // sin camino: espera y reintenta (no atraviesa)
   }
 
   const playNode = (n) => api.play(entry, n.anim || null, { loop: n.loop === true });
@@ -182,7 +191,7 @@ export function createRoute(entry, data, sceneRoot, api, { name = '' } = {}) {
     // al terminar la charla: sigue, mirando hacia donde iba (o como lo dejó el nodo)
     resume() {
       paused = false;
-      if (state === 'walk') { from.copy(h.position); plan(to); }
+      if (state === 'walk') { from.copy(h.position); if (!plan(to) && data.avoid !== false && api.world) { state = 'blocked'; timer = 1; } }
       else { const p = cur && pointOf(cur); entry.targetYaw = nodes[cur]?.face && p ? p.yaw + entry.yawOffset : h.rotation.y; resumeAnim(); }
     },
     update(dt) {
@@ -209,11 +218,21 @@ export function createRoute(entry, data, sceneRoot, api, { name = '' } = {}) {
           const w = walkName();
           if (w) api.play(entry, w); else warn('nowalk', 'el modelo no tiene un clip de caminar; se desliza con el idle. Marcá uno con 🚶 en el Studio (panel NPC) o ponelo en "walk" de la ruta.');
         }
+        const prevWalked = walked, prevSeg = seg;
         walked = Math.min(dist, walked + speed * dt);
         const f = dist > 0 ? walked / dist : 1;
         while (seg < segEnd.length - 1 && walked >= segEnd[seg]) { seg++; entry.targetYaw = heading(pts[seg + 1].x - pts[seg].x, pts[seg + 1].z - pts[seg].z); }
         const s0 = seg ? segEnd[seg - 1] : 0, sl = segEnd[seg] - s0, t = sl > 0 ? Math.min(1, (walked - s0) / sl) : 1;
-        h.position.set(pts[seg].x + (pts[seg + 1].x - pts[seg].x) * t, from.y + (to.y - from.y) * f, pts[seg].z + (pts[seg + 1].z - pts[seg].z) * t);
+        const nx = pts[seg].x + (pts[seg + 1].x - pts[seg].x) * t, ny = from.y + (to.y - from.y) * f, nz = pts[seg].z + (pts[seg + 1].z - pts[seg].z) * t;
+        // Red de seguridad: si el próximo paso lo mete en un objeto con colisión, no avanza y busca otro camino
+        if (hits(nx, ny, nz) && !hits(h.position.x, h.position.y, h.position.z)) {
+          walked = prevWalked; seg = prevSeg;
+          stuck += dt;
+          if (stuck > 0.3) { stuck = 0; from.copy(h.position); if (!plan(to)) { state = 'blocked'; walking = false; timer = 1; api.play(entry, null); } }
+          return;
+        }
+        stuck = 0;
+        h.position.set(nx, ny, nz);
         setObstacle();
         if (walked >= dist) arrive(cur);
       }

@@ -105,7 +105,16 @@ Al exportar el `.glb` tildá **Include > Custom Properties** (igual que con las 
 
 - **Herencia:** lo que pongas en un objeto padre (ej. un Empty) lo heredan sus hijos, salvo que el hijo tenga su propio valor.
 - **Atajo por nombre:** un objeto llamado `col_algo` o `colision_algo` es sólido e invisible.
-- **Sin propiedad:** vale el valor por defecto de la escena, en `data/scenes/<escena>.json`: `"collision": { "default": "solid" }` (todo sólido salvo lo marcado con `0`) o `"none"` (nada sólido salvo lo marcado con `1`). Los objetos `cielo_…` / `sky_…` nunca colisionan.
+- **Malla de colisión aparte (como en Ocarina):** para objetos muy detallados, modelá al lado una versión simple (cajas, pocos polígonos) y llamala `col_<nombre>`. El objeto detallado **deja de colisionar solo** si:
+  - se llama igual sin el prefijo: `casa` + `col_casa` (o varias piezas `col_casa_1`, `col_casa_2`…), o
+  - la malla `col_…` es **hija** del objeto detallado en Blender (*Ctrl+P > Object*).
+  Si al detallado le pusiste `colision` a mano, se respeta lo que pusiste. En la consola, `replaced` dice cuántos objetos quedaron reemplazados.
+- **Empties como colisión:** un Empty **sin hijos** llamado `col_…` es un bloque sólido e invisible, sin modelar nada.
+  - **Caja:** en Blender, *Object Data > Display As: Cube* con *Size = 1*. El tamaño y el giro se los das con Escala (S) y Rotación (R): lo que ves en Blender es lo que choca. Ideal para paredes invisibles, límites del mapa, bloques de escaleras.
+  - **Cilindro:** agregale la Custom Property `colision_forma = cilindro` (de guía, *Display As: Circle*, *Size = 1*). Radio = escala X, alto = escala Z (el centro del Empty queda a mitad de altura). Ideal para postes, troncos, columnas.
+  - Su parte de arriba es suelo (se puede caminar encima). También cuenta para reemplazar al detallado: un Empty `col_arbol` hace que `arbol` deje de colisionar. En la consola, `empties` dice cuántos encontró.
+- **Sin propiedad:** vale el valor por defecto de la escena, en `data/scenes/<escena>.json`. **Por defecto es `"none"`: las mallas que se ven no chocan**, la colisión la hacen solo los `col_…` (mallas o Empties) y lo que tenga `colision = 1`, como en Ocarina. Con `"collision": { "default": "solid" }` todo choca salvo lo marcado con `0`. Los objetos `cielo_…` / `sky_…` nunca colisionan.
+- **El suelo también necesita su colisión:** un Empty `col_suelo` (*Display As: Cube*, Size 1) estirado con la escala y con la cara de arriba a la altura del piso, o ponerle `colision = 1` al plano del suelo. Sin suelo el personaje no sube ni baja y los NPC no encuentran camino (la consola avisa).
 - **Suelo o pared:** lo decide la pendiente de cada triángulo. Hasta `maxSlope` grados (50 por defecto) es suelo; más empinado es pared; los techos no frenan. Las **normales** tienen que mirar hacia afuera (en Blender: *Overlay > Face Orientation*, todo azul).
 - **Escalones:** el personaje sube sin saltar hasta `stepHeight` (0,5 m). Algo más alto es pared.
 - **Ajustes del cuerpo** en `data/tables/player.json > collision`: `radius`, `height`, `stepHeight`, `maxSlope`, `gravity`.
@@ -138,7 +147,7 @@ Para cambiar tecla o texto, o para enlazar un clip que ya existe sin renombrarlo
 Un NPC es un modelo `.glb` con su animación, puesto en la escena con un Empty de Blender. Código: `src/actors/npc.js`.
 
 1. Exportá el modelo a `assets/models/objects/vecino.glb` (origen en los pies, frente hacia -Y de Blender) con una animación en bucle, por ejemplo una acción llamada `idle`.
-2. En el `.glb` de la escena poné un **Empty llamado `npc_vecino`** en el suelo, donde va a estar. El NPC mira hacia donde apunta la **flecha verde (eje Y)** del Empty, igual que `empty_spawn`. Duplicá el Empty para tener más de uno (`npc_vecino.001` sigue siendo "vecino"; el modelo se descarga una sola vez).
+2. En el `.glb` de la escena poné un **Empty llamado `npc_vecino`** en el suelo, donde va a estar. El NPC mira hacia donde apunta la **flecha verde (eje Y)** del Empty, igual que los spawns. Duplicá el Empty para tener más de uno (`npc_vecino.001` sigue siendo "vecino"; el modelo se descarga una sola vez).
 3. Opcional, en *Custom Properties* del Empty (tildá *Include > Custom Properties* al exportar):
 
 | Propiedad | Qué hace |
@@ -186,7 +195,8 @@ Se arma igual que las puertas y las colisiones: con **propiedades personalizadas
 **La caja de texto es parte de la imagen del juego**, como en Ocarina: se dibuja a la misma resolución (320×240), con letra de píxeles, y se escala y recorta junto con el mundo. Código: `src/ui/textbox.js` (dibujo) y `src/ui/pixel-font.js` (la fuente, Spleen 6×12 con acentos, ñ, ¿ y ¡).
 - Los renglones se cortan solos según el ancho de la caja, y si un texto no entra en **4 renglones** sigue en otra caja (no hace falta partirlo a mano). La última caja deja lugar a las opciones.
 - El nombre del que habla va en una pestañita arriba; las opciones en verde con una flechita ▶; abajo a la derecha, **▼** = sigue y **■** = termina.
-- Colores, tamaño, renglones por caja y márgenes se cambian en `STYLE`, arriba de `src/ui/textbox.js`.
+- La caja mide siempre lo mismo (4 renglones); si el texto es corto queda **centrado en el medio**, como en Ocarina.
+- Colores, tamaño, renglones por caja y márgenes, y la alineación (`valign`: `center`/`top`; `align`: `left`/`center`) se cambian en `STYLE`, arriba de `src/ui/textbox.js`.
 - Las comillas tipográficas, `…` y `—` se cambian solas por `"`, `...` y `-` (la fuente no las tiene).
 
 **En Blender:** seleccioná el Empty del NPC (ej. `npc_prueba`) > *Object Properties* > *Custom Properties* > **+** y agregá lo que necesites. Al exportar el `.glb` tildá **Include > Custom Properties** (como siempre).
@@ -260,37 +270,73 @@ Cualquier animación que ya esté dentro del `.glb` del NPC se puede usar, sin t
 - Las llaves `{clip}` también funcionan dentro de los textos de un JSON de diálogo.
 Si el clip no existe, la consola (F12) lista los que trae el archivo y el NPC sigue como estaba.
 
-## Puertas (cambio de escena)
+## Puertas y teleports
 
-Una puerta es un objeto normal y visible al que le das la propiedad de interactuable. Al acercarte aparece **"E Entrar"**; al apretar **E** (o tocar el aviso en celular) se hace un fundido a negro y se carga la escena destino. El código no oculta ni modifica el objeto.
+Un objeto normal y visible (o un Empty) que te lleva a otro punto: de la **misma escena** o de **otra escena** (otro `.glb`). Siempre con fundido a negro. El código no oculta ni modifica el objeto.
 
-**En Blender** (forma recomendada): seleccioná el objeto > *Object Properties* > *Custom Properties* y agregá
-- `puerta` = `scene_casa1` (id de la escena destino, registrada en `data/tables/scenes.json`)
-- opcional: `puerta_radio` = `3` (metros, por defecto 3) y `puerta_texto` = `Entrar`
+Hay dos modos:
+- **`auto`**: se activa solo al entrar en la zona, sin apretar nada (una baldosa, un portal, el borde de un camino).
+- **`E`**: al acercarte aparece **"E Entrar"** y viajás al apretar **E** (o tocar el aviso en celular).
 
-Al exportar el `.glb` tildá **Include > Custom Properties**. Se puede poner en cualquier objeto (la puerta, un cartel, un empty).
+**En Blender**: seleccioná el objeto > *Object Properties* > *Custom Properties* y agregá
 
-**Por nombre** (atajo): un objeto llamado `puerta_casa1` o `empty_puerta_casa1` lleva a `scene_casa1` (`puerta_X` → `scene_X`). Si existen los dos, cuentan como la misma puerta.
+| Propiedad | Valor | Por defecto |
+|---|---|---|
+| `teleport` | destino (ver abajo) | modo `auto`; en un Empty se activa al entrar en su cubo, en un objeto visible a 1 m |
+| `puerta` | destino (ver abajo) | modo `E`, radio 3 m |
+| `teleport_modo` / `puerta_modo` | `auto` o `E` | |
+| `teleport_radio` / `puerta_radio` | metros | |
+| `teleport_texto` / `puerta_texto` | texto del aviso (solo modo `E`) | `Entrar` |
 
-**Ajustes en el JSON** de la escena (pisan lo anterior), útiles para dónde aparecés al llegar:
+El **destino** es el nombre de un Empty spawn (ver la sección siguiente):
+- `spawn_muelle` → el `spawn_muelle` de la **misma escena**. Te mueve ahí sin recargar nada.
+- `spawn` → el spawn base de la misma escena.
+- `scene_casa1:spawn_cocina` → otra escena (registrada en `data/tables/scenes.json`), en su `spawn_cocina`.
+- `scene_casa1:spawn` → otra escena, en su spawn base.
+- `scene_casa1` → otra escena, en su spawn normal (`spawn_<origen>` si existe, si no `spawn`).
+
+Al exportar el `.glb` tildá **Include > Custom Properties**.
+
+Ejemplos:
+- Teleport automático en la plaza: Empty `tp_fuente` con `teleport` = `spawn_techo`, y un Empty `spawn_techo` donde querés aparecer.
+- Interactuar con un objeto para ir a otro punto: el cartel con `teleport` = `spawn_muelle` y `teleport_modo` = `E`.
+- Interactuar para cambiar de escena: la puerta con `puerta` = `scene_casa1:spawn`.
+
+**Zona de un Empty:** en Blender usá *Display As = Cube* con *Size = 1* y escalalo: ese cubo es la zona (la misma regla que los Empties `col_`). **No le pongas `col_` a un teleport**: `col_` lo vuelve una pared sólida e invisible y nunca vas a poder entrar. Usá otro nombre, por ejemplo `tp_montana`.
+
+**Ida y vuelta:** el spawn destino puede estar dentro de otro teleport automático. Después de cada viaje (y al entrar a una escena) los automáticos esperan a que salgas de su zona, así que no rebotás.
+
+**Por nombre** (atajo): un objeto llamado `puerta_casa1` o `empty_puerta_casa1` lleva a `scene_casa1` (`puerta_X` → `scene_X`) con modo `E`.
+
+**Ajustes en el JSON** de la escena (pisan lo de Blender):
 ```json
 "doors": [
-  { "empty": "puerta_casa1", "spawn": { "position": [0, 1.7, 4], "yaw": 0 } }
+  { "empty": "puerta_casa1", "target": "scene_casa1:spawn_entrada", "mode": "E", "radius": 2,
+    "spawn": { "position": [0, 1.7, 4], "yaw": 0 } }
 ]
 ```
-Sin `spawn` se usa el empty de spawn de la escena destino (ver más abajo). `position` sirve si el objeto todavía no está en el `.glb`. La distancia se mide hasta la superficie del objeto. En `dev.html` cada puerta muestra una caja con su zona de activación.
+`spawn` fija el punto exacto de llegada (a la altura de los ojos) y gana sobre el spawn del destino. `position` sirve si el objeto todavía no está en el `.glb`. La distancia se mide hasta la superficie del objeto; un Empty cuenta como una columna de 2 m desde el suelo. En `dev.html` cada uno muestra su zona: **verde agua** = con E, **naranja** = automático. La consola (F12) lista todos los de la escena con su destino.
 
-Código: `src/systems/doors.js` y `src/systems/fade.js`.
+Código: `src/systems/doors.js`, `src/systems/fade.js` y `src/game.js`.
 
-## Punto de aparición (spawn)
+## Puntos de aparición (spawns)
 
-En el `.glb` de cada escena poné un Empty llamado **`empty_spawn`** (el mismo nombre en todas las escenas). Al entrar a la escena, el jugador aparece ahí.
+Todos los lugares donde puede aparecer el jugador siguen la misma regla: son **Empties en el suelo** (la cámara se ubica 1,7 m más arriba) y el jugador mira hacia su **flecha verde (eje Y)**. Rotalo sobre Z para girar la vista.
 
-- Poné el empty **en el suelo**: la cámara se ubica 1,7 m más arriba.
-- Mira hacia donde apunta la **flecha verde (eje Y)** del empty en Blender. Rotalo sobre Z para girar la vista.
-- Opcional: `empty_spawn_casa1` se usa solo cuando llegás **desde** `scene_casa1` (se quita el `scene_` del nombre). Sirve para reaparecer afuera de la puerta correcta. Si no existe, se usa `empty_spawn`.
+| Nombre del Empty | Para qué |
+|---|---|
+| `spawn` | el spawn base de la escena (aparecés ahí al empezar o si no se pide otro) |
+| `spawn_muelle`, `spawn_techo`, … | otros puntos, para teleports y puertas: `teleport` = `spawn_muelle` |
+| `spawn_casa1` | (opcional) se usa solo cuando llegás **desde** `scene_casa1` sin pedir un spawn, para reaparecer afuera de la puerta correcta |
 
-Orden de prioridad: `spawn` de la puerta en el JSON → `empty_spawn_<origen>` → `empty_spawn` → `spawn` del JSON de la escena (que queda como respaldo si el `.glb` no tiene empty).
+- El prefijo `empty_` es opcional: `empty_spawn` y `empty_spawn_casa1` siguen funcionando.
+- **Por propiedad** (si no querés depender del nombre del objeto): a cualquier Empty agregale `spawn` = `spawn_muelle`. Con `spawn` = `1` (o vacío) es el spawn base.
+
+Orden de prioridad al llegar a una escena: `spawn` de la puerta en el JSON → spawn pedido por el teleport (`scene_x:spawn_cocina` o `scene_x:spawn`) → `spawn_<origen>` → `spawn` → `spawn` del JSON de la escena (respaldo si el `.glb` no tiene ningún empty).
+
+Código: `src/systems/spawns.js`.
+
+**Ver los spawns** (solo `dev.html`): botón **Spawns** o tecla **P**. Cada spawn es un poste de la altura del jugador con una flecha en el suelo hacia donde vas a mirar y su nombre encima (se ve a través de las paredes). Amarillo = `spawn` base · celeste = los demás · gris = el `spawn` de respaldo del JSON. Las líneas naranjas unen cada teleport con el spawn al que lleva; los que van a otra escena muestran su destino en una etiqueta. Con el **inspector**, apuntá a un poste para ver su objeto de Blender, posición, hacia dónde mira y cómo escribirlo en un `teleport`. Código: `src/systems/spawn-debug.js`.
 
 ## Versión final y modo desarrollador
 

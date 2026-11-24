@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { loadJSON, loadGLB } from '../core/assets.js';
 import { makeUnlit, setShade, isSkyName } from './shading.js';
+import { findSpawn } from './spawns.js';
 
 const _v = new THREE.Vector3();
 
@@ -48,28 +49,8 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     }
   }
 
-  const EYE_HEIGHT = 1.7; // el empty va en el suelo; la cámara se pone a esta altura
-  const spawnName = (n) => THREE.PropertyBinding.sanitizeNodeName(n);
-
-  // Busca un empty de spawn en la escena y devuelve { position, yaw }. Mira hacia donde apunta
-  // la flecha verde (eje Y) del empty en Blender.
-  function findSpawn(group, fromId) {
-    group.updateMatrixWorld(true);
-    const names = [];
-    if (fromId) names.push(`empty_spawn_${fromId.replace(/^scene_/, '')}`);
-    names.push('empty_spawn');
-    for (const n of names) {
-      const node = group.getObjectByName(spawnName(n));
-      if (!node) continue;
-      const p = node.getWorldPosition(new THREE.Vector3());
-      const f = new THREE.Vector3(0, 0, -1).applyQuaternion(node.getWorldQuaternion(new THREE.Quaternion()));
-      return { position: [p.x, p.y + EYE_HEIGHT, p.z], yaw: Math.atan2(-f.x, -f.z) };
-    }
-    return null;
-  }
-
-  async function loadScene(id, { spawn } = {}) {
-    const fromId = current?.data.id ?? null; // escena de la que venimos (para empty_spawn_<origen>)
+  async function loadScene(id, { spawn, spawnName } = {}) {
+    const fromId = current?.data.id ?? null; // escena de la que venimos (para spawn_<origen>)
     const entry = scenesTable[id];
     if (!entry) throw new Error(`La escena "${id}" no está en data/tables/scenes.json`);
 
@@ -121,12 +102,16 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
       }
     }
 
-    // Posición inicial, por orden de prioridad:
+    // Posición inicial, por orden de prioridad (los spawns se explican en spawns.js):
     //  1) "spawn" de la puerta por la que entraste (JSON)
-    //  2) empty "empty_spawn_<origen>" del .glb (solo cuando venís de esa escena; ej. empty_spawn_casa1)
-    //  3) empty "empty_spawn" del .glb
-    //  4) "spawn" del JSON de la escena
-    const sp = spawn ?? findSpawn(group, fromId) ?? data.spawn;
+    //  2) el spawn que pide el teleport ("scene_casa1:spawn_cocina", o "scene_casa1:spawn" para el base)
+    //  3) spawn_<origen>, solo cuando venís de esa escena (desde scene_casa1 -> spawn_casa1)
+    //  4) spawn (el de por defecto)
+    //  5) "spawn" del JSON de la escena
+    const fromKey = fromId ? fromId.replace(/^scene_/, '') : null;
+    if (spawnName && !spawn && !findSpawn(group, [spawnName]))
+      console.warn(`Escena "${id}": no hay ningún Empty "spawn_${spawnName}"; se usa el spawn normal.`);
+    const sp = spawn ?? findSpawn(group, [spawnName, fromKey, '']) ?? data.spawn;
     lastSpawn = sp ?? null;
     if (sp) {
       camera.position.set(...sp.position);
@@ -148,6 +133,9 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
   return {
     loadScene,
     unload,
+    // Punto de aparición desde un Empty de la escena actual: { position (ojos), yaw } o null
+    // Spawn de la escena actual por su nombre corto ("arriba" -> Empty spawn_arriba): { position (ojos), yaw } o null
+    findSpawnByName(name) { return current ? findSpawn(current.group, [name]) : null; },
     get spawn() { return lastSpawn; },
     get shade() { return shade; },
     // El cielo acompaña a la cámara para que nunca se acabe

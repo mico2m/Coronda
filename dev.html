@@ -21,14 +21,16 @@
   <div id="stage" aria-label="Escena 3D"></div>
 
   <button id="inspectToggle" class="inspect-toggle" type="button" aria-pressed="true">Inspector: activado (I)</button>
+  <button id="collisionToggle" class="inspect-toggle collision-toggle" type="button" aria-pressed="false">Colisiones: ocultas (K)</button>
+  <button id="spawnToggle" class="inspect-toggle spawn-toggle" type="button" aria-pressed="true">Spawns: visibles (P)</button>
   <div class="crosshair" id="crosshair" aria-hidden="true"></div>
   <aside class="inspector" id="inspector" aria-live="polite" aria-label="Información del objeto"></aside>
 
   <div class="loading" id="loading" aria-live="polite" hidden></div>
 
   <div class="hint" id="hint">
-    <span id="hintFree"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Espacio</kbd> subir · <kbd>Shift</kbd> bajar · arrastrar para mirar · <kbd>I</kbd> inspector · <kbd>C</kbd> personaje · rueda para la velocidad (<b id="speedOut">6</b> m/s)</span>
-    <span id="hintPlayer" hidden><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Shift</kbd> correr · arrastrar para girar la cámara · rueda para el zoom · <kbd>E</kbd> interactuar · <kbd>I</kbd> inspector · <kbd>C</kbd> cámara libre/personaje</span>
+    <span id="hintFree"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Espacio</kbd> subir · <kbd>Shift</kbd> bajar · arrastrar para mirar · <kbd>I</kbd> inspector · <kbd>K</kbd> colisiones · <kbd>P</kbd> spawns · <kbd>C</kbd> personaje · rueda para la velocidad (<b id="speedOut">6</b> m/s)</span>
+    <span id="hintPlayer" hidden><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Shift</kbd> correr · arrastrar para girar la cámara · rueda para el zoom · <kbd>E</kbd> interactuar · <kbd>I</kbd> inspector · <kbd>K</kbd> colisiones · <kbd>P</kbd> spawns · <kbd>C</kbd> cámara libre/personaje</span>
   </div>
 
   <div class="pad" id="pad" aria-label="Controles táctiles">

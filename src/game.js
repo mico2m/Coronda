@@ -57,6 +57,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
 
   let inspector = null;
   let collisionDebug = null;
+  let spawnDebug = null;
   const npcs = createNpcs();
   let dialogue = null;
   let doors = null;
@@ -132,20 +133,22 @@ export async function startGame({ dev = false, retro = null } = {}) {
     world = sceneManager;
 
     // Carga una escena y deja listas sus puertas
-    async function enterScene(id, spawn) {
-      await sceneManager.loadScene(id, { spawn });
+    async function enterScene(id, spawn, spawnName) {
+      await sceneManager.loadScene(id, { spawn, spawnName });
       doors.setup(sceneManager.current, sceneManager.root);
       // El jugador aparece en el punto de inicio de la escena (sp está a la altura de los ojos)
       // Colisiones: se leen las propiedades `colision` de los objetos del .glb (ver collision.js)
       const scol = sceneManager.current.collision ?? {};
       const cworld = buildCollision(sceneManager.root, {
-        defaultSolid: scol.default === undefined ? true : scol.default !== 'none' && scol.default !== false,
+        // Por defecto NADA colisiona: solo los col_… (mallas o Empties) y lo que tenga colision = 1. Para que todo choque: "default": "solid"
+        defaultSolid: scol.default === 'solid' || scol.default === true,
         maxSlope: playerConfig.collision?.maxSlope,
         ignore: (node) => isSkyName(node.name),
       });
       if (!cworld.hasGround) console.warn('Colisiones: la escena no tiene ninguna superficie de suelo sólida; el jugador no cambia de altura.');
       console.info(`Colisiones de "${sceneManager.current.id}":`, cworld.stats);
       collisionDebug?.attach(sceneManager.root, cworld);
+      spawnDebug?.attach(sceneManager.root, sceneManager.current, doors.list); // después de las colisiones: los postes no chocan
       player.setWorld(cworld);
       npcs.setWorld(cworld); // las rutas de los NPC esquivan los objetos con colisión
       // NPC: Empties npc_* del .glb + "actors" del JSON (ver src/actors/npc.js). Van después de armar las colisiones.
@@ -157,22 +160,40 @@ export async function startGame({ dev = false, retro = null } = {}) {
       const sp = sceneManager.spawn;
       if (sp) player.place([sp.position[0], sp.position[1] - EYE, sp.position[2]], sp.yaw ?? 0);
     }
-    // Puerta (se activa con la tecla E): fundido a negro -> cambiar de escena -> fundido desde negro
+    // Mueve al jugador (o a la cámara libre) a un punto { position (ojos), yaw } sin cambiar de escena
+    function moveTo(sp) {
+      if (mode === 'player') player.place([sp.position[0], sp.position[1] - EYE, sp.position[2]], sp.yaw ?? 0);
+      else { camera.position.set(...sp.position); controls.setLook(sp.yaw ?? 0, 0); }
+    }
+
+    // Puertas y teleports (ver systems/doors.js): fundido a negro -> viajar -> fundido desde negro.
+    //  - mismo .glb: se mueve al jugador al spawn destino (ej. spawn_muelle)
+    //  - otra escena: se carga su .glb y se aparece en el spawn pedido (o en el normal)
     doors = createDoors({
       stage,
       dev,
       blocked: () => dialogue?.blocked ?? false, // las charlas con NPC usan la misma tecla E
+      isScene: (id) => !!scenesTable[id],
       onEnter: async (door) => {
         player.frozen = true; // no se mueve durante el fundido
+        if (mode === 'free') controls.setEnabled(false);
         await fade.fadeOut();
         try {
-          await enterScene(door.target, door.spawn);
+          if (door.scene === sceneManager.current?.id) {
+            const key = door.spawnName ?? ''; // '' = el spawn base de la escena
+            const sp = door.spawn ?? sceneManager.findSpawnByName(key);
+            if (!sp) throw new Error(`Teleport "${door.id}": no existe el Empty "${key ? 'spawn_' + key : 'spawn'}" en esta escena.`);
+            moveTo(sp);
+          } else {
+            await enterScene(door.scene, door.spawn, door.spawnName);
+          }
         } catch (err) { // destino inexistente: nos quedamos donde estábamos, sin pantalla negra eterna
           console.error(err);
           ui.setStatus(String(err.message || err));
         }
         await fade.fadeIn();
         player.frozen = false;
+        if (mode === 'free') controls.setEnabled(true);
       },
     });
 
@@ -182,6 +203,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
         inspector = createInspector({ scene, camera, getRoot: () => sceneManager.root });
         const { createCollisionDebug } = await import('./systems/collision-debug.js');
         collisionDebug = createCollisionDebug();
+        const { createSpawnDebug } = await import('./systems/spawn-debug.js');
+        spawnDebug = createSpawnDebug();
       } catch (err) {
         // Si el inspector no carga, el mundo igual se muestra
         console.error(err);

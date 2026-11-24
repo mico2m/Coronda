@@ -8,6 +8,11 @@
   background: var(--panel); color: var(--fg); border: 1px solid var(--line); cursor: pointer;
 }
 .inspect-toggle[aria-pressed="true"] { border-color: var(--accent); }
+.collision-toggle { left: 200px; } /* collision-debug.js lo acomoda justo a la derecha del botón Inspector */
+.collision-toggle[aria-pressed="true"] { border-color: #ff3b3b; box-shadow: inset 3px 0 0 #3bff6b; }
+.spawn-toggle { left: 400px; } /* spawn-debug.js lo acomoda a la derecha de "Colisiones" */
+.spawn-toggle[aria-pressed="true"] { border-color: #ffd400; box-shadow: inset 3px 0 0 #38bdf8; }
+.insp-code { font-family: ui-monospace, monospace; font-size: 12px; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.08); }
 
 .crosshair { position: absolute; top: 50%; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px;
   z-index: 2; pointer-events: none; mix-blend-mode: difference; }

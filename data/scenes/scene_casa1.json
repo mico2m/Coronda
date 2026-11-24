@@ -30,7 +30,7 @@
     ],
     "yaw": 0
   },
-  "collision": { "default": "solid" },
+  "collision": { "default": "none" },
   "rooms": [
     {
       "id": "interior",

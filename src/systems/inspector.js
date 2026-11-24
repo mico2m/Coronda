@@ -154,14 +154,52 @@ export function createInspector({ scene, camera, getRoot }) {
     panel.replaceChildren(frag);
   }
 
+  // Un spawn (poste del modo "Spawns", ver spawn-debug.js)
+  function renderSpawn(s, distance) {
+    const frag = document.createDocumentFragment();
+    frag.append(el('h2', 'insp-title', s.name));
+    const dl = el('dl', 'insp-list');
+    const add = (k, v, cls) => { dl.append(el('dt', null, k)); const dd = el('dd', cls, v); dl.append(dd); return dd; };
+    add('Tipo', s.fromJson ? 'Spawn de respaldo (JSON de la escena)' : s.key ? 'Spawn' : 'Spawn base de la escena');
+    if (s.object) add('Objeto en Blender', s.object);
+    if (s.file) add('Archivo', s.file);
+    add('Posición (pies)', s.feet.map((n) => fmt(n)).join(' · '));
+    add('Mira hacia', `${Math.round(((THREE.MathUtils.radToDeg(s.yaw) % 360) + 360) % 360)}°`);
+    distanceEl = add('Distancia', `${fmt(distance)} m`);
+    frag.append(dl);
+
+    frag.append(el('h3', 'insp-sub', 'Para llegar acá'));
+    const how = el('div', 'insp-mat');
+    how.append(el('div', 'insp-tex', 'Desde esta escena:'));
+    how.append(el('div', 'insp-code', `teleport = ${s.key ? s.name : 'spawn'}`));
+    how.append(el('div', 'insp-tex', 'Desde otra escena:'));
+    how.append(el('div', 'insp-code', `teleport = ${s.scene}:${s.key ? s.name : 'spawn'}`));
+    if (s.key && !s.fromJson) how.append(el('div', 'insp-flags', `Al llegar desde "scene_${s.key}" sin pedir spawn, también se usa este.`));
+    frag.append(how);
+
+    frag.append(el('h3', 'insp-sub', 'Teleports de esta escena que llegan acá'));
+    frag.append(el('div', 'insp-tex', s.teleports.length ? s.teleports.join(', ') : 'Ninguno'));
+    panel.replaceChildren(frag);
+  }
+
   function pick() {
     const root = getRoot();
     if (!root) return showEmpty();
     camera.updateMatrixWorld();
     raycaster.setFromCamera(center, camera);
     const hits = raycaster.intersectObjects(root.children, true);
-    const hit = hits.find((h) => h.object.isMesh && h.object.visible);
+    const hit = hits.find((h) => h.object.isMesh && h.object.visible && h.object.parent?.parent?.visible !== false);
     if (!hit) return showEmpty();
+
+    const spawn = hit.object.userData.spawnMarker;
+    if (spawn) {
+      const key = `spawn:${spawn.name}`;
+      if (key !== lastKey) { lastKey = key; renderSpawn(spawn, hit.distance); }
+      else if (distanceEl) distanceEl.textContent = `${fmt(hit.distance)} m`;
+      highlight.box.setFromObject(hit.object);
+      highlight.visible = true;
+      return;
+    }
 
     const info = describeHit(hit);
     if (info.key !== lastKey) {

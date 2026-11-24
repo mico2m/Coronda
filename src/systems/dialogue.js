@@ -211,6 +211,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
       shown: Math.floor(s.shown),
       choices: s.choices.map((c) => c.text),
       choicesVisible: s.picking,
+      reserve: s.page === s.pages.length - 1 ? s.node.choices.length : 0, // lugar para las opciones que vienen
       sel: s.sel,
       more,
     });

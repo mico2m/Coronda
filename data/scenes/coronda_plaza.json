@@ -35,7 +35,7 @@
     ],
     "yaw": 0
   },
-  "collision": { "default": "solid" },
+  "collision": { "default": "none" },
   "rooms": [
     {
       "id": "principal",
@@ -46,16 +46,5 @@
   "actors": [
     { "empty": "npc_tokse", "id": "tokse" }
   ],
-  "doors": [
-    {
-      "empty": "puerta_casa1",
-      "radius": 2.5,
-      "target": "scene_casa1",
-      "position": [
-        0,
-        1.7,
-        22
-      ]
-    }
-  ]
+  "doors": []
 }

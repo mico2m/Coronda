@@ -1,3 +1,3 @@
 {
-  "plaza_dia": { "file": "audio/music/coronda_plaza.mp3", "loop": true, "volume": 0.8 }
+  "coronda_plaza": { "file": "audio/music/coronda_plaza.mp3", "loop": true, "volume": 0.8 }
 }

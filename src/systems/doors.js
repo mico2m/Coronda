@@ -22,7 +22,8 @@ export const doorIdFromName = (name) => NAME_RE.exec(name ?? '')?.[1] ?? null;
 
 const _p = new THREE.Vector3();
 
-export function createDoors({ stage, onEnter, dev = false }) {
+// `blocked`: función que devuelve true mientras algo más usa la tecla E (una charla con un NPC); la puerta espera.
+export function createDoors({ stage, onEnter, dev = false, blocked = () => false }) {
   let doors = [];
   let helpers = null;
   let busy = false;
@@ -37,7 +38,7 @@ export function createDoors({ stage, onEnter, dev = false }) {
   stage.parentElement.appendChild(prompt);
 
   function trigger() {
-    if (!near || busy) return;
+    if (!near || busy || blocked()) return;
     const door = near;
     busy = true;
     prompt.hidden = true;
@@ -132,6 +133,10 @@ export function createDoors({ stage, onEnter, dev = false }) {
     // `focus`: punto del jugador (o de la cámara libre) que se compara con cada puerta
     update(focus) {
       if (busy) return;
+      if (blocked()) { // un NPC tiene prioridad: se esconde el aviso de la puerta
+        if (near) { near = null; prompt.hidden = true; }
+        return;
+      }
       _p.copy(focus);
       let best = null, bestD = Infinity;
       for (const d of doors) {

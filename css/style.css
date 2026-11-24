@@ -113,14 +113,14 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 }
 .fade.on { opacity: 1; pointer-events: all; }
 
-/* Aviso de puerta: "E Entrar" */
-.door-prompt {
+/* Aviso de puerta ("E Entrar") y de NPC ("E Hablar") */
+.door-prompt, .talk-prompt {
   position: absolute; left: 50%; bottom: 18%; transform: translateX(-50%); z-index: 2;
   display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 15px;
   background: var(--panel); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-.door-prompt[hidden] { display: none; }
-.door-prompt kbd { font: 600 13px var(--font-body); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 7px; }
+.door-prompt[hidden], .talk-prompt[hidden] { display: none; }
+.door-prompt kbd, .talk-prompt kbd { font: 600 13px var(--font-body); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 7px; }
 
 /* Botones de acciones del personaje (acostarse, saludar…): se crean solos desde las animaciones accion_* */
 .actions { position: absolute; right: 12px; bottom: 12px; z-index: 2; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
@@ -131,3 +131,30 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 /* Modo retro: el canvas tiene resolución fija (ej. 320x240) y se escala con píxeles nítidos, manteniendo la proporción */
 #stage.retro { background: #000; display: flex; align-items: center; justify-content: center; }
 #stage.retro canvas { width: 100%; height: 100%; object-fit: contain; image-rendering: crisp-edges; image-rendering: pixelated; }
+
+/* Diálogo con NPC: caja abajo, nombre, texto que se escribe solo y opciones */
+.dialogue {
+  position: absolute; left: 50%; transform: translateX(-50%); z-index: 5; box-sizing: border-box;
+  bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  width: min(720px, calc(100% - 24px)); padding: 14px 18px 16px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+}
+.dialogue[hidden] { display: none; }
+.dialogue-name { margin-bottom: 8px; font: 600 12px/1 var(--font-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.dialogue-name:empty { display: none; }
+.talking .hint, .talking .pad, .talking .actions { visibility: hidden; }
+.dialogue-text { margin: 0; min-height: 1.5em; font-size: 16px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dialogue-rest { visibility: hidden; }
+.dialogue-more { position: absolute; right: 16px; bottom: 10px; font-size: 12px; color: var(--accent); animation: dialogue-blink 1s steps(2, start) infinite; }
+.dialogue-more[hidden] { display: none; }
+@keyframes dialogue-blink { to { visibility: hidden; } }
+.dialogue-choices { display: grid; gap: 6px; margin-top: 10px; }
+.dialogue-choices:empty { display: none; }
+.dialogue-choice { display: flex; gap: 6px; align-items: baseline; text-align: left; font-size: 14px; line-height: 1.35; }
+.dialogue-choice kbd { font: 600 11px var(--font-body); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+.dialogue-choice.sel { border-color: var(--accent); background: var(--bg); }
+.dialogue-choice.sel kbd { border-color: var(--accent); color: var(--accent); }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+@media (prefers-reduced-motion: reduce) { .dialogue-more { animation: none; } }

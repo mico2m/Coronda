@@ -11,6 +11,7 @@ import { createDoors } from './systems/doors.js';
 import { createPlayer } from './actors/player.js';
 import { buildCollision } from './systems/collision.js';
 import { createNpcs } from './actors/npc.js';
+import { createDialogue } from './systems/dialogue.js';
 import { isSkyName } from './systems/shading.js';
 
 const _focus = new THREE.Vector3();
@@ -56,6 +57,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
   let inspector = null;
   let collisionDebug = null;
   const npcs = createNpcs();
+  let dialogue = null;
   let doors = null;
   let player = null;
   let world = null; // gestor de escenas (para mover el cielo)
@@ -63,6 +65,16 @@ export async function startGame({ dev = false, retro = null } = {}) {
   const hintFree = document.getElementById('hintFree');
   const hintPlayer = document.getElementById('hintPlayer');
   const EYE = 1.7; // altura de los ojos de la cámara libre sobre el suelo
+
+  // Charlas con NPC (ver systems/dialogue.js): mientras dura, el jugador (o la cámara libre) no se mueve.
+  // Se libera un instante después para que la tecla que cierra la charla no active otra cosa (ej. una acción 1, 2, 3).
+  dialogue = createDialogue({
+    stage,
+    npcs,
+    onStart: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
+    onEnd: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
+    onError: (msg) => ui.setStatus(msg),
+  });
 
   function setMode(m) {
     mode = m;
@@ -79,7 +91,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     if (hintPlayer) hintPlayer.hidden = !asPlayer;
   }
   // En dev, C alterna entre cámara libre y personaje
-  if (dev) window.addEventListener('keydown', (e) => { if (e.code === 'KeyC' && !e.repeat && player) setMode(mode === 'player' ? 'free' : 'player'); });
+  if (dev) window.addEventListener('keydown', (e) => { if (e.code === 'KeyC' && !e.repeat && player && !dialogue?.active) setMode(mode === 'player' ? 'free' : 'player'); });
 
   let last = performance.now();
   const interval = retro?.fps ? 1000 / retro.fps : 0;
@@ -94,10 +106,10 @@ export async function startGame({ dev = false, retro = null } = {}) {
     npcs.update(dt);
     inspector?.update(dt);
     world?.updateSky(camera.position);
-    if (doors) {
-      if (mode === 'player' && player) doors.update(_focus.copy(player.position).setY(player.position.y + 1));
-      else doors.update(camera.position);
-    }
+    // Punto que se compara con puertas y NPC: el jugador (a la altura del pecho) o la cámara libre
+    const focus = mode === 'player' && player ? _focus.copy(player.position).setY(player.position.y + 1) : camera.position;
+    dialogue?.update(focus, dt);
+    doors?.update(focus);
     renderer.render(scene, camera);
   }
   requestAnimationFrame(frame);
@@ -133,6 +145,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       // NPC: Empties npc_* del .glb + "actors" del JSON (ver src/actors/npc.js). Van después de armar las colisiones.
       const npcInfo = await npcs.setup(sceneManager.root, sceneManager.current, sceneManager.shade);
       player.setObstacles(npcs.obstacles);
+      dialogue.setup(); // los NPC con diálogo (npc_texto / npc_dialogo)
       if (npcInfo.missing.length) ui.setStatus(`NPC: no se pudo cargar ${npcInfo.missing.join(', ')}`);
       player.setShade(sceneManager.shade); // mismo tono y brillo que la escena
       const sp = sceneManager.spawn;
@@ -142,6 +155,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     doors = createDoors({
       stage,
       dev,
+      blocked: () => dialogue?.blocked ?? false, // las charlas con NPC usan la misma tecla E
       onEnter: async (door) => {
         player.frozen = true; // no se mueve durante el fundido
         await fade.fadeOut();

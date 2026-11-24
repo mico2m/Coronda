@@ -24,13 +24,14 @@ Coronda/
 │   ├── tables/
 │   │   ├── scenes.json     lista de escenas y cuál arranca
 │   │   └── music.json      id de música → archivo
-│   └── scenes/             una escena por archivo (ambiente, spawn, salas, música)
+│   ├── scenes/             una escena por archivo (ambiente, spawn, salas, música)
+│   └── dialogues/          conversaciones con opciones de los NPC (un JSON por NPC)
 └── src/                    código
     ├── main.js             arranque de la versión final
     ├── dev.js              arranque del modo desarrollador
     ├── game.js             motor compartido por los dos
     ├── core/               utilidades base (carga de archivos)
-    ├── systems/            cámara, audio, gestor de escenas, colisiones, inspector (solo dev)
+    ├── systems/            cámara, audio, gestor de escenas, colisiones, puertas, diálogos, inspector (solo dev)
     ├── actors/             personajes y objetos con comportamiento (próximamente)
     └── ui/                 interfaz
 ```
@@ -155,7 +156,63 @@ También se puede ajustar o crear desde `data/scenes/<escena>.json > "actors"`:
   { "id": "gato", "model": "gato", "position": [3, 0, 5], "yaw": 90 }
 ]
 ```
-La primera línea ajusta un NPC que viene del `.glb`; la segunda crea uno que no está en el `.glb` (`yaw` en grados). Si un clip no existe, la consola (F12) lista los que trae el archivo. Por ahora los NPC están quietos en su lugar y el jugador los rodea; hablarles y que caminen es el paso siguiente.
+La primera línea ajusta un NPC que viene del `.glb`; la segunda crea uno que no está en el `.glb` (`yaw` en grados). Si un clip no existe, la consola (F12) lista los que trae el archivo. Los NPC están quietos en su lugar y el jugador los rodea. Para hablarles, ver **Diálogos con NPC** (abajo); que caminen es un paso que viene después.
+
+## Diálogos con NPC
+
+Se arma igual que las puertas y las colisiones: con **propiedades personalizadas en Blender**, en el mismo Empty `npc_…` del NPC. Al acercarte (2,5 m por defecto) aparece **"E Hablar"**; al apretar **E** (o tocar el aviso) se abre la caja de texto abajo y el NPC se da vuelta hacia vos. Mientras hablás el personaje no se mueve y las puertas esperan. Código: `src/systems/dialogue.js`.
+
+**En Blender:** seleccioná el Empty del NPC (ej. `npc_prueba`) > *Object Properties* > *Custom Properties* > **+** y agregá lo que necesites. Al exportar el `.glb` tildá **Include > Custom Properties** (como siempre).
+
+| Propiedad | Ejemplo | Qué hace |
+|---|---|---|
+| `npc_texto` | `Hola, vecino.\|¿Cómo andás?` | Frases sueltas. Cada `\|` es una página nueva; un `\n` es un salto de línea. Es lo más rápido para un NPC que solo habla |
+| `npc_dialogo` | `tokse` | Conversación con opciones: usa `data/dialogues/tokse.json` (formato abajo) |
+| `npc_nombre` | `Don Tokse` | Nombre que se ve arriba de la caja. Si falta: el del archivo de diálogo o el del Empty (`npc_prueba` → "Prueba") |
+| `npc_hablar_radio` | `3` | Metros a los que aparece el aviso (2,5 por defecto) |
+| `npc_hablar_texto` | `Charlar` | Lo que dice el aviso (por defecto "Hablar") |
+| `npc_mirar` | `0` | `0` = el NPC no se da vuelta hacia vos (por defecto sí) |
+
+Si tiene `npc_texto` y `npc_dialogo`, manda `npc_dialogo`; si ese archivo no se puede leer, se usa `npc_texto` y la consola (F12) avisa. Un NPC sin ninguna de las dos no tiene aviso y se comporta como antes.
+
+**Controles:** `E` / `Espacio` / `Enter` o tocar la caja: avanzar (si el texto se está escribiendo, lo completa) · `1`–`9` o click/toque: elegir una opción · `↑` `↓` (o `W` `S`) y `E`: elegir con teclado · `Esc`: cerrar. Con "reducir movimiento" activado en el sistema, el texto aparece de una vez.
+
+### Conversaciones con opciones (`data/dialogues/<id>.json`)
+
+Es un conjunto de **nodos**; cada nodo es lo que dice el NPC y a dónde va después:
+
+```json
+{
+  "speaker": "Tokse",
+  "start": "inicio",
+  "nodes": {
+    "inicio": { "text": ["¡Hola!", "¿Primera vez por acá?"], "next": "menu" },
+    "menu": {
+      "text": "¿Necesitás algo?",
+      "choices": [
+        { "text": "¿Qué hay para hacer?", "next": "que_hacer" },
+        { "text": "Nada, gracias.", "next": "chau" }
+      ]
+    },
+    "que_hacer": { "text": "Caminá y mirá todo.", "next": "menu" },
+    "chau": { "text": "¡Nos vemos!" }
+  }
+}
+```
+
+- `text`: un texto, o una lista (cada elemento es una página).
+- `choices`: opciones que aparecen al terminar de leer. Una opción sin `next` cierra la charla.
+- `next`: nodo al que sigue al terminar de leer. Sin `next` ni `choices`, la charla termina.
+- `speaker`: nombre del que habla (arriba del archivo para todos los nodos, o en un nodo para ese solo).
+- `start`: nodo inicial (por defecto, el primero).
+- Hay un ejemplo en `data/dialogues/tokse.json`.
+
+También se puede definir desde `data/scenes/<escena>.json > "actors"` (pisa lo que venga de Blender): `"dialogue"`, `"text"` (texto o lista), `"speaker"`, `"talkRadius"`, `"talkLabel"`, `"look"`:
+```json
+"actors": [ { "empty": "npc_prueba", "dialogue": "tokse", "speaker": "Tokse" } ]
+```
+
+Si el NPC y una puerta están cerca a la vez, gana el NPC; al alejarte vuelve el aviso de la puerta.
 
 ## Puertas (cambio de escena)
 

@@ -12,10 +12,12 @@
 //       npc_escala = 1              tamaño
 //       npc_radio  = 0.4            qué tan "ancho" es para que el jugador no lo atraviese (m)
 //       npc_giro   = 0              grados extra de giro
+//     Para hablarle (npc_texto, npc_dialogo, npc_nombre, npc_hablar_radio, npc_hablar_texto, npc_mirar) ver src/systems/dialogue.js.
 //
 // También se pueden definir/ajustar en el JSON de la escena (data/scenes/*.json > "actors"):
 //   { "empty": "npc_vecino", "animation": "idle", "scale": 1 }                 ajusta el que viene del .glb
 //   { "id": "gato", "model": "gato", "position": [3, 0, 5], "yaw": 90 }        NPC que no está en el .glb
+//   (para diálogos también: "dialogue", "text", "speaker", "talkRadius", "talkLabel", "look")
 // (yaw en grados; 0 mira hacia el frente de Blender, -Y).
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -32,6 +34,12 @@ const modelPath = (v, id) => {
   if (/[\\/]/.test(s)) return s; // ruta completa (assets/models/objects/otro.glb)
   return `${DIR}${s.replace(/\.glb$/i, '')}.glb`; // "personaje" y "personaje.glb" valen lo mismo
 };
+const flag = (v, d) => (v === undefined || v === '' || v === null ? d : !(v === false || v === 0 || /^(?:0|false|no|off)$/i.test(String(v).trim())));
+const humanize = (id) => { const t = String(id).replace(/_+/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
+// "Hola|¿Cómo andás?" -> ["Hola", "¿Cómo andás?"]; un \n escrito en Blender (barra y n) es un salto de línea
+const splitPages = (v) => String(v ?? '').split('|').map((t) => t.replace(/\\n/g, '\n').trim()).filter(Boolean);
+const TALK_KEYS = ['speaker', 'text', 'dialogue', 'talkRadius', 'talkLabel', 'look'];
+const TAU = Math.PI * 2;
 const num = (v, d) => (v !== undefined && v !== '' && v !== null && Number.isFinite(Number(v)) ? Number(v) : d);
 
 export function createNpcs() {
@@ -62,6 +70,8 @@ export function createNpcs() {
           name: o.name,
           id: m[1].replace(/\d{3}$/, ''), // npc_vecino.001 -> (three lo guarda como npc_vecino001) -> vecino
           model: u.npc_modelo, animation: u.npc_anim, scale: u.npc_escala, radius: u.npc_radio, yawOffset: u.npc_giro,
+          speaker: u.npc_nombre, text: u.npc_texto, dialogue: u.npc_dialogo,
+          talkRadius: u.npc_hablar_radio, talkLabel: u.npc_hablar_texto, look: u.npc_mirar,
           position: p, yaw: Math.atan2(f.x, f.z),
         });
       });
@@ -71,12 +81,13 @@ export function createNpcs() {
         const name = a.empty ?? a.name;
         const found = name && defs.find((d) => d.name === THREE.PropertyBinding.sanitizeNodeName(name));
         if (found) {
-          for (const k of ['model', 'animation', 'scale', 'radius', 'yawOffset']) if (a[k] !== undefined) found[k] = a[k];
+          for (const k of ['model', 'animation', 'scale', 'radius', 'yawOffset', ...TALK_KEYS]) if (a[k] !== undefined) found[k] = a[k];
           if (a.id) found.id = a.id;
         } else if (Array.isArray(a.position)) {
           defs.push({
             name: a.id ?? name ?? 'npc', id: a.id ?? (String(name ?? '').replace(/^npc_/i, '') || 'npc'),
             model: a.model, animation: a.animation, scale: a.scale, radius: a.radius, yawOffset: a.yawOffset,
+            speaker: a.speaker, text: a.text, dialogue: a.dialogue, talkRadius: a.talkRadius, talkLabel: a.talkLabel, look: a.look,
             position: new THREE.Vector3(...a.position), yaw: (a.yaw ?? 0) * DEG,
           });
         } else if (name) {
@@ -133,14 +144,36 @@ export function createNpcs() {
           console.warn(`NPC "${d.id}": ${path} no trae animaciones (exportá con Animation > Actions).`);
         }
 
-        list.push({ id: d.id, holder, mixer });
+        // Datos para hablarle (ver systems/dialogue.js); null = no tiene nada que decir
+        const pages = Array.isArray(d.text) ? d.text.map(String) : splitPages(d.text);
+        const dialogue = String(d.dialogue ?? '').trim();
+        const talk = (dialogue || pages.length) ? {
+          speaker: String(d.speaker ?? '').trim() || null,   // el que pusiste vos (npc_nombre)
+          defaultSpeaker: humanize(d.id),                    // si no pusiste nombre
+          pages, dialogue: dialogue || null,
+          radius: num(d.talkRadius, 2.5),
+          label: String(d.talkLabel ?? '').trim() || 'Hablar',
+          look: flag(d.look, true),
+        } : null;
+        const yawOffset = num(d.yawOffset, 0) * DEG;
+        list.push({ id: d.id, holder, mixer, talk, yawOffset, baseYaw: holder.rotation.y, targetYaw: holder.rotation.y });
         obstacles.push({ x: d.position.x, z: d.position.z, r: num(d.radius, 0.4) });
       }
       return { count: list.length, missing: [...missing] };
     },
 
+    // Girar hacia un punto (el jugador, mientras hablan) y volver a la posición original
+    faceTowards(n, x, z) { n.targetYaw = Math.atan2(x - n.holder.position.x, z - n.holder.position.z) + n.yawOffset; },
+    release(n) { n.targetYaw = n.baseYaw; },
+
     update(dt) {
-      for (const n of list) n.mixer?.update(dt);
+      for (const n of list) {
+        n.mixer?.update(dt);
+        const cur = n.holder.rotation.y;
+        if (cur === n.targetYaw) continue;
+        const diff = ((n.targetYaw - cur + Math.PI) % TAU + TAU) % TAU - Math.PI; // camino corto
+        n.holder.rotation.y = Math.abs(diff) < 0.003 ? n.targetYaw : cur + diff * Math.min(1, dt * 10);
+      }
     },
   };
 }

@@ -3,11 +3,14 @@
 //
 // Cómo se arma, en Blender (Object Properties > Custom Properties del Empty npc_*; tildá Include > Custom Properties al exportar):
 //   npc_texto         = "Hola|¿Cómo andás?"   frases sueltas; cada "|" es una página nueva (y "\n" un salto de línea)
+//                       Con {clip} el NPC hace esa animación al llegar a esa página: "¡Hola!{saludar_vuelve}|¿Cómo andás?{}"
+//                       ({} vuelve al idle). La marca no se ve en pantalla. También sirve dentro de los textos del JSON.
 //   npc_dialogo       = "tokse"               conversación con opciones: usa data/dialogues/tokse.json (ver README)
 //   npc_nombre        = "Tokse"               nombre que se ve arriba de la caja (por defecto, el del Empty sin "npc_")
 //   npc_hablar_radio  = 2.5                   a cuántos metros aparece el aviso
 //   npc_hablar_texto  = "Hablar"              lo que dice el aviso
 //   npc_mirar         = 1                     0 = el NPC no se da vuelta hacia vos
+//   npc_anim_hablar   = "hablar"              animación del NPC (un clip de su .glb) mientras dura la charla
 // Si tiene las dos, manda npc_dialogo; si ese archivo no se puede leer, se usa npc_texto.
 // También se puede definir en el JSON de la escena (actors): "dialogue", "text", "speaker", "talkRadius", "talkLabel", "look".
 //
@@ -18,7 +21,9 @@
 //       "menu":   { "text": "Elegí.", "choices": [ { "text": "Nada", "next": "chau" }, { "text": "Contame", "next": "inicio" } ] },
 //       "chau":   { "text": "Nos vemos." } } }
 // Cada nodo tiene "text" (un texto o una lista de páginas), y opcionalmente "choices" (opciones), "next" (a qué nodo
-// sigue al terminar de leer) y "speaker". Sin "next" ni "choices" la conversación termina. Una opción sin "next" también termina.
+// sigue al terminar de leer), "speaker" y "anim" (clip del NPC que se reproduce al llegar a ese nodo; "" = vuelve al idle;
+// si termina en "_vuelve" se reproduce una vez y vuelve solo). Sin "next" ni "choices" la conversación termina.
+// Una opción sin "next" también termina. Al cerrarse la charla el NPC vuelve a su animación de siempre.
 import { loadJSON } from '../core/assets.js';
 
 const DIR = 'data/dialogues/';
@@ -117,6 +122,7 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
     box.hidden = false;
     onStart?.(entry);
     if (entry.talk.look) npcs.faceTowards(entry, focus.x, focus.z);
+    if (entry.talk.talkAnim) npcs.play(entry, entry.talk.talkAnim);
     goto(script.start);
   }
 
@@ -136,13 +142,21 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
     const raw = s.script.nodes[id];
     if (!raw) { console.warn(`Diálogo: no existe el nodo "${id}".`); end(); return; }
     s.node = normalize(raw);
+    if (raw.anim !== undefined) npcs.play(s.entry, raw.anim); // sin "anim" sigue la que estaba
     s.pages = s.node.pages.length ? s.node.pages : [''];
     s.page = 0;
     showPage();
   }
 
   function showPage() {
-    s.text = s.pages[s.page];
+    // Marca de animación {clip} dentro de la página: se ejecuta y se saca del texto
+    let raw = s.pages[s.page];
+    const mark = /\{([^{}]*)\}/.exec(raw);
+    if (mark) {
+      raw = (raw.slice(0, mark.index) + raw.slice(mark.index + mark[0].length)).trim();
+      npcs.play(s.entry, mark[1]);
+    }
+    s.text = raw;
     s.shown = reduceMotion() ? s.text.length : 0;
     s.picking = false;
     s.choices = [];

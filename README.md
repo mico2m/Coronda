@@ -172,6 +172,7 @@ Se arma igual que las puertas y las colisiones: con **propiedades personalizadas
 | `npc_hablar_radio` | `3` | Metros a los que aparece el aviso (2,5 por defecto) |
 | `npc_hablar_texto` | `Charlar` | Lo que dice el aviso (por defecto "Hablar") |
 | `npc_mirar` | `0` | `0` = el NPC no se da vuelta hacia vos (por defecto sí) |
+| `npc_anim_hablar` | `hablar` | Animación del NPC mientras dura la charla (ver **Animaciones del NPC al hablar**) |
 
 Si tiene `npc_texto` y `npc_dialogo`, manda `npc_dialogo`; si ese archivo no se puede leer, se usa `npc_texto` y la consola (F12) avisa. Un NPC sin ninguna de las dos no tiene aviso y se comporta como antes.
 
@@ -204,15 +205,33 @@ Es un conjunto de **nodos**; cada nodo es lo que dice el NPC y a dónde va despu
 - `choices`: opciones que aparecen al terminar de leer. Una opción sin `next` cierra la charla.
 - `next`: nodo al que sigue al terminar de leer. Sin `next` ni `choices`, la charla termina.
 - `speaker`: nombre del que habla (arriba del archivo para todos los nodos, o en un nodo para ese solo).
+- `anim`: clip del NPC que se reproduce al llegar a ese nodo (ver abajo).
 - `start`: nodo inicial (por defecto, el primero).
 - Hay un ejemplo en `data/dialogues/tokse.json`.
 
-También se puede definir desde `data/scenes/<escena>.json > "actors"` (pisa lo que venga de Blender): `"dialogue"`, `"text"` (texto o lista), `"speaker"`, `"talkRadius"`, `"talkLabel"`, `"look"`:
+También se puede definir desde `data/scenes/<escena>.json > "actors"` (pisa lo que venga de Blender): `"dialogue"`, `"text"` (texto o lista), `"speaker"`, `"talkRadius"`, `"talkLabel"`, `"look"`, `"talkAnim"`:
 ```json
 "actors": [ { "empty": "npc_prueba", "dialogue": "tokse", "speaker": "Tokse" } ]
 ```
 
 Si el NPC y una puerta están cerca a la vez, gana el NPC; al alejarte vuelve el aviso de la puerta.
+
+### Animaciones del NPC al hablar
+
+Cualquier animación que ya esté dentro del `.glb` del NPC se puede usar, sin tocar código. Lo mismo que con el jugador: una acción por animación en Blender (con *Fake User*) y al exportar *Animation > Mode: Actions*. El nombre se escribe como se llama el clip (sin importar mayúsculas; sirve que empiece igual, `hablar` encuentra `hablar.001`).
+
+- **Durante toda la charla:** propiedad `npc_anim_hablar` = `hablar` en el Empty. Al abrir el diálogo el NPC pasa de su `npc_anim` (idle) a ese clip, en bucle, con transición. Al cerrar la charla (o con `Esc`) vuelve al idle.
+- **En una frase puntual, desde Blender:** escribí el clip entre llaves dentro de `npc_texto`, pegado a la frase donde querés que ocurra. Las llaves no se ven en pantalla y `{}` vuelve al idle:
+  `¡Hola!{saludar_vuelve}|¿Cómo andás?|Bueno, chau.{}`
+  (en la primera página saluda una vez; la segunda sigue en idle; la tercera vuelve a idle). Una marca vale desde esa página hasta que otra la cambie.
+- **En un momento puntual, desde el JSON:** `"anim"` en un nodo del JSON de diálogo. Se reproduce al llegar a ese nodo y sigue hasta que otro nodo la cambie. `"anim": ""` vuelve al idle.
+  ```json
+  "inicio": { "text": "¡Hola!", "anim": "saludar_vuelve", "next": "menu" },
+  "menu":   { "text": "¿Necesitás algo?", "anim": "", "choices": [ ... ] }
+  ```
+- **Una sola vez:** si el nombre del clip termina en `_vuelve` (como `saludar_vuelve`), se reproduce una vez y el NPC regresa solo al idle. Sin ese sufijo, el clip se repite.
+- Las llaves `{clip}` también funcionan dentro de los textos de un JSON de diálogo.
+Si el clip no existe, la consola (F12) lista los que trae el archivo y el NPC sigue como estaba.
 
 ## Puertas (cambio de escena)
 

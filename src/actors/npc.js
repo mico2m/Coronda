@@ -12,12 +12,12 @@
 //       npc_escala = 1              tamaño
 //       npc_radio  = 0.4            qué tan "ancho" es para que el jugador no lo atraviese (m)
 //       npc_giro   = 0              grados extra de giro
-//     Para hablarle (npc_texto, npc_dialogo, npc_nombre, npc_hablar_radio, npc_hablar_texto, npc_mirar) ver src/systems/dialogue.js.
+//     Para hablarle (npc_texto, npc_dialogo, npc_nombre, npc_hablar_radio, npc_hablar_texto, npc_mirar, npc_anim_hablar) ver src/systems/dialogue.js.
 //
 // También se pueden definir/ajustar en el JSON de la escena (data/scenes/*.json > "actors"):
 //   { "empty": "npc_vecino", "animation": "idle", "scale": 1 }                 ajusta el que viene del .glb
 //   { "id": "gato", "model": "gato", "position": [3, 0, 5], "yaw": 90 }        NPC que no está en el .glb
-//   (para diálogos también: "dialogue", "text", "speaker", "talkRadius", "talkLabel", "look")
+//   (para diálogos también: "dialogue", "text", "speaker", "talkRadius", "talkLabel", "look", "talkAnim")
 // (yaw en grados; 0 mira hacia el frente de Blender, -Y).
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
@@ -38,7 +38,8 @@ const flag = (v, d) => (v === undefined || v === '' || v === null ? d : !(v === 
 const humanize = (id) => { const t = String(id).replace(/_+/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
 // "Hola|¿Cómo andás?" -> ["Hola", "¿Cómo andás?"]; un \n escrito en Blender (barra y n) es un salto de línea
 const splitPages = (v) => String(v ?? '').split('|').map((t) => t.replace(/\\n/g, '\n').trim()).filter(Boolean);
-const TALK_KEYS = ['speaker', 'text', 'dialogue', 'talkRadius', 'talkLabel', 'look'];
+const TALK_KEYS = ['speaker', 'text', 'dialogue', 'talkRadius', 'talkLabel', 'look', 'talkAnim'];
+const ANIM_FADE = 0.2; // segundos de transición entre animaciones
 const TAU = Math.PI * 2;
 const num = (v, d) => (v !== undefined && v !== '' && v !== null && Number.isFinite(Number(v)) ? Number(v) : d);
 
@@ -46,7 +47,7 @@ export function createNpcs() {
   let list = [];       // { id, holder, mixer }
   let obstacles = [];  // { x, z, r }: para que el jugador no los atraviese
 
-  return {
+  const api = {
     get obstacles() { return obstacles; },
     get list() { return list; },
 
@@ -71,7 +72,7 @@ export function createNpcs() {
           id: m[1].replace(/\d{3}$/, ''), // npc_vecino.001 -> (three lo guarda como npc_vecino001) -> vecino
           model: u.npc_modelo, animation: u.npc_anim, scale: u.npc_escala, radius: u.npc_radio, yawOffset: u.npc_giro,
           speaker: u.npc_nombre, text: u.npc_texto, dialogue: u.npc_dialogo,
-          talkRadius: u.npc_hablar_radio, talkLabel: u.npc_hablar_texto, look: u.npc_mirar,
+          talkRadius: u.npc_hablar_radio, talkLabel: u.npc_hablar_texto, look: u.npc_mirar, talkAnim: u.npc_anim_hablar,
           position: p, yaw: Math.atan2(f.x, f.z),
         });
       });
@@ -87,7 +88,7 @@ export function createNpcs() {
           defs.push({
             name: a.id ?? name ?? 'npc', id: a.id ?? (String(name ?? '').replace(/^npc_/i, '') || 'npc'),
             model: a.model, animation: a.animation, scale: a.scale, radius: a.radius, yawOffset: a.yawOffset,
-            speaker: a.speaker, text: a.text, dialogue: a.dialogue, talkRadius: a.talkRadius, talkLabel: a.talkLabel, look: a.look,
+            speaker: a.speaker, text: a.text, dialogue: a.dialogue, talkRadius: a.talkRadius, talkLabel: a.talkLabel, look: a.look, talkAnim: a.talkAnim,
             position: new THREE.Vector3(...a.position), yaw: (a.yaw ?? 0) * DEG,
           });
         } else if (name) {
@@ -127,6 +128,7 @@ export function createNpcs() {
         group.add(holder);
 
         let mixer = null;
+        let idle = null;
         const want = String(d.animation ?? 'idle').trim().toLowerCase();
         if (g.animations.length) {
           mixer = new THREE.AnimationMixer(model);
@@ -136,6 +138,7 @@ export function createNpcs() {
             const act = mixer.clipAction(clip);
             act.play();
             act.time = Math.random() * clip.duration; // NPC iguales no se mueven al unísono
+            idle = act;
           } else {
             const names = g.animations.map((c) => c.name);
             console.warn(`NPC "${d.id}": no hay un clip llamado "${want}" en ${path}. Clips: ${names.slice(0, 12).join(', ')}${names.length > 12 ? ', …' : ''}`);
@@ -154,9 +157,14 @@ export function createNpcs() {
           radius: num(d.talkRadius, 2.5),
           label: String(d.talkLabel ?? '').trim() || 'Hablar',
           look: flag(d.look, true),
+          talkAnim: String(d.talkAnim ?? '').trim() || null, // animación mientras habla (npc_anim_hablar)
         } : null;
         const yawOffset = num(d.yawOffset, 0) * DEG;
-        list.push({ id: d.id, holder, mixer, talk, yawOffset, baseYaw: holder.rotation.y, targetYaw: holder.rotation.y });
+        const entry = { id: d.id, holder, mixer, talk, yawOffset, baseYaw: holder.rotation.y, targetYaw: holder.rotation.y,
+          clips: g.animations, idle, current: idle };
+        // Un clip "…_vuelve" se reproduce una vez y el NPC vuelve solo a su idle
+        mixer?.addEventListener('finished', (e) => { if (e.action === entry.current && entry.current !== entry.idle) api.play(entry, null); });
+        list.push(entry);
         obstacles.push({ x: d.position.x, z: d.position.z, r: num(d.radius, 0.4) });
       }
       return { count: list.length, missing: [...missing] };
@@ -164,7 +172,32 @@ export function createNpcs() {
 
     // Girar hacia un punto (el jugador, mientras hablan) y volver a la posición original
     faceTowards(n, x, z) { n.targetYaw = Math.atan2(x - n.holder.position.x, z - n.holder.position.z) + n.yawOffset; },
-    release(n) { n.targetYaw = n.baseYaw; },
+    // Fin de la charla: vuelve a su posición y a su animación de siempre
+    release(n) { n.targetYaw = n.baseYaw; api.play(n, null); },
+
+    // Reproduce un clip del .glb del NPC con transición. Sin nombre vuelve al idle.
+    // Acepta mayúsculas/minúsculas y que el nombre empiece así. Un clip que termina en "_vuelve" se reproduce una vez.
+    play(n, name) {
+      if (!n.mixer) return;
+      const want = String(name ?? '').trim().toLowerCase();
+      let next = n.idle;
+      if (want) {
+        const clip = n.clips.find((c) => c.name.toLowerCase() === want) || n.clips.find((c) => c.name.toLowerCase().startsWith(want));
+        if (!clip) {
+          const names = n.clips.map((c) => c.name);
+          console.warn(`NPC "${n.id}": no hay un clip llamado "${want}". Clips: ${names.slice(0, 12).join(', ')}${names.length > 12 ? ', …' : ''}`);
+          return;
+        }
+        next = n.mixer.clipAction(clip);
+        const once = /_vuelve$/i.test(clip.name.replace(/\.\d+$/, ''));
+        next.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
+        next.clampWhenFinished = false;
+      }
+      if (!next || (next === n.current && next.isRunning())) return;
+      next.reset().setEffectiveWeight(1).fadeIn(ANIM_FADE).play();
+      if (n.current && n.current !== next) n.current.fadeOut(ANIM_FADE);
+      n.current = next;
+    },
 
     update(dt) {
       for (const n of list) {
@@ -176,4 +209,5 @@ export function createNpcs() {
       }
     },
   };
+  return api;
 }

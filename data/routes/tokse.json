@@ -10,24 +10,13 @@
     "fuente": {
       "point": "ruta_tokse_1",
       "wait": 2,
-      "waitMax": 1,
-      "anim": "saludar"
-    }
-  },
-  "editor": {
-    "nodes": {
-      "inicio": {
-        "x": 380,
-        "y": 30
-      },
-      "fuente": {
-        "x": 720,
-        "y": 30
-      }
+      "waitMax": 0,
+      "next": "parada"
     },
-    "start": {
-      "x": 20,
-      "y": 40
+    "parada": {
+      "point": "ruta_tokse_3",
+      "wait": 4,
+      "next": "inicio"
     }
   }
 }

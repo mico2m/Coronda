@@ -10,6 +10,8 @@
 //  a una o varias paradas:   "mods": ["espera_1", "barrer"]  en la parada  +  "modifiers": { "espera_1": { "type": "wait", "wait": 3 } }
 //  (el motor también lee los mismos atributos escritos directo en la parada, como en los ejemplos de abajo).
 //  { "speed": 1.4,                       velocidad por defecto (m/s)
+//    "blockWait": 2.5,                 segundos que se queda quieto si te cruzás en su camino, antes de volver a buscar cómo rodearte
+//    "avoid": false,                   (opcional) no esquivar objetos con colisión; por defecto camina rodeándolos (A*, ver npc-nav.js)
 //    "walk": "caminar",                  clip al caminar (si no, el del modelo en data/tables/npcs.json, o el primero que parezca "camina")
 //    "start": "a",                       nodo donde empieza
 //    "nodes": {
@@ -39,6 +41,7 @@
 import * as THREE from 'three';
 import { flags } from '../systems/flags.js';
 import { classifyClip } from './npc-anim.js';
+import { findPath } from './npc-nav.js';
 
 const sanitize = THREE.PropertyBinding.sanitizeNodeName;
 const num = (v, d) => (v !== undefined && v !== '' && v !== null && Number.isFinite(Number(v)) ? Number(v) : d);
@@ -86,10 +89,11 @@ export function createRoute(entry, data, sceneRoot, api, { name = '' } = {}) {
   const setObstacle = () => { if (entry.obstacle) { entry.obstacle.x = h.position.x; entry.obstacle.z = h.position.z; } };
   const heading = (dx, dz) => Math.atan2(dx, dz) + entry.yawOffset; // mismo criterio que faceTowards
 
-  let state = 'idle';          // 'walk' | 'wait' | 'done' | 'idle'
+  let state = 'idle';          // 'walk' | 'wait' | 'blocked' (se interpuso el jugador) | 'done' | 'idle'
   let cur = null;              // id del nodo al que va o en el que está
   let paused = false;
   const from = new THREE.Vector3(), to = new THREE.Vector3();
+  let pts = [], segEnd = [], seg = 0; // camino a seguir: puntos (x,z) y distancia acumulada al final de cada tramo
   let dist = 0, walked = 0, speed = 1.4, timer = 0, turning = 0, walking = false;
 
   function stopAt(why) { state = 'done'; if (why) warn('stop', why); api.play(entry, null); walking = false; }
@@ -120,15 +124,47 @@ export function createRoute(entry, data, sceneRoot, api, { name = '' } = {}) {
     playNode(n);
   }
 
+  // Arma el camino desde donde está hasta `target`, rodeando objetos con colisión (si la ruta no dice "avoid": false)
+  function plan(target, extra = []) {
+    let ok = true;
+    pts = [{ x: h.position.x, z: h.position.z }];
+    if (data.avoid !== false && api.world) {
+      const r = findPath(api.world, h.position, target, { radius: entry.obstacle?.r ?? 0.4, extra });
+      ok = r.found;
+      if (!r.found && !extra.length) warn(`nav:${cur}`, `no encontré camino hasta "${cur}" esquivando colisiones: va en línea recta (¿el Empty queda dentro de un objeto sólido?).`);
+      pts.push(...r.points);
+    } else pts.push({ x: target.x, z: target.z });
+    segEnd = []; dist = 0;
+    for (let i = 1; i < pts.length; i++) { dist += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z); segEnd.push(dist); }
+    walked = 0; seg = 0; turning = 0; walking = false;
+    entry.targetYaw = heading(pts[1].x - pts[0].x, pts[1].z - pts[0].z);
+    return ok;
+  }
+
+  // El jugador (o lo que sea) se interpone: se frena unos segundos, mira a quien lo frena y después vuelve a buscar camino rodeándolo
+  const PL = { r: 0.35 + 0.45 };
+  let grace = 0; // tras rodearte, unos segundos sin volver a frenarse
+  const playerXZ = () => { const pl = api.player; return pl?.active && pl.position ? pl.position : null; };
+  const blockedBy = () => {
+    const pp = playerXZ(); if (!pp || pts.length < 2 || grace > 0) return false;
+    const i = Math.min(seg, pts.length - 2), dx = pts[i + 1].x - pts[i].x, dz = pts[i + 1].z - pts[i].z, l = Math.hypot(dx, dz) || 1;
+    const rx = pp.x - h.position.x, rz = pp.z - h.position.z, d = Math.hypot(rx, rz);
+    return d < (entry.obstacle?.r ?? 0.4) + 0.35 + 0.15 && (rx * dx + rz * dz) / (l * (d || 1)) > 0.3;
+  };
+  function block() {
+    state = 'blocked'; walking = false; timer = num(data.blockWait, 2.5);
+    api.play(entry, null);
+    const pp = playerXZ(); if (pp) entry.targetYaw = heading(pp.x - h.position.x, pp.z - h.position.z);
+  }
+
   function goTo(id) {
     const p = id && nodes[id] ? pointOf(id) : null;
     if (!p) return stopAt(id ? `el nodo "${id}" no existe o no tiene punto: me quedo quieto.` : null);
     cur = id; from.copy(h.position); to.copy(p.pos);
-    dist = Math.hypot(to.x - from.x, to.z - from.z); walked = 0; turning = 0; walking = false;
     speed = num(nodes[id].speed, num(data.speed, 1.4));
-    if (dist < 0.15) return arrive(id);
+    if (Math.hypot(to.x - from.x, to.z - from.z) < 0.15) return arrive(id);
     state = 'walk';
-    entry.targetYaw = heading(to.x - from.x, to.z - from.z);
+    plan(to);
   }
 
   const playNode = (n) => api.play(entry, n.anim || null, { loop: n.loop === true });
@@ -146,7 +182,7 @@ export function createRoute(entry, data, sceneRoot, api, { name = '' } = {}) {
     // al terminar la charla: sigue, mirando hacia donde iba (o como lo dejó el nodo)
     resume() {
       paused = false;
-      if (state === 'walk') { entry.targetYaw = heading(to.x - h.position.x, to.z - h.position.z); from.copy(h.position); dist = Math.hypot(to.x - from.x, to.z - from.z); walked = 0; turning = 0; walking = false; }
+      if (state === 'walk') { from.copy(h.position); plan(to); }
       else { const p = cur && pointOf(cur); entry.targetYaw = nodes[cur]?.face && p ? p.yaw + entry.yawOffset : h.rotation.y; resumeAnim(); }
     },
     update(dt) {
@@ -155,7 +191,17 @@ export function createRoute(entry, data, sceneRoot, api, { name = '' } = {}) {
         const n = nodes[cur], forever = n.loop === true;
         if (!forever) timer -= dt;
         if (forever || timer <= 0) { const nx = pickNext(n, forever); if (nx === undefined) return; nx ? goTo(nx) : stopAt(null); }
+      } else if (state === 'blocked') {
+        timer -= dt;
+        if (timer > 0) return;
+        const pp = playerXZ();
+        // vuelve a buscar camino contando al jugador como obstáculo; si no hay forma de pasar, sigue esperando
+        from.copy(h.position);
+        const ok = plan(to, pp ? [{ x: pp.x, z: pp.z, r: PL.r }] : []);
+        if (ok) { state = 'walk'; grace = 2; } else { timer = 1; state = 'blocked'; }
       } else if (state === 'walk') {
+        grace -= dt;
+        if (blockedBy()) return block();
         // primero gira hacia donde va (máx. ~0,8 s), después camina
         if (Math.abs(angleDiff(h.rotation.y, entry.targetYaw)) > 0.5 && turning < 0.8) { turning += dt; return; }
         if (!walking) {
@@ -165,7 +211,9 @@ export function createRoute(entry, data, sceneRoot, api, { name = '' } = {}) {
         }
         walked = Math.min(dist, walked + speed * dt);
         const f = dist > 0 ? walked / dist : 1;
-        h.position.set(from.x + (to.x - from.x) * f, from.y + (to.y - from.y) * f, from.z + (to.z - from.z) * f);
+        while (seg < segEnd.length - 1 && walked >= segEnd[seg]) { seg++; entry.targetYaw = heading(pts[seg + 1].x - pts[seg].x, pts[seg + 1].z - pts[seg].z); }
+        const s0 = seg ? segEnd[seg - 1] : 0, sl = segEnd[seg] - s0, t = sl > 0 ? Math.min(1, (walked - s0) / sl) : 1;
+        h.position.set(pts[seg].x + (pts[seg + 1].x - pts[seg].x) * t, from.y + (to.y - from.y) * f, pts[seg].z + (pts[seg + 1].z - pts[seg].z) * t);
         setObstacle();
         if (walked >= dist) arrive(cur);
       }

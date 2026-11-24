@@ -183,6 +183,12 @@ En `dev.html`, el botón **NPC** (arriba a la izquierda, debajo de *Diálogos*) 
 
 Se arma igual que las puertas y las colisiones: con **propiedades personalizadas en Blender**, en el mismo Empty `npc_…` del NPC. Al acercarte (2,5 m por defecto) aparece **"E Hablar"**; al apretar **E** (o tocar el aviso) se abre la caja de texto abajo y el NPC se da vuelta hacia vos. Mientras hablás el personaje no se mueve y las puertas esperan. Código: `src/systems/dialogue.js`.
 
+**La caja de texto es parte de la imagen del juego**, como en Ocarina: se dibuja a la misma resolución (320×240), con letra de píxeles, y se escala y recorta junto con el mundo. Código: `src/ui/textbox.js` (dibujo) y `src/ui/pixel-font.js` (la fuente, Spleen 6×12 con acentos, ñ, ¿ y ¡).
+- Los renglones se cortan solos según el ancho de la caja, y si un texto no entra en **4 renglones** sigue en otra caja (no hace falta partirlo a mano). La última caja deja lugar a las opciones.
+- El nombre del que habla va en una pestañita arriba; las opciones en verde con una flechita ▶; abajo a la derecha, **▼** = sigue y **■** = termina.
+- Colores, tamaño, renglones por caja y márgenes se cambian en `STYLE`, arriba de `src/ui/textbox.js`.
+- Las comillas tipográficas, `…` y `—` se cambian solas por `"`, `...` y `-` (la fuente no las tiene).
+
 **En Blender:** seleccioná el Empty del NPC (ej. `npc_prueba`) > *Object Properties* > *Custom Properties* > **+** y agregá lo que necesites. Al exportar el `.glb` tildá **Include > Custom Properties** (como siempre).
 
 | Propiedad | Ejemplo | Qué hace |
@@ -197,7 +203,7 @@ Se arma igual que las puertas y las colisiones: con **propiedades personalizadas
 
 Si tiene `npc_texto` y `npc_dialogo`, manda `npc_dialogo`; si ese archivo no se puede leer, se usa `npc_texto` y la consola (F12) avisa. Un NPC sin ninguna de las dos no tiene aviso y se comporta como antes.
 
-**Controles:** `E` / `Espacio` / `Enter` o tocar la caja: avanzar (si el texto se está escribiendo, lo completa) · `1`–`9` o click/toque: elegir una opción · `↑` `↓` (o `W` `S`) y `E`: elegir con teclado · `Esc`: cerrar. Con "reducir movimiento" activado en el sistema, el texto aparece de una vez.
+**Controles:** `E` / `Espacio` / `Enter` o tocar la pantalla: avanzar (si el texto se está escribiendo, lo completa) · `1`–`9` o click/toque: elegir una opción · `↑` `↓` (o `W` `S`) y `E`: elegir con teclado · `Esc`: cerrar. Con "reducir movimiento" activado en el sistema, el texto aparece de una vez.
 
 ### Conversaciones con opciones (`data/dialogues/<id>.json`)
 

@@ -12,6 +12,7 @@ import { createPlayer } from './actors/player.js';
 import { buildCollision } from './systems/collision.js';
 import { createNpcs } from './actors/npc.js';
 import { createDialogue } from './systems/dialogue.js';
+import { createTextbox } from './ui/textbox.js';
 import { isSkyName } from './systems/shading.js';
 
 const _focus = new THREE.Vector3();
@@ -68,9 +69,12 @@ export async function startGame({ dev = false, retro = null } = {}) {
 
   // Charlas con NPC (ver systems/dialogue.js): mientras dura, el jugador (o la cámara libre) no se mueve.
   // Se libera un instante después para que la tecla que cierra la charla no active otra cosa (ej. una acción 1, 2, 3).
+  // La caja de texto se dibuja dentro de la imagen del juego (ui/textbox.js), encima del mundo y en el mismo cuadro
+  const textbox = createTextbox({ renderer, retro });
   dialogue = createDialogue({
     stage,
     npcs,
+    textbox,
     onStart: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
     onEnd: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
     onError: (msg) => ui.setStatus(msg),
@@ -111,6 +115,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     dialogue?.update(focus, dt);
     doors?.update(focus);
     renderer.render(scene, camera);
+    textbox.render(); // caja de diálogo, encima del mundo
   }
   requestAnimationFrame(frame);
 
@@ -142,6 +147,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       console.info(`Colisiones de "${sceneManager.current.id}":`, cworld.stats);
       collisionDebug?.attach(sceneManager.root, cworld);
       player.setWorld(cworld);
+      npcs.setWorld(cworld); // las rutas de los NPC esquivan los objetos con colisión
       // NPC: Empties npc_* del .glb + "actors" del JSON (ver src/actors/npc.js). Van después de armar las colisiones.
       const npcInfo = await npcs.setup(sceneManager.root, sceneManager.current, sceneManager.shade);
       player.setObstacles(npcs.obstacles);

@@ -48,11 +48,16 @@ const num = (v, d) => (v !== undefined && v !== '' && v !== null && Number.isFin
 
 export function createNpcs() {
   let list = [];       // { id, holder, mixer }
+  let navWorld = null, playerRef = null;
   let obstacles = [];  // { x, z, r }: para que el jugador no los atraviese (los NPC que caminan los actualizan)
   let rootRef = null;  // grupo de la escena actual (para buscar los Empties de los recorridos)
 
   const api = {
     get obstacles() { return obstacles; },
+    get world() { return navWorld; },                // mundo de colisión de la escena (para que las rutas esquiven objetos)
+    setWorld(w) { navWorld = w ?? null; },
+    get player() { return playerRef; },
+    setPlayer(p) { playerRef = p ?? null; },
     get list() { return list; },
 
     // Llamar después de cargar cada escena. Los NPC se agregan dentro del grupo de la escena

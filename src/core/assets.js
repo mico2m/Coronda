@@ -1,5 +1,6 @@
 // Carga de archivos externos (datos y modelos), con caché.
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { padUVTextures } from './texture-padding.js';
 
 const jsonCache = new Map();
 const gltfLoader = new GLTFLoader();
@@ -20,7 +21,7 @@ export function loadGLB(url, onProgress) {
   return new Promise((resolve, reject) => {
     gltfLoader.load(
       url,
-      resolve,
+      (gltf) => { padUVTextures(gltf.scene); resolve(gltf); },
       (e) => onProgress?.(e.total ? e.loaded / e.total : 0),
       (err) => reject(new Error(`No se pudo cargar ${url}${err?.message ? ` (${err.message})` : ''}`))
     );

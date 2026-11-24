@@ -1,5 +1,7 @@
 // Diálogos con NPC. Al acercarte a un NPC con diálogo aparece "E Hablar"; al apretar E (o tocar el aviso)
-// se abre una caja de texto abajo. E / Espacio / Enter / tocar la caja avanzan. Escape la cierra.
+// se abre la caja de texto. E / Espacio / Enter / tocar la pantalla avanzan. Escape la cierra.
+// La caja se dibuja DENTRO de la imagen del juego, con letra de píxeles, como en Ocarina (ver ui/textbox.js):
+// los textos largos se parten solos en varias cajas de 4 renglones.
 //
 // Cómo se arma, en Blender (Object Properties > Custom Properties del Empty npc_*; tildá Include > Custom Properties al exportar):
 //   npc_texto         = "Hola|¿Cómo andás?"   frases sueltas; cada "|" es una página nueva (y "\n" un salto de línea)
@@ -44,7 +46,7 @@ function el(tag, className, parent) {
   return e;
 }
 
-export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
+export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }) {
   const host = stage.parentElement;
   let entries = [];     // NPC con algo para decir
   let near = null;      // NPC al alcance
@@ -59,23 +61,26 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
   prompt.hidden = true;
   prompt.addEventListener('click', () => { if (near) start(near); });
 
-  // ---- Caja de diálogo ----
-  const box = el('div', 'dialogue', host);
-  box.hidden = true;
-  box.setAttribute('role', 'dialog');
-  box.setAttribute('aria-label', 'Diálogo');
-  const nameEl = el('div', 'dialogue-name', box);
-  const textEl = el('p', 'dialogue-text', box);
-  textEl.setAttribute('aria-hidden', 'true'); // se escribe letra por letra: los lectores de pantalla leen sr (abajo)
-  const shownEl = el('span', 'dialogue-shown', textEl);
-  const restEl = el('span', 'dialogue-rest', textEl); // el resto, invisible, para que la caja no cambie de tamaño
-  const choicesEl = el('div', 'dialogue-choices', box);
-  const moreEl = el('span', 'dialogue-more', box);
-  moreEl.textContent = '▼';
-  moreEl.hidden = true;
-  const sr = el('p', 'sr-only', box);
+  // ---- Caja de diálogo: la dibuja textbox (dentro del juego). Acá queda solo el texto para lectores de pantalla ----
+  const sr = el('p', 'sr-only', host);
   sr.setAttribute('aria-live', 'polite');
-  box.addEventListener('click', (e) => { if (!e.target.closest('.dialogue-choice')) advance(); });
+
+  // Tocar o hacer clic en la pantalla durante la charla: elige la opción tocada o avanza (si no fue un arrastre)
+  let down = null;
+  stage.addEventListener('pointerdown', (e) => { if (s) down = { x: e.clientX, y: e.clientY }; });
+  stage.addEventListener('pointerup', (e) => {
+    if (!s || !down) return;
+    const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+    down = null;
+    if (moved > 8) return;
+    const hit = textbox.pick(e.clientX, e.clientY);
+    if (hit?.choice !== undefined && s.picking) { s.sel = hit.choice; choose(hit.choice); } else advance();
+  });
+  stage.addEventListener('pointermove', (e) => { // con el mouse, la opción bajo el puntero queda elegida
+    if (!s?.picking || e.pointerType !== 'mouse') return;
+    const hit = textbox.pick(e.clientX, e.clientY);
+    if (hit?.choice !== undefined && hit.choice !== s.sel) { s.sel = hit.choice; paint(); }
+  });
 
   // ---- Armado de la conversación ----
   const asPages = (t) => (Array.isArray(t) ? t.map(String) : t === undefined || t === null ? [] : [String(t)]);
@@ -139,8 +144,7 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
     flags.inc(`veces_${entry.id}`);
     for (const f of entry.talk.sets) flags.set(f, true);
     host.classList.add('talking'); // esconde la ayuda y los botones mientras se habla
-    s = { entry, script, node: null, pages: [], page: 0, text: '', shown: 0, choices: [], sel: 0, picking: false };
-    box.hidden = false;
+    s = { entry, script, node: null, pages: [], page: 0, count: 0, shown: 0, choices: [], sel: 0, picking: false };
     onStart?.(entry);
     npcs.hold?.(entry); // si el NPC está caminando, se frena
     if (entry.talk.look) npcs.faceTowards(entry, focus.x, focus.z);
@@ -153,8 +157,8 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
     const entry = s.entry;
     s = null;
     host.classList.remove('talking');
-    box.hidden = true;
-    choicesEl.replaceChildren();
+    textbox.hide();
+    sr.textContent = '';
     npcs.release(entry);
     cooldownUntil = performance.now() + 250; // evita que el mismo toque de E vuelva a abrir la charla
     onEnd?.(entry);
@@ -166,66 +170,61 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
     if (raw.set && typeof raw.set === 'object') for (const [k, v] of Object.entries(raw.set)) flags.set(k, v);
     s.node = normalize(raw);
     if (raw.anim !== undefined) npcs.play(s.entry, raw.anim); // sin "anim" sigue la que estaba
-    s.pages = s.node.pages.length ? s.node.pages : [''];
+    // Cada página del texto se parte en las cajas que hagan falta (4 renglones). La última deja lugar a las opciones.
+    // Una marca {clip} se saca del texto y se ejecuta al mostrar la primera caja de esa página.
+    const src = s.node.pages.length ? s.node.pages : [''];
+    s.pages = [];
+    src.forEach((txt, i) => {
+      let anim;
+      const mark = /\{([^{}]*)\}/.exec(txt);
+      if (mark) { anim = mark[1]; txt = (txt.slice(0, mark.index) + txt.slice(mark.index + mark[0].length)).trim(); }
+      const last = i === src.length - 1;
+      const boxes = textbox.paginate(txt, last ? s.node.choices.length : 0);
+      boxes.forEach((b, j) => s.pages.push({ ...b, anim: j === 0 ? anim : undefined }));
+    });
     s.page = 0;
     showPage();
   }
 
   function showPage() {
-    // Marca de animación {clip} dentro de la página: se ejecuta y se saca del texto
-    let raw = s.pages[s.page];
-    const mark = /\{([^{}]*)\}/.exec(raw);
-    if (mark) {
-      raw = (raw.slice(0, mark.index) + raw.slice(mark.index + mark[0].length)).trim();
-      npcs.play(s.entry, mark[1]);
-    }
-    s.text = raw;
-    s.shown = reduceMotion() ? s.text.length : 0;
+    const pg = s.pages[s.page];
+    if (pg.anim !== undefined) npcs.play(s.entry, pg.anim);
+    s.count = pg.count;
+    s.shown = reduceMotion() ? s.count : 0;
     s.picking = false;
     s.choices = [];
     s.sel = 0;
-    choicesEl.replaceChildren();
-    moreEl.hidden = true;
-    nameEl.textContent = s.node.speaker ?? s.entry.talk.speaker ?? s.script.speaker ?? s.entry.talk.defaultSpeaker;
-    sr.textContent = s.text;
+    s.name = s.node.speaker ?? s.entry.talk.speaker ?? s.script.speaker ?? s.entry.talk.defaultSpeaker;
+    sr.textContent = pg.text.replace(/\n/g, ' ');
     paint();
-    if (s.shown >= s.text.length) pageDone();
+    if (s.shown >= s.count) pageDone();
   }
 
+  // Le pasa a la caja lo que tiene que dibujar
   function paint() {
-    const n = Math.floor(s.shown);
-    shownEl.textContent = s.text.slice(0, n);
-    restEl.textContent = s.text.slice(n);
+    const done = s.shown >= s.count;
+    const more = !done || s.picking ? null
+      : s.page < s.pages.length - 1 || s.node.next ? 'next' : 'end';
+    textbox.show({
+      name: s.name,
+      page: s.pages[s.page],
+      shown: Math.floor(s.shown),
+      choices: s.choices.map((c) => c.text),
+      choicesVisible: s.picking,
+      sel: s.sel,
+      more,
+    });
   }
 
-  // La página terminó de escribirse: aparecen las opciones (en la última página) o la flechita
+  // La página terminó de escribirse: aparecen las opciones (en la última página) o el triángulo
   function pageDone() {
     const last = s.page >= s.pages.length - 1;
     if (last && s.node.choices.length) {
       s.picking = true;
       s.choices = s.node.choices;
-      choicesEl.replaceChildren();
-      s.choices.forEach((c, i) => {
-        const b = el('button', 'dialogue-choice', choicesEl);
-        b.type = 'button';
-        const k = el('kbd', '', b);
-        k.textContent = i < 9 ? String(i + 1) : '·';
-        b.append(' ', c.text); // el texto viene de un archivo externo: nunca como HTML
-        b.addEventListener('mousedown', (e) => e.preventDefault()); // no robar el foco del teclado
-        b.addEventListener('mouseenter', () => { s.sel = i; markSel(); });
-        b.addEventListener('click', () => choose(i));
-      });
-      markSel();
-    } else {
-      moreEl.hidden = false;
+      sr.textContent = `${s.pages[s.page].text.replace(/\n/g, ' ')} Opciones: ${s.choices.map((c, i) => `${i + 1}. ${c.text}`).join('. ')}`;
     }
-  }
-
-  function markSel() {
-    [...choicesEl.children].forEach((b, i) => {
-      b.classList.toggle('sel', i === s.sel);
-      b.setAttribute('aria-current', i === s.sel ? 'true' : 'false');
-    });
+    paint();
   }
 
   function choose(i) {
@@ -236,7 +235,7 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
 
   function advance() {
     if (!s) return;
-    if (s.shown < s.text.length) { s.shown = s.text.length; paint(); pageDone(); return; } // completa la página
+    if (s.shown < s.count) { s.shown = s.count; pageDone(); return; } // completa la página
     if (s.picking) { choose(s.sel); return; }
     if (s.page < s.pages.length - 1) { s.page++; showPage(); return; }
     if (s.node.next) goto(s.node.next); else end();
@@ -261,7 +260,7 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
     if (s.picking && (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'ArrowDown' || e.code === 'KeyS')) {
       const dir = e.code === 'ArrowUp' || e.code === 'KeyW' ? -1 : 1;
       s.sel = (s.sel + dir + s.choices.length) % s.choices.length;
-      markSel();
+      paint();
       e.preventDefault();
       return;
     }
@@ -300,10 +299,12 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
     update(p, dt) {
       focus.x = p.x; focus.y = p.y; focus.z = p.z;
       if (s) {
-        if (s.shown < s.text.length) {
-          s.shown = Math.min(s.text.length, s.shown + CPS * dt);
-          paint();
-          if (s.shown >= s.text.length) pageDone();
+        textbox.update(dt);
+        if (s.shown < s.count) {
+          const before = Math.floor(s.shown);
+          s.shown = Math.min(s.count, s.shown + CPS * dt);
+          if (s.shown >= s.count) pageDone();
+          else if (Math.floor(s.shown) !== before) paint();
         }
         return;
       }

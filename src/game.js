@@ -59,6 +59,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
   let inspector = null;
   let collisionDebug = null;
   let spawnDebug = null;
+  let routeDebug = null;
   const npcs = createNpcs();
   const followers = createFollowers(); // objetos con la propiedad `seguir` (ver systems/followers.js)
   let dialogue = null;
@@ -158,6 +159,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       // NPC: Empties npc_* del .glb + "actors" del JSON (ver src/actors/npc.js). Van después de armar las colisiones.
       const npcInfo = await npcs.setup(sceneManager.root, sceneManager.current, sceneManager.shade);
       player.setObstacles(npcs.obstacles);
+      routeDebug?.attach(sceneManager.root, sceneManager.current, npcs.list); // recorridos de los NPC (tecla R)
       followers.setup(sceneManager.root); // objetos que giran para mirar al jugador (propiedad `seguir`)
       dialogue.setup(); // los NPC con diálogo (npc_texto / npc_dialogo)
       if (npcInfo.missing.length) ui.setStatus(`NPC: no se pudo cargar ${npcInfo.missing.join(', ')}`);
@@ -223,6 +225,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
         collisionDebug = createCollisionDebug();
         const { createSpawnDebug } = await import('./systems/spawn-debug.js');
         spawnDebug = createSpawnDebug();
+        const { createRouteDebug } = await import('./systems/route-debug.js');
+        routeDebug = createRouteDebug();
       } catch (err) {
         // Si el inspector no carga, el mundo igual se muestra
         console.error(err);

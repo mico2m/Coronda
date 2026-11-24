@@ -12,6 +12,8 @@
 .collision-toggle[aria-pressed="true"] { border-color: #ff3b3b; box-shadow: inset 3px 0 0 #3bff6b; }
 .spawn-toggle { left: 400px; } /* spawn-debug.js lo acomoda a la derecha de "Colisiones" */
 .spawn-toggle[aria-pressed="true"] { border-color: #ffd400; box-shadow: inset 3px 0 0 #38bdf8; }
+.route-toggle { left: 560px; } /* route-debug.js lo acomoda a la derecha de "Spawns" */
+.route-toggle[aria-pressed="true"] { border-color: #4ade80; box-shadow: inset 3px 0 0 #38bdf8; }
 .insp-code { font-family: ui-monospace, monospace; font-size: 12px; padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.08); }
 
 .crosshair { position: absolute; top: 50%; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px;

@@ -182,6 +182,40 @@ export function createInspector({ scene, camera, getRoot }) {
     panel.replaceChildren(frag);
   }
 
+  // Una parada de un recorrido (bolita del modo "Rutas", ver route-debug.js)
+  function renderStop(r, distance) {
+    const frag = document.createDocumentFragment();
+    frag.append(el('h2', 'insp-title', `${r.number} · ${r.stop}`));
+    const dl = el('dl', 'insp-list');
+    const add = (k, v, cls) => { dl.append(el('dt', null, k)); const dd = el('dd', cls, v); dl.append(dd); return dd; };
+    add('Tipo', r.start ? 'Parada de recorrido (empieza acá)' : 'Parada de recorrido');
+    add('Recorrido', r.file);
+    add('NPC', r.npcs.join(', '));
+    add('Punto', r.point ?? '(posición fija en el JSON)');
+    add('Posición', r.position.map((n) => fmt(n)).join(' · '));
+    if (r.loop) add('Espera', 'loop: repite su animación hasta que se cumpla una condición');
+    else add('Espera', r.wait === null ? 'no se queda' : `${r.wait}${r.waitMax ? ' a ' + r.waitMax : ''} s`);
+    if (r.anim) add('Animación', r.anim);
+    if (r.walk) add('Camina con', r.walk);
+    const sp = r.speed ?? r.routeSpeed;
+    if (sp !== null) add('Velocidad', `${sp} m/s${r.speed !== null ? ' (para llegar acá)' : ''}`);
+    distanceEl = add('Distancia', `${fmt(distance)} m`);
+    frag.append(dl);
+
+    frag.append(el('h3', 'insp-sub', 'Después va a'));
+    if (!r.next.length) frag.append(el('div', 'insp-tex', 'Ninguna: se queda acá para siempre'));
+    for (const n of r.next) {
+      const box = el('div', 'insp-mat');
+      box.append(el('div', 'insp-code', n.to));
+      if (n.weight !== null) box.append(el('div', 'insp-tex', `peso ${n.weight}`));
+      if (n.cond) box.append(el('div', 'insp-flags', `solo si ${n.cond}`));
+      frag.append(box);
+    }
+    frag.append(el('h3', 'insp-sub', 'Llega desde'));
+    frag.append(el('div', 'insp-tex', r.from.length ? r.from.join(', ') : 'Ninguna'));
+    panel.replaceChildren(frag);
+  }
+
   function pick() {
     const root = getRoot();
     if (!root) return showEmpty();
@@ -195,6 +229,16 @@ export function createInspector({ scene, camera, getRoot }) {
     if (spawn) {
       const key = `spawn:${spawn.name}`;
       if (key !== lastKey) { lastKey = key; renderSpawn(spawn, hit.distance); }
+      else if (distanceEl) distanceEl.textContent = `${fmt(hit.distance)} m`;
+      highlight.box.setFromObject(hit.object);
+      highlight.visible = true;
+      return;
+    }
+
+    const stop = hit.object.userData.routeMarker;
+    if (stop) {
+      const key = `ruta:${stop.route}:${stop.stop}`;
+      if (key !== lastKey) { lastKey = key; renderStop(stop, hit.distance); }
       else if (distanceEl) distanceEl.textContent = `${fmt(hit.distance)} m`;
       highlight.box.setFromObject(hit.object);
       highlight.visible = true;

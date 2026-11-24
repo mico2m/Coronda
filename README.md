@@ -88,6 +88,50 @@ El jugador se mueve en tercera persona con la cámara siguiéndolo. Código en `
   - Para que los pies no resbalen, en `player.json > animation` poné `walkAnimSpeed` / `runAnimSpeed` = la velocidad (m/s) a la que está animado cada ciclo. Con 0 no se ajusta.
 - **Modo dev:** `dev.html` arranca con la cámara libre; la tecla `C` alterna con el personaje. `index.html` arranca directo con el personaje.
 
+## Motor (editor de escenas)
+
+Las escenas se arman en el **motor**: Blender queda para modelar los assets sueltos. Con `node studio/server.js` corriendo, abrí **http://localhost:5173/__motor** (o `/studio/editor/`).
+
+| Zona | Qué hace |
+|---|---|
+| **Escena** (izquierda) | Todo lo que hay en la escena. Clic elige, doble clic renombra, arrastrar una fila sobre otra la hace hija. El ojo oculta solo en el editor. **+** agrega vacíos, spawns, NPC, puertas, teleports, colisiones y puntos de ruta. |
+| **Visor** (centro) | Se ve igual que en el juego. Gizmos para mover, rotar y escalar; ayudas visuales para lo invisible (spawns, NPC, colisiones, rutas). |
+| **Inspector** (derecha) | Posición, rotación y escala (arrastrá la letra X/Y/Z para cambiar el valor), modelo y **componentes**: Puerta, Teleport, Colisión, Punto de aparición, NPC, Objeto reutilizable. Sin nada elegido: ambiente, niebla y música de la escena. |
+| **Assets** (abajo) | Carpetas del proyecto con miniaturas 3D. **Importar** (o soltar archivos desde la PC) copia `.glb`, imágenes y audio al proyecto. Arrastrá un modelo al visor para colocarlo. |
+
+**▶ Jugar** guarda y prueba la escena dentro del visor; con *Desde la vista* el personaje aparece donde mira la cámara. Al elegir un NPC con recorrido, su camino se dibuja en el visor (línea violeta). En el inspector, al lado del diálogo y del recorrido de un NPC, un botón los abre en su pestaña.
+
+**Atajos:** `W` `E` `R` mover/rotar/escalar · `X` ejes globales/locales · `Ctrl` (mantener) ajuste a la grilla · `F` enfocar · `Inicio` ver todo · clic derecho + `WASD` / `Q` `E` volar (Shift rápido, rueda = velocidad) · ruedita apretada desplazar · `Alt` + clic orbitar · `Ctrl+D` duplicar · `Ctrl+C` / `Ctrl+V` copiar y pegar (también de una escena a otra) · `Fin` apoyar en el suelo · `Num 7` / `Num 1` / `Num 3` vista de arriba / frente / costado · `Supr` borrar · `F2` renombrar · `Ctrl+Z` / `Ctrl+Y` · `Ctrl+S` guardar · `Ctrl+P` jugar · **`Ctrl+K` paleta de comandos**: escribí y saltá a cualquier escena, objeto, diálogo, recorrido, vista o acción.
+
+**Cómo se guarda:** en `data/scenes/<escena>.json > "entities"`. Cada entidad tiene nombre, posición, rotación (grados), escala, modelo (`.glb`, o una parte con `"node"`) y `props`: las mismas Custom Properties de Blender. El juego crea cada entidad con ese nombre y esas propiedades, así que puertas, colisiones, spawns, NPC y objetos reutilizables funcionan igual que si vinieran de Blender (código: `src/systems/entities.js`).
+
+**Escenas hechas en Blender:** si una escena todavía se arma desde un `.glb` ("rooms"), el motor la muestra pero no deja moverla. El botón **Convertir en entidades editables** pasa cada objeto del `.glb` a una entidad, con sus propiedades, y deja una copia en `data/scenes/<escena>.antes-de-convertir.json`.
+
+**Pestañas del motor** (arriba a la izquierda): cada una guarda lo suyo con `Ctrl+S` y tiene su propio `Ctrl+Z`.
+
+| Pestaña | Qué se edita | Archivo |
+|---|---|---|
+| Escena | Lo de arriba: objetos, componentes, assets | `data/scenes/<escena>.json` |
+| Diálogos | Conversaciones por nodos, con las animaciones reales del NPC que las usa. **Probar** reproduce la charla ahí mismo (primera vez / ya habló) | `data/dialogues/*.json` |
+| Rutas | Recorridos de los NPC (paradas, esperas, condiciones) + **Mapa** desde arriba: la escena fotografiada, los puntos y el camino numerado; clic en un punto agrega una parada | `data/routes/*.json` |
+| Música | Pistas: archivo, repetir, volumen, escucha previa y en qué escenas suenan | `data/tables/music.json` |
+| Menús | Pantalla de título, pausa y opciones, con vista previa en vivo | `data/menus.json` |
+| Interfaz | Diseño de la UI del juego: estilos listos, caja de diálogo, avisos y botones, textos, íconos y letras (ver abajo) | `data/ui.json` |
+| Proyecto | Escena inicial, personaje (modelo, velocidades, cámara, colisión, animaciones y acciones) e idle de los NPC | `data/tables/*.json` |
+
+**Variables:** botón *Variables* (en Diálogos y Rutas, o menú **⋯**): lista lo que el juego recuerda (`set` de los diálogos, `hablo_<npc>`, `veces_<npc>`), quién lo cambia y quién lo mira, y avisa si una variable no la cambia nadie o no la mira nadie.
+
+**Diseño de la interfaz (pestaña Interfaz, `data/ui.json`):**
+- **Estilo**: siete puntos de partida completos (Ocarina, Pergamino, Moderno, Noche, Portátil, Cuento, Alto contraste).
+- **Caja de diálogo**: letra (la de píxeles de Ocarina, 13 de Google o una importada; tamaño, negrita y *píxeles duros*), escala, colores con opacidad (fondo, borde, texto, sombra, nombre, opciones, flechita, indicador), forma (posición, cómo va el nombre, indicador ▼ ► ●, renglones, márgenes, esquinas, alineación), velocidad de escritura y **sonido de las letras** (bip sintetizado, con tono).
+- **Avisos y botones**: letra, tamaño, colores, esquinas, estilo de la tecla, desenfoque, sombra, altura del aviso, qué se muestra (ayuda de teclas, botones de acciones y de qué lado).
+- **Textos** de los avisos ("Entrar", "Hablar", la tecla) · **Íconos** para el aviso de puerta, el de hablar y cada acción del personaje (60 dibujos propios o un `.svg`/`.png` importado a `assets/icons`) · **Letras** importadas (`.ttf .otf .woff .woff2` → `assets/fonts`, también sirven para los menús).
+- La vista previa usa el mismo código que el juego (charla, opciones, puerta, hablar, pausa, título; 16:9 o 4:3, de fondo un paisaje o una imagen del proyecto). Clic en una parte la abre para editar. Código: `src/ui/theme.js`, `src/ui/textbox-paint.js`.
+
+**Menús del juego:** al abrir `index.html` aparece la pantalla de título (con la escena de fondo y la cámara girando); `Esc` pausa. Se navega con flechas o `W`/`S`, `Enter`/`E` elige y `Esc` vuelve. Cada opción tiene una acción: empezar, nueva partida, continuar, abrir otro menú, ir a una escena, volumen de la música, pantalla completa, volver o volver al título. En el ▶ Jugar del motor y en `dev.html` el título se saltea. Código: `src/ui/menus.js`.
+
+**Probar una escena directo:** `index.html?scene=<id>` · `&play=1` arranca con el personaje · `&from=x,y,z,giro` aparece en ese punto.
+
 ## Objetos reutilizables (prefabs)
 
 Un objeto que se modela **una sola vez** en su propio archivo y se usa en todas las escenas que quieras (puertas, cofres, faroles, árboles…). Código: `src/systems/scene-manager.js`.

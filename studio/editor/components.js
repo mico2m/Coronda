@@ -1,0 +1,172 @@
+// Qué es cada entidad (para íconos y ayudas del visor) y qué "componentes" se le pueden agregar.
+// Un componente es solo un grupo de Custom Properties con nombre: lo que lee el juego son las propiedades.
+
+export const isSky = (n) => /^(cielo|sky)/i.test(n ?? '');
+
+// Tipo principal de una entidad: define el ícono y la ayuda visual en el visor
+export function kindOf(e) {
+  const n = e.name ?? '', p = e.props ?? {};
+  if (isSky(n)) return 'sky';
+  if (/^(?:empty_)?spawn(?:_|$)/i.test(n) || 'spawn' in p) return 'spawn';
+  if (/^npc_/i.test(n) || Object.keys(p).some((k) => k.startsWith('npc_'))) return 'npc';
+  if ('teleport' in p) return 'teleport';
+  if ('puerta' in p || /^(?:empty_)?puerta_/i.test(n)) return 'door';
+  if (/^(?:col|colision)_/i.test(n)) return 'collider';
+  if (/^ruta_/i.test(n)) return 'route';
+  if (/^pos_jugador/i.test(n)) return 'stand';
+  if ('objeto' in p) return 'prefab';
+  if (e.model) return 'model';
+  return 'empty';
+}
+
+export const KIND = {
+  model:    { label: 'Modelo',             color: '#5b6478', icon: 'cube' },
+  prefab:   { label: 'Objeto reutilizable', color: '#7c5cd6', icon: 'box' },
+  empty:    { label: 'Vacío',              color: '#8a91a0', icon: 'axes' },
+  spawn:    { label: 'Punto de aparición', color: '#1f9d61', icon: 'flag' },
+  npc:      { label: 'NPC',                color: '#e08a1e', icon: 'user' },
+  door:     { label: 'Puerta',             color: '#0e9aa7', icon: 'door' },
+  teleport: { label: 'Teleport',           color: '#d9690c', icon: 'spark' },
+  collider: { label: 'Colisión',           color: '#e0464b', icon: 'shield' },
+  route:    { label: 'Punto de ruta',      color: '#8b5cf6', icon: 'dot' },
+  stand:    { label: 'Posición del jugador', color: '#2f6fed', icon: 'foot' },
+  sky:      { label: 'Cielo',              color: '#3aa0e0', icon: 'cloud' },
+};
+
+// Íconos (trazos de 16×16, estilo línea)
+const P = {
+  cube: 'M8 1.8 13.5 5v6L8 14.2 2.5 11V5L8 1.8Zm0 0V8m0 0 5.5-3M8 8 2.5 5',
+  box: 'M2.5 4.5h11v8h-11zM2.5 4.5 4 2h8l1.5 2.5M6.5 7.5h3',
+  axes: 'M8 8V2.5M8 8l4.5 3M8 8l-4.5 3',
+  flag: 'M4 14V2.5m0 0h8l-2 3 2 3H4',
+  user: 'M8 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM3 14c.6-2.6 2.6-4 5-4s4.4 1.4 5 4',
+  door: 'M4 14V2.5h8V14M2.5 14h11M9.5 8.5h.01',
+  spark: 'M8 1.5v4M8 10.5v4M1.5 8h4M10.5 8h4M3.4 3.4l2.4 2.4M10.2 10.2l2.4 2.4M12.6 3.4l-2.4 2.4M5.8 10.2l-2.4 2.4',
+  shield: 'M8 1.8 13 3.6v4.1c0 3-2.1 5.3-5 6.5-2.9-1.2-5-3.5-5-6.5V3.6L8 1.8Z',
+  dot: 'M8 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z',
+  foot: 'M5 13.5c-1.4 0-2-1.2-1.6-2.4L4.6 7c.4-1.3 2.4-1.1 2.4.3V12c0 .9-.9 1.5-2 1.5ZM11 9.5c-1.1 0-2-.6-2-1.5V3.8c0-1.4 2-1.6 2.4-.3l1.2 4.1c.4 1.2-.2 1.9-1.6 1.9Z',
+  cloud: 'M4.5 12.5h7a2.7 2.7 0 0 0 .3-5.4A3.8 3.8 0 0 0 4.4 7a2.75 2.75 0 0 0 .1 5.5Z',
+  folder: 'M2 4.5v8h12V6H8L6.5 4.5H2Z',
+  image: 'M2.5 3h11v10h-11zM2.5 10.5l3-3 3 3 2-2 2.5 2.5M10.5 6h.01',
+  music: 'M6 12V3.5l7-1.5V10.5M6 12a1.8 1.8 0 1 1-3.6 0A1.8 1.8 0 0 1 6 12Zm7-1.5a1.8 1.8 0 1 1-3.6 0 1.8 1.8 0 0 1 3.6 0Z',
+  file: 'M4 1.8h5.5L12.5 5v9.2H4V1.8Zm5.5 0V5h3',
+  chat: 'M2.5 3.5h11v7H7l-3 2.5v-2.5H2.5v-7Z',
+  route: 'M3.5 12.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM12.5 6.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM5 11h4.5a2 2 0 0 0 0-4h-3a2 2 0 0 1 0-4H11',
+  eye: 'M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8ZM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
+  eyeOff: 'M2 2l12 12M6.6 6.6a2 2 0 0 0 2.8 2.8M4.2 4.6C2.6 5.8 1.5 8 1.5 8S4 12.5 8 12.5c1.3 0 2.4-.4 3.4-1M7 3.6c.3 0 .7-.1 1-.1 4 0 6.5 4.5 6.5 4.5s-.6 1.1-1.7 2.3',
+  plus: 'M8 3v10M3 8h10',
+  x: 'M4 4l8 8M12 4l-8 8',
+  search: 'M7 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10ZM14 14l-3.4-3.4',
+  play: 'M5 3.2v9.6L12.5 8 5 3.2Z',
+  stop: 'M4 4h8v8H4z',
+  undo: 'M5.5 6.5H11a3 3 0 0 1 0 6H8M5.5 6.5 8 4M5.5 6.5 8 9',
+  redo: 'M10.5 6.5H5a3 3 0 0 0 0 6h3M10.5 6.5 8 4M10.5 6.5 8 9',
+  move: 'M8 1.5v13M1.5 8h13M8 1.5 6.2 3.3M8 1.5l1.8 1.8M8 14.5l-1.8-1.8M8 14.5l1.8-1.8M1.5 8l1.8-1.8M1.5 8l1.8 1.8M14.5 8l-1.8-1.8M14.5 8l-1.8 1.8',
+  rotate: 'M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.8h-2.8',
+  scale: 'M2.5 13.5h6v-6h-6zM8.5 7.5l5-5M9.5 2.5h4v4',
+  globe: 'M8 14.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13ZM1.5 8h13M8 1.5c1.8 2 2.6 4.1 2.6 6.5S9.8 12.5 8 14.5C6.2 12.5 5.4 10.4 5.4 8S6.2 3.5 8 1.5Z',
+  local: 'M3 13V3M3 13h10M3 13l7-7',
+  magnet: 'M3.5 2.5v5a4.5 4.5 0 0 0 9 0v-5M3.5 5.5h3M9.5 5.5h3M6.5 2.5v5a1.5 1.5 0 0 0 3 0v-5',
+  upload: 'M8 11V2.5M8 2.5 5 5.5M8 2.5l3 3M2.5 10.5v3h11v-3',
+  more: 'M3.5 8h.01M8 8h.01M12.5 8h.01',
+  chevron: 'M6 4l4 4-4 4',
+  reset: 'M3 8a5 5 0 1 0 1.5-3.6M3 2.5v2.8h2.8',
+  copy: 'M5.5 5.5h8v8h-8zM2.5 10.5v-8h8',
+  trash: 'M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 9h5.8l.6-9',
+  target: 'M8 13.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11ZM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
+  layers: 'M8 2 14 5.2 8 8.4 2 5.2 8 2ZM2 8l6 3.2L14 8M2 10.8 8 14l6-3.2',
+  warn: 'M8 2 14.5 13.5h-13L8 2Zm0 4.5v3.5m0 1.8h.01',
+  gear: 'M8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM13 8.9V7.1l-1.6-.4-.4-1 .9-1.4-1.3-1.3-1.4.9-1-.4L7.9 2H6.1l-.4 1.6-1 .4-1.4-.9L2 4.4l.9 1.4-.4 1L1 7.1v1.8l1.6.4.4 1-.9 1.4 1.3 1.3 1.4-.9 1 .4.3 1.5h1.8l.4-1.6 1-.4 1.4.9 1.3-1.3-.9-1.4.4-1L13 8.9Z',
+  menu: 'M2.5 4h11M2.5 8h11M2.5 12h7',
+  type: 'M2 13 5.5 3.5 9 13M3.2 10h4.6M10.5 8.6c.4-.7 1-1.1 1.9-1.1 1 0 1.6.6 1.6 1.6V13M14 10.6h-1.7c-1 0-1.8.5-1.8 1.3s.6 1.3 1.4 1.3c1.1 0 2.1-.7 2.1-1.8',
+  palette: 'M8 14.5a6.5 6.5 0 1 1 6.5-6.5c0 1.7-1.3 2.5-2.7 2.5h-1.3a1.2 1.2 0 0 0-.9 2c.6.7.1 2-1.6 2ZM4.8 7.5h.01M6.5 4.8h.01M9.8 4.8h.01M11.5 7.5h.01',
+  star: 'M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.8Z',
+};
+
+export function icon(name, { size = 16, color = 'currentColor', stroke = 1.4 } = {}) {
+  return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[name] ?? P.dot}"/></svg>`;
+}
+
+// ---- Componentes (grupos de propiedades) ----
+// type: text | number | bool | select | dest (destino de puerta/teleport) | model | prefab | dialogue | route | clip | textarea
+export const COMPONENTS = [
+  {
+    id: 'puerta', label: 'Puerta', icon: 'door', color: KIND.door.color,
+    help: 'Al acercarte aparece el aviso; con E Link la abre y viajás al destino.',
+    has: (p) => 'puerta' in p, add: { puerta: '' },
+    fields: [
+      { k: 'puerta', label: 'Destino', type: 'dest' },
+      { k: 'puerta_modo', label: 'Se activa', type: 'select', options: [['', 'Con la tecla E'], ['auto', 'Sola, al acercarse']] },
+      { k: 'puerta_radio', label: 'Distancia', type: 'number', unit: 'm', placeholder: '3' },
+      { k: 'puerta_texto', label: 'Texto del aviso', type: 'text', placeholder: 'Entrar' },
+      { k: 'puerta_anim', label: 'Animación de Link', type: 'text', placeholder: 'abrirpuerta (automática)' },
+      { k: 'puerta_anim_objeto', label: 'Animación de la puerta', type: 'text', placeholder: 'la del modelo (automática)' },
+      { k: 'puerta_espera', label: 'Espera antes del fundido', type: 'number', unit: 's', placeholder: 'lo que dure la animación' },
+    ],
+  },
+  {
+    id: 'teleport', label: 'Teleport', icon: 'spark', color: KIND.teleport.color,
+    help: 'Zona que te lleva a otro punto. Por defecto se activa sola al entrar.',
+    has: (p) => 'teleport' in p, add: { teleport: '' },
+    fields: [
+      { k: 'teleport', label: 'Destino', type: 'dest' },
+      { k: 'teleport_modo', label: 'Se activa', type: 'select', options: [['', 'Sola, al entrar'], ['E', 'Con la tecla E']] },
+      { k: 'teleport_radio', label: 'Distancia', type: 'number', unit: 'm', placeholder: '0 (adentro del cubo)' },
+      { k: 'teleport_texto', label: 'Texto del aviso', type: 'text', placeholder: 'Entrar' },
+      { k: 'teleport_anim', label: 'Animación de Link', type: 'text', placeholder: 'ninguna' },
+    ],
+  },
+  {
+    id: 'colision', label: 'Colisión', icon: 'shield', color: KIND.collider.color,
+    help: 'Solo choca lo que tiene colisión. Un vacío con este componente es un bloque invisible.',
+    has: (p) => 'colision' in p || 'colision_forma' in p || 'colision_invisible' in p, add: { colision: 1 },
+    fields: [
+      { k: 'colision', label: 'Sólido', type: 'bool' },
+      { k: 'colision_forma', label: 'Forma', type: 'select', options: [['', 'Malla exacta'], ['caja', 'Caja'], ['cilindro', 'Cilindro']] },
+      { k: 'colision_invisible', label: 'Invisible en el juego', type: 'bool' },
+    ],
+  },
+  {
+    id: 'spawn', label: 'Punto de aparición', icon: 'flag', color: KIND.spawn.color,
+    help: 'Donde aparece el jugador. La flecha verde marca hacia dónde mira.',
+    has: (p) => 'spawn' in p, add: { spawn: '' },
+    fields: [{ k: 'spawn', label: 'Nombre', type: 'text', placeholder: 'vacío = el de la escena' }],
+  },
+  {
+    id: 'npc', label: 'NPC', icon: 'user', color: KIND.npc.color, needsName: /^npc_/i, namePrefix: 'npc_',
+    help: 'Personaje con modelo, animación, diálogo y recorrido.',
+    has: (p) => Object.keys(p).some((k) => k.startsWith('npc_')), add: { npc_modelo: '' },
+    fields: [
+      { k: 'npc_modelo', label: 'Modelo', type: 'model', placeholder: 'según el nombre' },
+      { k: 'npc_nombre', label: 'Nombre en pantalla', type: 'text' },
+      { k: 'npc_anim', label: 'Animación quieto', type: 'text', placeholder: 'automática' },
+      { k: 'npc_dialogo', label: 'Diálogo', type: 'dialogue' },
+      { k: 'npc_texto', label: 'Texto simple', type: 'textarea', placeholder: 'Hola|¿Cómo andás? (| separa páginas)' },
+      { k: 'npc_ruta', label: 'Recorrido', type: 'route' },
+      { k: 'npc_escala', label: 'Escala', type: 'number', placeholder: '1' },
+      { k: 'npc_radio', label: 'Radio del cuerpo', type: 'number', unit: 'm', placeholder: '0.4' },
+      { k: 'npc_giro', label: 'Giro extra', type: 'number', unit: '°', placeholder: '0' },
+      { k: 'npc_hablar_radio', label: 'Distancia para hablar', type: 'number', unit: 'm', placeholder: '2.5' },
+    ],
+  },
+  {
+    id: 'objeto', label: 'Objeto reutilizable', icon: 'box', color: KIND.prefab.color,
+    help: 'Carga un .glb de assets/models/objects (con su animación y colisiones) en este lugar.',
+    has: (p) => 'objeto' in p, add: { objeto: '' },
+    fields: [{ k: 'objeto', label: 'Archivo', type: 'prefab' }],
+  },
+];
+
+export const KNOWN_KEYS = new Set(COMPONENTS.flatMap((c) => c.fields.map((f) => f.k)));
+
+// Plantillas del botón "+" de la jerarquía (como "Add Node" de Godot)
+export const TEMPLATES = [
+  { id: 'empty', label: 'Vacío', icon: 'axes', make: () => ({ name: 'vacio' }) },
+  { id: 'spawn', label: 'Punto de aparición', icon: 'flag', make: () => ({ name: 'spawn_nuevo' }) },
+  { id: 'npc', label: 'NPC', icon: 'user', make: () => ({ name: 'npc_nuevo', props: { npc_nombre: 'Nuevo' } }) },
+  { id: 'door', label: 'Puerta (zona)', icon: 'door', make: () => ({ name: 'puerta_zona', props: { puerta: '' }, scale: [0.8, 1.2, 0.3] }) },
+  { id: 'teleport', label: 'Teleport', icon: 'spark', make: () => ({ name: 'tp_nuevo', props: { teleport: '' } }) },
+  { id: 'colbox', label: 'Colisión · caja', icon: 'shield', make: () => ({ name: 'col_caja', scale: [1, 1, 1] }) },
+  { id: 'colcyl', label: 'Colisión · cilindro', icon: 'shield', make: () => ({ name: 'col_cilindro', props: { colision_forma: 'cilindro' } }) },
+  { id: 'route', label: 'Punto de ruta', icon: 'dot', make: () => ({ name: 'ruta_npc_1' }) },
+];

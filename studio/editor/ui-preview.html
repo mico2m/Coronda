@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Vista previa de la interfaz</title>
+<!-- Vista previa de la pestaña Interfaz: usa el mismo CSS y el mismo código de dibujo que el juego -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  .app { position: relative; width: 100%; height: 100%; }
+  #stage { position: absolute; inset: 0; cursor: default; overflow: hidden;
+    background:
+      radial-gradient(circle at 78% 22%, #fff7d6 0 3.2%, rgba(255, 240, 190, .55) 3.3% 6%, transparent 6.1%),
+      linear-gradient(180deg, #7fb0e0 0%, #b5d4ee 46%, #dfeaf2 58%, #dfeaf2 58%); }
+  #stage::before { content: ''; position: absolute; left: -10%; right: -10%; top: 44%; height: 30%;
+    background:
+      radial-gradient(60% 90% at 18% 100%, #6f8fa8 0 60%, transparent 61%),
+      radial-gradient(55% 80% at 62% 100%, #7d9db3 0 60%, transparent 61%),
+      radial-gradient(40% 70% at 92% 100%, #6a8aa2 0 60%, transparent 61%); }
+  #stage::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 44%;
+    background:
+      radial-gradient(120% 60% at 50% 0%, #86ac5a 0 40%, transparent 41%),
+      linear-gradient(180deg, #78a04e 0%, #5f8a3d 55%, #4b7231 100%); }
+  #stage.img { background-size: cover !important; background-position: center !important; }
+  #stage.img::before, #stage.img::after { display: none; }
+  .deco { position: absolute; z-index: 1; bottom: 26%; width: 9%; aspect-ratio: 1 / 1.6; left: 20%;
+    background: radial-gradient(50% 38% at 50% 32%, #3f6f35 0 98%, transparent 100%), linear-gradient(90deg, transparent 44%, #6b4a2b 44% 56%, transparent 56%) bottom / 100% 40% no-repeat; }
+  .deco.b { left: 72%; width: 12%; bottom: 22%; }
+  .house { position: absolute; z-index: 1; left: 44%; bottom: 30%; width: 14%; aspect-ratio: 1.25;
+    background: linear-gradient(#c96f4a, #b45f3e) top / 100% 42% no-repeat, linear-gradient(#efe4cf, #e2d3b6) bottom / 86% 58% no-repeat;
+    clip-path: polygon(50% 0, 100% 42%, 93% 42%, 93% 100%, 7% 100%, 7% 42%, 0 42%); }
+  .house::after { content: ''; position: absolute; left: 42%; bottom: 0; width: 16%; height: 34%; background: #6b4a2b; }
+  #tb { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none;
+    image-rendering: crisp-edges; image-rendering: pixelated; }
+  [data-sel] { cursor: pointer; }
+  .app.pickable [data-sel]:hover { outline: 2px dashed #3d6df2; outline-offset: 4px; }
+  #menuHost { position: absolute; inset: 0; z-index: 30; }
+  #menuHost:empty { display: none; }
+  .app .door-prompt, .app .talk-prompt { pointer-events: auto; }
+</style>
+</head>
+<body>
+<div class="app pickable" id="app">
+  <div id="stage"><div class="deco"></div><div class="house"></div><div class="deco b"></div></div>
+  <div class="hint" id="hint" data-sel="hud"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Shift</kbd> correr · <kbd>E</kbd> interactuar</span></div>
+  <button type="button" class="door-prompt" id="door" data-sel="hud" hidden></button>
+  <button type="button" class="talk-prompt" id="talk" data-sel="hud" hidden></button>
+  <div class="actions" id="actions" data-sel="icons"></div>
+  <canvas id="tb"></canvas>
+  <div id="menuHost"></div>
+</div>
+<script type="module" src="ui-preview.js"></script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coronda · Motor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="editor.css">
+<link rel="stylesheet" href="nodes.css">
+<script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  } }
+</script>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div class="brand"><span class="logo"></span>Coronda</div>
+    <nav id="wsTabs" aria-label="Espacios de trabajo"></nav>
+    <div class="sep"></div>
+    <div class="group" id="sceneTools">
+      <select id="sceneSel" title="Escena abierta"></select>
+      <button class="ib" id="bNewScene" title="Escena nueva"></button>
+      <div class="sep"></div>
+      <div class="seg" id="tools" role="group" aria-label="Herramienta">
+        <button data-tool="translate" title="Mover (W)"></button>
+        <button data-tool="rotate" title="Rotar (E)"></button>
+        <button data-tool="scale" title="Escalar (R)"></button>
+      </div>
+      <button class="ib toggle" id="bSpace" title="Ejes globales / locales (X)"></button>
+      <button class="ib toggle" id="bSnap" title="Ajuste a la grilla: 0,25 m · 15° · 0,1 (o mantené Ctrl)"></button>
+    </div>
+    <div class="spacer"></div>
+    <div class="play">
+      <button id="bPlay" class="primary" title="Probar la escena (Ctrl+P)"><span class="pi"></span><span class="pl">Jugar</span></button>
+      <label class="chk" title="El personaje aparece donde mira la cámara del editor"><input type="checkbox" id="fromView"> Desde la vista</label>
+    </div>
+    <div class="spacer"></div>
+    <button class="ib" id="bUndo" title="Deshacer (Ctrl+Z)"></button>
+    <button class="ib" id="bRedo" title="Rehacer (Ctrl+Y)"></button>
+    <button id="bSave" class="save" title="Guardar (Ctrl+S)"><span class="dot"></span>Guardar</button>
+    <div class="menuwrap">
+      <button class="ib" id="bMore" title="Más"></button>
+      <div class="menu" id="moreMenu" hidden>
+        <a href="/__studio" target="_blank" rel="noopener">Diálogos y rutas <small>Studio clásico</small></a>
+        <a id="openGame" href="/dev.html" target="_blank" rel="noopener">Abrir el juego <small>dev.html</small></a>
+        <button id="bPalette">Buscar comandos <small>Ctrl+K</small></button>
+        <button id="bVars">Variables del juego <small>flags</small></button>
+        <button id="bShortcuts">Atajos de teclado</button>
+      </div>
+    </div>
+  </header>
+
+  <aside id="left" class="panel">
+    <div class="ph">
+      <h2>Escena</h2>
+      <div class="menuwrap">
+        <button class="ib sm" id="bAdd" title="Agregar a la escena"></button>
+        <div class="menu" id="addMenu" hidden></div>
+      </div>
+    </div>
+    <div class="search"><span class="si"></span><input id="hFilter" placeholder="Buscar en la escena" spellcheck="false"></div>
+    <div id="convert" hidden></div>
+    <div id="tree" tabindex="0"></div>
+  </aside>
+  <div class="split v" id="splitL"></div>
+
+  <section id="center">
+    <div id="viewport"></div>
+    <div id="vpHud"><span id="hudTool"></span><span id="hudSpeed"></span></div>
+    <div id="playView" hidden>
+      <div class="playbar"><span class="live"></span>Jugando <b id="playScene"></b><span class="spacer"></span><button id="bStop" title="Volver a editar (Ctrl+P)"><span class="si"></span>Detener</button></div>
+      <iframe id="playFrame" title="Juego"></iframe>
+    </div>
+    <div id="drop" hidden>Soltá para agregar a la escena</div>
+  </section>
+
+  <div class="split v" id="splitR"></div>
+  <aside id="right" class="panel">
+    <div id="inspector"></div>
+  </aside>
+
+  <div class="split h" id="splitB"></div>
+  <section id="bottom" class="panel">
+    <div class="ph">
+      <h2>Assets</h2>
+      <div id="crumbs"></div>
+      <div class="spacer"></div>
+      <div class="search sm"><span class="si"></span><input id="aFilter" placeholder="Buscar" spellcheck="false"></div>
+      <button id="bImport" class="ghost"><span class="si"></span>Importar</button>
+      <input type="file" id="importInput" multiple hidden>
+    </div>
+    <div class="assets">
+      <nav id="folders"></nav>
+      <div id="grid" tabindex="0"></div>
+    </div>
+  </section>
+
+  <div id="ws" hidden></div>
+
+  <footer id="status">
+    <span id="stHint"></span>
+    <span class="spacer"></span>
+    <span id="stMsg"></span>
+    <span id="stCount"></span>
+  </footer>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="dlg"><form method="dialog"><h3 id="dlgTitle"></h3><div id="dlgBody"></div><div class="actions" id="dlgActions"></div></form></dialog>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>

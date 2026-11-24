@@ -367,6 +367,9 @@ function reload(path) {
   if (/^data\/dialogues\/[^/]+\.json$/.test(path)) { // un diálogo: el juego lo lee al hablar, no hace falta recargar (se pierde el lugar en el mundo)
     try { pv.contentWindow.coronda.forgetJSON(path); return; } catch { /* recarga completa */ }
   }
+  if (/\.glb$/i.test(path) || /^data\/scenes\//.test(path)) { // el juego cambia el mundo solo, sin perder tu lugar (src/systems/live.js)
+    try { if (pv.contentWindow.coronda?.live) return; } catch { /* recarga completa */ }
+  }
   if (!$('#live').checked || /\.(md|txt)$/i.test(path)) return;
   if (/\.css$/i.test(path)) { // los estilos se cambian sin recargar: no perdés tu lugar en el mundo
     try { pv.contentDocument.querySelectorAll('link[rel=stylesheet]').forEach((l) => { const u = new URL(l.href); u.searchParams.set('_', Date.now()); l.href = u; }); return; } catch { /* recarga completa */ }

@@ -70,6 +70,7 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
   return {
     setLook(y, p = 0) { yaw = y; pitch = p; },
     getYaw() { return yaw; },
+    getPitch() { return pitch; },
     setEnabled(v) { enabled = v; keys = {}; dragging = false; stage.classList.remove('dragging'); },
     update(dt) {
       if (!enabled) return;

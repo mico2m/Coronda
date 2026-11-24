@@ -1,7 +1,7 @@
 // Motor del juego, compartido por index.html (versión final) y dev.html (modo desarrollador).
 // En modo dev se carga además el inspector; la versión final no descarga ese código.
 import * as THREE from 'three';
-import { loadJSON } from './core/assets.js';
+import { loadJSON, forgetJSON, freshModels } from './core/assets.js';
 import { createCameraControls } from './systems/camera.js';
 import { createAudio } from './systems/audio.js';
 import { createSceneManager } from './systems/scene-manager.js';
@@ -224,6 +224,59 @@ export async function startGame({ dev = false, retro = null } = {}) {
         console.error(err);
         ui.setStatus('No se pudo cargar el inspector (falta src/systems/inspector.js).');
       }
+    }
+
+    // En vivo con Blender (solo dev): ver systems/live.js y blender/coronda_vivo.py
+    if (dev) {
+      const { connectLive } = await import('./systems/live.js');
+      const embedded = window.parent !== window; // dentro del Coronda Studio: él recarga lo demás
+      let busy = null, again = false;
+      // Vuelve a armar la escena actual sin moverte de donde estás
+      async function refreshScene(why) {
+        if (busy) { again = true; return busy; }
+        const id = sceneManager.current?.id;
+        if (!id || player.frozen) return; // en medio de una puerta o una charla: se deja para el próximo cambio
+        const here = mode === 'player'
+          ? { position: [player.position.x, player.position.y + EYE, player.position.z], yaw: player.yaw }
+          : { position: camera.position.toArray(), yaw: controls.getYaw() };
+        const pitch = controls.getPitch();
+        busy = (async () => {
+          const t0 = performance.now();
+          freshModels();
+          forgetJSON(scenesTable[id]?.file);
+          await enterScene(id, here);
+          if (mode === 'free') { camera.position.set(...here.position); controls.setLook(here.yaw, pitch); }
+          ui.setStatus(`Actualizado desde ${why} (${Math.round(performance.now() - t0)} ms)`);
+          setTimeout(() => ui.clearStatus(), 1500);
+        })().catch((err) => { console.error(err); ui.setStatus(String(err.message || err)); });
+        await busy;
+        busy = null;
+        if (again) { again = false; refreshScene(why); }
+      }
+      const live = connectLive({
+        onFiles(paths) {
+          const sceneFile = scenesTable[sceneManager.current?.id]?.file;
+          const glbs = paths.filter((p) => /\.glb$/i.test(p));
+          if (glbs.some((p) => p === playerConfig.model)) { location.reload(); return; } // el personaje: hay que empezar de nuevo
+          if (glbs.length) { refreshScene(glbs.map((p) => p.split('/').pop()).join(', ')); return; }
+          if (sceneFile && paths.includes(sceneFile)) { refreshScene(sceneFile.split('/').pop()); return; }
+          if (!embedded && paths.some((p) => /\.(js|css|html)$/i.test(p) || /^data\/tables\//.test(p))) location.reload();
+        },
+        onBlender(m) {
+          const pos = Array.isArray(m.pos) && m.pos.length === 3 && m.pos.every(Number.isFinite) ? m.pos : null;
+          if (!pos || player.frozen) return;
+          if (m.cmd === 'view') {
+            if (mode !== 'free') setMode('free');
+            camera.position.set(...pos);
+            controls.setLook(Number(m.yaw) || 0, Number(m.pitch) || 0);
+          }
+          if (m.cmd === 'play') {
+            if (mode !== 'player') setMode('player');
+            player.place(pos, Number(m.yaw) || 0);
+          }
+        },
+      });
+      window.addEventListener('pagehide', () => live?.close());
     }
 
     const startId = Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0];

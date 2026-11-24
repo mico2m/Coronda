@@ -51,6 +51,26 @@ http.createServer((req, res) => {
     req.on('close', () => clients.delete(res));
     return;
   }
+  // El addon de Blender (blender/coronda_vivo.py) le manda órdenes al juego: { cmd: 'view' | 'play', … }
+  if (pathname === '/__blender' && req.method === 'POST') {
+    if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host || '')) return send(res, 403, 'Host no permitido');
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      let m; try { m = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return send(res, 400, 'JSON inválido'); }
+      if (m?.cmd === 'exported') { // acaba de exportar un .glb: aviso directo (más rápido y seguro que esperar a que lo note el sistema)
+        const key = String(m.path || '').replace(/\\/g, '/').replace(/^\/+/, '');
+        if (!/\.glb$/i.test(key) || !resolveIn(key)) return send(res, 400, 'Ruta no permitida');
+        mine.set(key, Date.now()); // así la vigilancia de archivos no avisa dos veces
+        broadcast({ path: key, ext: true });
+        return send(res, 200, 'ok');
+      }
+      if (!['view', 'play'].includes(m?.cmd)) return send(res, 400, 'Orden desconocida');
+      broadcast({ type: 'blender', ...m });
+      send(res, 200, 'ok');
+    });
+    return;
+  }
   if (pathname === '/__studio') return serve(res, path.join(__dirname, 'studio.html'));
   if (pathname === '/__dialogos') { res.writeHead(302, { Location: '/studio/dialogos/' }); return res.end(); } // editor de diálogos (nodos + probar + variables)
 

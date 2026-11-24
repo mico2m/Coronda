@@ -370,6 +370,22 @@ Código: `src/systems/spawns.js`.
 
 Los dos usan el mismo motor (`src/game.js`). La versión final no descarga el código del inspector.
 
+## Blender en vivo (addon)
+
+`blender/coronda_vivo.py` hace que lo que cambiás en Blender aparezca en el juego al instante, sin exportar a mano y sin recargar la página (quedás en el mismo lugar del mundo).
+
+**Instalar (una vez):** en Blender, *Edit > Preferences > Add-ons*, flechita de arriba a la derecha > *Install from Disk…* > `blender/coronda_vivo.py`, y tildalo. Si tus `.blend` no están adentro de la carpeta de Coronda, en las preferencias del addon elegí la **Carpeta del proyecto**.
+
+**Usar:** en la Vista 3D apretá `N` > pestaña **Coronda**.
+- **Exportar a:** el `.glb` de esta escena. *Automático* busca uno con el mismo nombre que el `.blend` (ej. `Coronda_Plaza.blend` → `assets/models/worlds/Coronda_Plaza.glb`).
+- **Abrir Coronda:** enciende el servidor del proyecto sin terminal (si no estaba andando) y abre `dev.html` en una ventana propia, para tenerla al lado de Blender.
+- **En vivo:** cada vez que cambiás algo (mover, modelar, materiales, Custom Properties…) exporta el `.glb` un instante después de que soltás (*Espera*, 0,6 s). El juego vuelve a armar la escena en el lugar donde estabas. Mientras estás en modo edición espera a que vuelvas a modo objeto.
+- **Seguir la vista:** la cámara libre del juego copia tu vista de Blender mientras la movés. **Ir a la vista** lo hace una vez.
+- **Jugar desde el cursor:** el personaje aparece donde está el cursor 3D, mirando hacia donde mira tu vista.
+- **Revisión:** cuenta spawns, puertas, colisiones, NPC y objetos, y avisa lo que el juego no va a encontrar (falta el `spawn`, una puerta apunta a un spawn que no existe, un `objeto` sin su `.glb`).
+
+Exporta con las Custom Properties (*extras*), con los modificadores aplicados y con las animaciones. Si cambia el personaje (`personaje.glb`), el juego se recarga entero. Del lado del juego lo hace `src/systems/live.js` (solo en `dev.html`, y solo con `node studio/server.js`).
+
 ## Probar en local
 
 Los módulos y los `.glb` no cargan abriendo el `index.html` con doble clic. Usá un servidor local:

@@ -58,6 +58,15 @@ const POS_RE = /^(?:empty_)?pos_jugador(?:[._]?\w+)?$/i;
 export const doorIdFromName = (name) => NAME_RE.exec(name ?? '')?.[1] ?? null;
 
 const _p = new THREE.Vector3();
+const _q = new THREE.Vector3();
+// El cuerpo del jugador es una columna (de los pies a la cabeza), no un punto: así un Empty
+// apoyado en el suelo se activa aunque su cubo sea bajito. `feet` = altura de los pies.
+function distToBody(box, p, feet) {
+  const y0 = feet + 0.1, y1 = feet + 1.7;
+  // la altura del cuerpo más cercana a la caja
+  const y = Math.min(Math.max(Math.min(Math.max(p.y, box.min.y), box.max.y), y0), y1);
+  return box.distanceToPoint(_q.set(p.x, y, p.z));
+}
 
 // Un valor como 1, 1.0, true o vacío (el que Blender pone por defecto) no es un destino
 const destText = (v) => {
@@ -301,14 +310,15 @@ export function createDoors({ stage, onEnter, dev = false, blocked = () => false
     closeDoor(door) { for (const a of door?.objectActions ?? []) a.stop(); },
 
     // `focus`: punto del jugador (o de la cámara libre) que se compara con cada puerta
-    update(focus) {
+    // `feetY`: altura de los pies (si falta, 1 m debajo de focus)
+    update(focus, feetY = focus.y - 1) {
       if (busy) return;
       _p.copy(focus);
       let best = null, bestD = Infinity;
       let autoHit = null, insideAuto = false;
       for (const d of doors) {
         for (const b of d.shapes) {
-          const dist = b.distanceToPoint(_p);
+          const dist = distToBody(b, _p, feetY);
           if (dist > d.radius) continue; // radio 0 = hay que estar adentro de la zona
           if (d.mode === 'auto') { insideAuto = true; autoHit ??= d; }
           else if (dist < bestD) { best = d; bestD = dist; }

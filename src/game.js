@@ -118,7 +118,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     followers.update(focus, dt);
     dialogue?.update(focus, dt);
     doors?.tick(dt);
-    doors?.update(focus);
+    doors?.update(focus, mode === 'player' && player ? player.position.y : camera.position.y - 1.7);
     renderer.render(scene, camera);
     textbox.render(); // caja de diálogo, encima del mundo
   }

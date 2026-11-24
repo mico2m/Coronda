@@ -288,6 +288,31 @@ Cualquier animación que ya esté dentro del `.glb` del NPC se puede usar, sin t
 - Las llaves `{clip}` también funcionan dentro de los textos de un JSON de diálogo.
 Si el clip no existe, la consola (F12) lista los que trae el archivo y el NPC sigue como estaba.
 
+## Objetos que siguen al jugador
+
+Un objeto que gira para mirarte: un cartel, la cabeza de una estatua, un girasol o una torreta. Se configura **en Blender** con propiedades personalizadas, en el objeto (o en el Empty de un `objeto`, y entonces gira la copia entera). Código: `src/systems/followers.js`.
+
+**En Blender**: seleccioná el objeto > *Object Properties* > *Custom Properties* y agregá
+
+| Propiedad | Valor | Por defecto |
+|---|---|---|
+| `seguir` | eje local sobre el que gira: `x`, `y` o `z`. Con dos o tres (`xz`, `todos`) te apunta de lleno, sin ladearse | `1` = `z` (gira de costado) |
+| `seguir_frente` | lado del objeto que te mira: `x`, `-x`, `y`, `-y`, `z`, `-z` | `-y` (el frente de Blender, vista *Front*) |
+| `seguir_velocidad` | `0` = al instante; más alto = más rápido (3 a 8 queda suave) | `0` |
+| `seguir_distancia` | metros: solo te sigue si estás más cerca; si te alejás vuelve a como estaba | `0` = siempre |
+| `seguir_giro` | grados extra, por si el modelo quedó torcido | `0` |
+
+Los ejes son los **locales del objeto, como los ves en Blender**: el juego los convierte solo. Si el objeto está rotado, gira sobre su propio eje (por ejemplo, un cartel inclinado gira sobre su eje inclinado).
+
+Ejemplos:
+- Cartel que siempre te da la cara: `seguir` = `z`.
+- Cabeza que te mira, también hacia arriba y hacia abajo: `seguir` = `todos`, `seguir_velocidad` = `5`, `seguir_distancia` = `8`.
+- Rueda o tapa que se inclina hacia vos: `seguir` = `x`.
+
+En modo libre (`C` en `dev.html`) siguen a la cámara. Las colisiones del objeto no giran con él.
+
+Al exportar el `.glb` tildá **Include > Custom Properties**.
+
 ## Puertas y teleports
 
 Un objeto normal y visible (o un Empty) que te lleva a otro punto: de la **misma escena** o de **otra escena** (otro `.glb`). Siempre con fundido a negro. El código no oculta ni modifica el objeto.
@@ -383,6 +408,8 @@ Los dos usan el mismo motor (`src/game.js`). La versión final no descarga el c�
 - **Seguir la vista:** la cámara libre del juego copia tu vista de Blender mientras la movés. **Ir a la vista** lo hace una vez.
 - **Jugar desde el cursor:** el personaje aparece donde está el cursor 3D, mirando hacia donde mira tu vista.
 - **Revisión:** cuenta spawns, puertas, colisiones, NPC y objetos, y avisa lo que el juego no va a encontrar (falta el `spawn`, una puerta apunta a un spawn que no existe, un `objeto` sin su `.glb`).
+
+**Árbol de objetos en el juego:** en `dev.html` apretá `O`. Aparecen todos los objetos de la escena con sus códigos (las Custom Properties: `puerta`, `objeto`, `colision`, `npc_dialogo`…). Elegís uno (en Blender también queda elegido), cambiás o agregás un código con Enter y **se guarda en Blender**: el addon lo pone en el objeto, exporta y el juego se actualiza solo. Blender tiene que estar abierto con el addon (arriba del árbol dice *Blender conectado*). Para que quede también en el `.blend`, guardalo con `Ctrl+S` (el panel del addon te lo recuerda). Doble clic en un objeto (o *Ir*): la cámara va a mirarlo. Código: `src/systems/object-tree.js`.
 
 Exporta con las Custom Properties (*extras*), con los modificadores aplicados y con las animaciones. Si cambia el personaje (`personaje.glb`), el juego se recarga entero. Del lado del juego lo hace `src/systems/live.js` (solo en `dev.html`, y solo con `node studio/server.js`).
 

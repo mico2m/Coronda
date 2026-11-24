@@ -16,6 +16,7 @@ const MIME = {
 };
 const ext = (p) => path.extname(p).slice(1).toLowerCase();
 const clients = new Set();      // pestañas del Studio escuchando cambios
+let blenderInbox = [], blenderSeen = 0; // órdenes del juego para el addon de Blender, y cuándo preguntó por última vez
 const mine = new Map();         // archivos que guardó el propio Studio (para no avisar dos veces)
 
 const send = (res, code, body, type = 'text/plain; charset=utf-8') => {
@@ -51,7 +52,11 @@ http.createServer((req, res) => {
     req.on('close', () => clients.delete(res));
     return;
   }
+  // Buzón para Blender: lo que el juego le pide (cambiar un código, elegir un objeto). El addon lo lee cada 1/4 s.
+  if (pathname === '/__blender/inbox') { blenderSeen = Date.now(); const out = blenderInbox; blenderInbox = []; return send(res, 200, JSON.stringify(out), MIME.json); }
+  if (pathname === '/__blender/estado') return send(res, 200, JSON.stringify({ blender: Date.now() - blenderSeen < 3000 }), MIME.json);
   // El addon de Blender (blender/coronda_vivo.py) le manda órdenes al juego: { cmd: 'view' | 'play', … }
+  // y el juego le manda órdenes a Blender: { cmd: 'setprop' | 'select', object, key, value }
   if (pathname === '/__blender' && req.method === 'POST') {
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host || '')) return send(res, 403, 'Host no permitido');
     const chunks = [];
@@ -63,6 +68,14 @@ http.createServer((req, res) => {
         if (!/\.glb$/i.test(key) || !resolveIn(key)) return send(res, 400, 'Ruta no permitida');
         mine.set(key, Date.now()); // así la vigilancia de archivos no avisa dos veces
         broadcast({ path: key, ext: true });
+        return send(res, 200, 'ok');
+      }
+      if (m?.cmd === 'setprop' || m?.cmd === 'select') {
+        const okVal = m.value === null || m.value === undefined || ['string', 'number', 'boolean'].includes(typeof m.value);
+        if (typeof m.object !== 'string' || !m.object || (m.cmd === 'setprop' && (!/^[A-Za-z_]\w*$/.test(m.key || '') || !okVal))) return send(res, 400, 'Orden inválida');
+        if (Date.now() - blenderSeen > 3000) return send(res, 409, 'Blender no está conectado');
+        blenderInbox.push(m.cmd === 'setprop' ? { cmd: 'setprop', object: m.object, key: m.key, value: m.value ?? null } : { cmd: 'select', object: m.object });
+        if (blenderInbox.length > 200) blenderInbox.shift();
         return send(res, 200, 'ok');
       }
       if (!['view', 'play'].includes(m?.cmd)) return send(res, 400, 'Orden desconocida');

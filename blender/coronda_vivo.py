@@ -8,6 +8,10 @@
 #  - Abrir Coronda: enciende el servidor del proyecto si hace falta (sin terminal) y abre el juego en su ventana.
 #  - Seguir la vista: la cámara libre del juego copia la vista de Blender mientras la movés.
 #  - Jugar desde el cursor: pone al personaje donde está el cursor 3D, mirando hacia donde mira tu vista.
+#  - .glb vinculados: un .glb importado que se recarga solo cuando cambia en disco (ej. la puerta o el personaje,
+#    exportados desde su propio .blend). Se usa como Collection Instance, así no perdés dónde lo pusiste.
+#  - Árbol de objetos del juego (tecla O en dev.html): los códigos que cambiás ahí se guardan acá, en el objeto, y se
+#    exporta solo. Guardá el .blend (Ctrl+S) para que también queden en el archivo.
 #  - Revisión: cuenta spawns, puertas, colisiones, NPC y objetos, y avisa lo que el juego no va a encontrar.
 #
 # Blender no puede mostrar una página web adentro de la ventana, así que el juego corre al lado: Blender exporta y le
@@ -16,7 +20,7 @@
 bl_info = {
     "name": "Coronda en vivo",
     "author": "Coronda",
-    "version": (1, 0, 0),
+    "version": (1, 2, 0),
     "blender": (3, 6, 0),
     "location": "Vista 3D > panel lateral (N) > Coronda",
     "description": "Exporta el .glb solo mientras editás y el juego lo muestra al instante",
@@ -178,6 +182,60 @@ def post(payload):
     threading.Thread(target=run, daemon=True).start()
 
 
+# ---------------------------------------------------------------- pedidos del juego (árbol de objetos, tecla O)
+# El juego cambia un código (Custom Property) o elige un objeto; el servidor lo guarda en un buzón y acá se lee
+# cada 1/4 s en segundo plano. Se aplica en Blender (el original) y se vuelve a exportar: el juego se actualiza solo.
+inbox = []
+
+
+def _poll_loop():
+    while state.get("polling"):
+        if state.get("server_ok"):
+            try:
+                _, body = _get("/__blender/inbox", 1.0)
+                msgs = json.loads(body or b"[]")
+                if msgs:
+                    inbox.extend(msgs)
+            except Exception:
+                pass
+            time.sleep(0.25)
+        else:
+            time.sleep(1.0)
+
+
+def apply_inbox():
+    ctx = bpy.context
+    changed = False
+    while inbox:
+        m = inbox.pop(0)
+        obj = bpy.data.objects.get(str(m.get("object", "")))
+        if not obj:
+            state["error"] = f"El juego pidió '{m.get('object')}', pero no está en este .blend"
+            continue
+        if m.get("cmd") == "select" and ctx.mode == "OBJECT" and obj.name in ctx.view_layer.objects:
+            for o in ctx.view_layer.objects:
+                o.select_set(False)
+            obj.select_set(True)
+            ctx.view_layer.objects.active = obj
+        elif m.get("cmd") == "setprop":
+            key, val = str(m.get("key", "")), m.get("value")
+            if not key:
+                continue
+            if val is None:
+                if key in obj.keys():
+                    del obj[key]
+            else:
+                obj[key] = val
+            obj.update_tag()
+            changed = True
+    if changed:  # exportar ya (aunque "En vivo" esté apagado): el cambio vino del juego y lo está esperando
+        state["force_export"] = True
+        state["dirty"] = True
+        state["changed_at"] = 0.0
+        state["unsaved_from_game"] = True
+        _redraw()
+
+
 # ---------------------------------------------------------------- exportar
 def _window():
     wm = bpy.context.window_manager
@@ -291,6 +349,11 @@ def on_depsgraph(scene, depsgraph):
         return
 
 
+@persistent
+def on_save(*_):
+    state["unsaved_from_game"] = False
+
+
 def _busy():
     """True mientras estás arrastrando algo (mover, rotar…): se espera a que sueltes."""
     win = _window()
@@ -312,9 +375,17 @@ def tick():
     if now - state["server_checked"] > 3:
         state["server_checked"] = now
         state["server_ok"] = server_alive()
-    if getattr(sc, "coronda_live", False) and state["dirty"] and not state["exporting"]:
-        if now - state["changed_at"] >= sc.coronda_delay and bpy.context.mode == "OBJECT" and not _busy():
+    if inbox:
+        apply_inbox()
+    forced = state.get("force_export")
+    if (getattr(sc, "coronda_live", False) or forced) and state["dirty"] and not state["exporting"]:
+        if (forced or now - state["changed_at"] >= sc.coronda_delay) and bpy.context.mode == "OBJECT" and not _busy():
+            state["force_export"] = False
             export_now()
+    if getattr(sc, "coronda_auto_reload", True) and now - state.get("linked_t", 0) > 0.8 and not state["exporting"]:
+        state["linked_t"] = now
+        if linked_collections():
+            check_linked()
     if now - state.get("redrawn", 0) > 1.0 and (state["dirty"] or now - state["exported_at"] < 90):
         state["redrawn"] = now  # para que el panel muestre "hace N s" y el estado de los cambios
         _redraw()
@@ -466,6 +537,233 @@ class CORONDA_OT_pick_folder(bpy.types.Operator):
         return {"FINISHED"}
 
 
+
+# ---------------------------------------------------------------- .glb vinculados (se recargan solos)
+# "Vincular un .glb" lo importa a una colección aparte (fuera de la escena) y pone una Collection Instance donde está
+# el cursor. Cuando ese .glb cambia en disco (lo exportaste desde otro .blend), la colección se vuelve a importar sola y
+# todas sus instancias se actualizan, sin perder dónde las pusiste. Si el .glb está en assets/models/objects, la
+# instancia ya lleva la Custom Property "objeto": es un objeto reutilizable de Coronda listo para exportar.
+LINK_KEY = "coronda_glb"
+
+
+def linked_collections():
+    return [c for c in bpy.data.collections if c.get(LINK_KEY)]
+
+
+def _abs_glb(path):
+    return os.path.normpath(bpy.path.abspath(path))
+
+
+def _file_sig(path):
+    try:
+        st = os.stat(path)
+        return f"{st.st_mtime_ns}:{st.st_size}"
+    except OSError:
+        return ""
+
+
+def load_into(coll, path):
+    """Importa el .glb y deja sus objetos (solo ellos) adentro de coll. Devuelve cuántos objetos quedaron."""
+    win = _window()
+    view_layer = bpy.context.view_layer
+    keep_sel = [o.name for o in bpy.context.selected_objects] if hasattr(bpy.context, "selected_objects") else []
+    keep_act = view_layer.objects.active.name if view_layer.objects.active else None
+    old = list(coll.all_objects)
+    before = set(bpy.data.objects)
+    state["exporting"] = True  # que el import no dispare una exportación en vivo
+    try:
+        if win:
+            with bpy.context.temp_override(window=win):
+                bpy.ops.import_scene.gltf(filepath=path)
+        else:
+            bpy.ops.import_scene.gltf(filepath=path)
+    finally:
+        state["exporting"] = False
+        state["quiet_until"] = time.time() + 0.5
+    new = [o for o in bpy.data.objects if o not in before]
+    for o in old:  # lo de la versión anterior se va
+        data = o.data
+        bpy.data.objects.remove(o, do_unlink=True)
+        if data is not None and data.users == 0:  # su malla (o huesos) tampoco queda dando vueltas
+            for bucket in (bpy.data.meshes, bpy.data.armatures, bpy.data.curves, bpy.data.lights, bpy.data.cameras):
+                try:
+                    bucket.remove(data)
+                    break
+                except (TypeError, ReferenceError, RuntimeError):
+                    continue
+    for o in new:  # lo nuevo sale de la escena y va solo a la colección vinculada
+        for c in list(o.users_collection):
+            c.objects.unlink(o)
+        coll.objects.link(o)
+    # se devuelve la selección que tenías
+    for o in view_layer.objects:
+        o.select_set(o.name in keep_sel)
+    if keep_act and keep_act in view_layer.objects:
+        view_layer.objects.active = view_layer.objects[keep_act]
+    coll[LINK_KEY + "_sig"] = _file_sig(path)
+    coll[LINK_KEY + "_at"] = time.time()
+    return len(new)
+
+
+def add_instance(context, coll):
+    """Una Collection Instance de coll en el cursor 3D (con "objeto" si es un objeto de Coronda)."""
+    path = _abs_glb(coll[LINK_KEY])
+    stem = os.path.splitext(os.path.basename(path))[0]
+    e = bpy.data.objects.new(stem, None)
+    e.instance_type = "COLLECTION"
+    e.instance_collection = coll
+    e.empty_display_type = "PLAIN_AXES"
+    e.empty_display_size = 0.5
+    e.location = context.scene.cursor.location
+    root = project_root(context)
+    if root:
+        rel = os.path.relpath(path, root).replace("\\", "/")
+        if rel.startswith("assets/models/objects/"):
+            e["objeto"] = stem
+    (context.collection or context.scene.collection).objects.link(e)
+    for o in context.view_layer.objects:
+        o.select_set(False)
+    e.select_set(True)
+    context.view_layer.objects.active = e
+    return e
+
+
+def check_linked():
+    """Vuelve a importar los .glb vinculados que cambiaron en disco. Devuelve los nombres actualizados."""
+    done = []
+    if bpy.context.mode != "OBJECT":
+        return done
+    own = ""
+    try:
+        root = project_root()
+        rel = target_path(bpy.context)
+        own = os.path.normpath(os.path.join(root, rel)) if root and rel else ""
+    except Exception:
+        pass
+    for coll in linked_collections():
+        path = _abs_glb(coll[LINK_KEY])
+        if path == own:
+            continue  # el .glb que exporta esta misma escena: no se recarga a sí mismo
+        sig = _file_sig(path)
+        if not sig or sig == coll.get(LINK_KEY + "_sig"):
+            continue
+        # se espera a que termine de escribirse: el tamaño tiene que repetirse en dos vueltas seguidas
+        pend = state.setdefault("pending_sig", {})
+        if pend.get(coll.name) != sig:
+            pend[coll.name] = sig
+            continue
+        pend.pop(coll.name, None)
+        try:
+            load_into(coll, path)
+            done.append(coll.name)
+        except Exception as e:  # noqa: BLE001
+            state["error"] = f"No se pudo recargar {os.path.basename(path)}: {e}"
+    if done:
+        _redraw()
+    return done
+
+
+class CORONDA_OT_link_glb(bpy.types.Operator):
+    bl_idname = "coronda.link_glb"
+    bl_label = "Vincular un .glb…"
+    bl_description = ("Importa un .glb que se recarga solo cada vez que ese archivo cambia, y lo pone en el cursor 3D "
+                      "(como Collection Instance: movela o duplicala con Alt+D)")
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    filter_glob: bpy.props.StringProperty(default="*.glb;*.gltf", options={"HIDDEN"})
+
+    def invoke(self, context, event):
+        root = project_root(context)
+        if root and not self.filepath:
+            self.filepath = os.path.join(root, "assets", "models", "objects", "")
+        context.window_manager.fileselect_add(self)
+        return {"RUNNING_MODAL"}
+
+    def execute(self, context):
+        path = os.path.normpath(self.filepath)
+        if not os.path.isfile(path):
+            self.report({"ERROR"}, "Elegí un archivo .glb")
+            return {"CANCELLED"}
+        if context.mode != "OBJECT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+        coll = next((c for c in linked_collections() if _abs_glb(c[LINK_KEY]) == path), None)
+        if not coll:
+            coll = bpy.data.collections.new("glb: " + os.path.basename(path))
+            coll[LINK_KEY] = bpy.path.relpath(path) if bpy.data.filepath else path
+            coll.use_fake_user = True  # vive fuera de la escena: no se exporta dos veces, solo sus instancias
+            try:
+                n = load_into(coll, path)
+            except Exception as e:  # noqa: BLE001
+                bpy.data.collections.remove(coll)
+                self.report({"ERROR"}, f"No se pudo importar: {e}")
+                return {"CANCELLED"}
+            self.report({"INFO"}, f"Vinculado {os.path.basename(path)} ({n} objetos): se recarga solo")
+        add_instance(context, coll)
+        return {"FINISHED"}
+
+
+class CORONDA_OT_glb_action(bpy.types.Operator):
+    bl_idname = "coronda.glb_action"
+    bl_label = ".glb vinculado"
+    coll: bpy.props.StringProperty()
+    action: bpy.props.EnumProperty(items=[("RELOAD", "Recargar", "Volver a importar ahora"),
+                                          ("ADD", "Otra copia", "Poner otra instancia en el cursor 3D"),
+                                          ("UNLINK", "Quitar", "Borra el vínculo y todas sus instancias")])
+
+    @classmethod
+    def description(cls, context, props):
+        return {"RELOAD": "Volver a importar este .glb ahora", "ADD": "Poner otra copia en el cursor 3D",
+                "UNLINK": "Quitar el vínculo y todas sus copias de la escena"}[props.action]
+
+    def execute(self, context):
+        coll = bpy.data.collections.get(self.coll)
+        if not coll:
+            return {"CANCELLED"}
+        if self.action == "RELOAD":
+            if context.mode != "OBJECT":
+                bpy.ops.object.mode_set(mode="OBJECT")
+            load_into(coll, _abs_glb(coll[LINK_KEY]))
+        elif self.action == "ADD":
+            add_instance(context, coll)
+        else:
+            for o in [o for o in bpy.data.objects if o.instance_collection == coll]:
+                bpy.data.objects.remove(o, do_unlink=True)
+            for o in list(coll.all_objects):
+                bpy.data.objects.remove(o, do_unlink=True)
+            bpy.data.collections.remove(coll)
+        _redraw()
+        return {"FINISHED"}
+
+
+class CORONDA_PT_linked(bpy.types.Panel):
+    bl_label = ".glb vinculados"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Coronda"
+    bl_parent_id = "CORONDA_PT_main"
+
+    def draw(self, context):
+        lay = self.layout
+        lay.operator("coronda.link_glb", icon="LINKED")
+        colls = linked_collections()
+        if not colls:
+            lay.label(text="Se recargan solos al exportarlos", icon="INFO")
+            return
+        lay.prop(context.scene, "coronda_auto_reload")
+        for c in colls:
+            box = lay.box()
+            row = box.row(align=True)
+            n = sum(1 for o in bpy.data.objects if o.instance_collection == c)
+            path = _abs_glb(c[LINK_KEY])
+            ok = os.path.isfile(path)
+            row.label(text=f"{os.path.basename(path)} · {n} cop{'ia' if n == 1 else 'ias'}", icon="FILE_3D" if ok else "ERROR")
+            for act, icon in (("RELOAD", "FILE_REFRESH"), ("ADD", "ADD"), ("UNLINK", "X")):
+                op = row.operator("coronda.glb_action", text="", icon=icon)
+                op.coll, op.action = c.name, act
+            at = c.get(LINK_KEY + "_at")
+            sub = box.row()
+            sub.scale_y = 0.8
+            sub.label(text=("No encuentro el archivo" if not ok else f"Actualizado {_ago(at)}" if at else ""))
+
 # ---------------------------------------------------------------- panel
 def _ago(t):
     s = time.time() - t
@@ -512,6 +810,8 @@ class CORONDA_PT_main(bpy.types.Panel):
             st.label(text="Cambios: exporta cuando sueltes", icon="TIME")
         elif state["exported_at"]:
             st.label(text=f"Exportado {_ago(state['exported_at'])} ({state['took']:.2f} s)", icon="CHECKMARK")
+        if state.get("unsaved_from_game"):
+            st.label(text="Hay códigos cambiados desde el juego: guardá el .blend (Ctrl+S)", icon="FILE_TICK")
         st.label(text="Servidor andando" if state["server_ok"] else "Servidor apagado (lo enciende Abrir Coronda)",
                  icon="LINKED" if state["server_ok"] else "UNLINKED")
 
@@ -569,7 +869,8 @@ class CORONDA_Prefs(bpy.types.AddonPreferences):
 
 
 CLASSES = (CORONDA_Prefs, CORONDA_OT_export, CORONDA_OT_open, CORONDA_OT_view, CORONDA_OT_play,
-           CORONDA_OT_pick_folder, CORONDA_PT_main, CORONDA_PT_game, CORONDA_PT_review)
+           CORONDA_OT_pick_folder, CORONDA_OT_link_glb, CORONDA_OT_glb_action,
+           CORONDA_PT_main, CORONDA_PT_game, CORONDA_PT_linked, CORONDA_PT_review)
 
 
 def register():
@@ -586,7 +887,12 @@ def register():
                                               description="Cuánto esperar después del último cambio para exportar")
     S.coronda_follow_view = bpy.props.BoolProperty(name="Seguir la vista", default=False,
                                                    description="La cámara libre del juego copia tu vista de Blender mientras la movés")
+    S.coronda_auto_reload = bpy.props.BoolProperty(name="Recargar solos al cambiar", default=True,
+                                                   description="Volver a importar los .glb vinculados cuando cambian en disco")
     bpy.app.handlers.depsgraph_update_post.append(on_depsgraph)
+    bpy.app.handlers.save_post.append(on_save)
+    state["polling"] = True
+    threading.Thread(target=_poll_loop, daemon=True).start()
     if not bpy.app.timers.is_registered(tick):
         bpy.app.timers.register(tick, first_interval=1.0, persistent=True)
 
@@ -594,10 +900,14 @@ def register():
 def unregister():
     if bpy.app.timers.is_registered(tick):
         bpy.app.timers.unregister(tick)
+    state["polling"] = False
+    if on_save in bpy.app.handlers.save_post:
+        bpy.app.handlers.save_post.remove(on_save)
     if on_depsgraph in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.remove(on_depsgraph)
     S = bpy.types.Scene
-    for p in ("coronda_live", "coronda_target", "coronda_only_visible", "coronda_delay", "coronda_follow_view"):
+    for p in ("coronda_live", "coronda_target", "coronda_only_visible", "coronda_delay", "coronda_follow_view",
+              "coronda_auto_reload"):
         if hasattr(S, p):
             delattr(S, p)
     for c in reversed(CLASSES):

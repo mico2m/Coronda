@@ -1,99 +1,41 @@
 {
   "speaker": "Tokse",
-  "start": [
-    {
-      "if": {
-        "veces_tokse": ">=3"
-      },
-      "goto": "pesado"
-    },
-    {
-      "if": {
-        "hablo_tokse": true
-      },
-      "goto": "otra_vez"
-    },
-    {
-      "goto": "inicio"
-    }
-  ],
+  "start": "inicio",
   "nodes": {
     "inicio": {
-      "text": "Hola putita {saludar}",
-      "next": "menu"
-    },
-    "otra_vez": {
-      "text": "¿Otra vez vos? Contame, ¿necesitás algo?",
-      "next": "menu"
-    },
-    "pesado": {
-      "text": "No rompas los cocos.",
-      "next": "menu"
-    },
-    "menu": {
-      "text": "¿Necesitás algo?",
+      "text": [
+        "Hola putita {saludar}",
+        "Bienvenido a Coronda{idle}",
+        "La verdad no hay mucho para hacer por ahora",
+        "...",
+        "¿Que por qué estoy en bolas?",
+        "Preguntale a mirkuwu"
+      ],
       "choices": [
         {
-          "text": "¿Qué hay para hacer?",
-          "next": "que_hacer"
-        },
-        {
-          "text": "¿Hay alguna casa para visitar?",
-          "next": "casa"
-        },
-        {
-          "text": "Nada, gracias.",
+          "text": "¿Quien es mirkuwu?",
           "next": "chau"
         }
       ]
     },
-    "que_hacer": {
-      "text": [
-        "Caminá, mirá los árboles, sentate un rato.",
-        "Y hablá con todos los que encuentres."
-      ],
-      "next": "menu"
-    },
-    "casa": {
-      "text": "Sí. Cuando estés cerca de una puerta te aparece el aviso: apretá E para entrar.",
-      "next": "menu",
-      "set": {
-        "sabe_de_puertas": true
-      }
-    },
     "chau": {
-      "text": "{idle}¡Adios!"
+      "text": [
+        "...",
+        "¿Que quien es mirkuwu?",
+        "Ni te gastes wachin",
+        "Chau"
+      ]
     }
   },
   "editor": {
     "nodes": {
       "inicio": {
-        "x": 390,
-        "y": 40
-      },
-      "otra_vez": {
-        "x": 390,
-        "y": 268
-      },
-      "pesado": {
-        "x": 390,
-        "y": 464
-      },
-      "menu": {
-        "x": 760,
-        "y": 40
-      },
-      "que_hacer": {
-        "x": 1130,
-        "y": 40
-      },
-      "casa": {
-        "x": 1130,
-        "y": 268
+        "x": 362,
+        "y": 176
       },
       "chau": {
-        "x": 1121,
-        "y": 516
+        "x": 797,
+        "y": 128
       }
     },
     "start": {

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coronda · Diálogos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="editor.css">
+<link rel="stylesheet" href="nodes.css">
+<style>
+  /* Esta página es solo el editor de diálogos: barra arriba y el espacio de trabajo abajo */
+  #app { display: flex; flex-direction: column; height: 100vh; }
+  #top { flex: none; }
+  #ws { flex: 1; position: relative; min-height: 0; }
+  #top .title { font-weight: 600; color: var(--muted); }
+  #top a.ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: var(--r); color: var(--text); text-decoration: none; font-size: 12.5px; }
+  #top a.ghost:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+<script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  } }
+</script>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <div class="brand"><span class="logo"></span>Coronda</div>
+    <span class="title">Diálogos</span>
+    <div class="spacer"></div>
+    <a class="ghost" href="/__studio" target="_blank" rel="noopener" title="Rutas y el resto de las herramientas de siempre">Studio clásico</a>
+    <a class="ghost" href="/dev.html" target="_blank" rel="noopener">Abrir el juego</a>
+    <div class="sep"></div>
+    <button class="ib" id="bUndo" title="Deshacer (Ctrl+Z)"></button>
+    <button class="ib" id="bRedo" title="Rehacer (Ctrl+Y)"></button>
+    <button id="bSave" class="save" title="Guardar (Ctrl+S)"><span class="dot"></span>Guardar</button>
+  </header>
+  <div id="ws"></div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="dlg"><form method="dialog"><h3 id="dlgTitle"></h3><div id="dlgBody"></div><div class="actions" id="dlgActions"></div></form></dialog>
+<script type="module" src="main.js"></script>
+</body>
+</html>

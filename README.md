@@ -204,6 +204,8 @@ En `dev.html`, el botón **NPC** (arriba a la izquierda, debajo de *Diálogos*) 
 
 ## Diálogos con NPC
 
+**Editor de diálogos con nodos:** con `node studio/server.js` corriendo, abrí **http://localhost:5173/__dialogos**. A la izquierda los diálogos; al medio los nodos (textos, opciones, condiciones, qué variables cambia cada nodo, animaciones del NPC); **Probar** reproduce la charla ahí mismo (como primera vez o como si ya hablaste, cambiando las variables a mano) y **Variables** lista cada flag, quién lo cambia y quién lo mira. `Ctrl+S` guarda en `data/dialogues/<id>.json`. Código: `studio/dialogos/`. Los recorridos siguen en el Studio clásico (`/__studio`).
+
 Se arma igual que las puertas y las colisiones: con **propiedades personalizadas en Blender**, en el mismo Empty `npc_…` del NPC. Al acercarte (2,5 m por defecto) aparece **"E Hablar"**; al apretar **E** (o tocar el aviso) se abre la caja de texto abajo y el NPC se da vuelta hacia vos. Mientras hablás el personaje no se mueve y las puertas esperan. Código: `src/systems/dialogue.js`.
 
 **La caja de texto es parte de la imagen del juego**, como en Ocarina: se dibuja a la misma resolución (320×240), con letra de píxeles, y se escala y recorta junto con el mundo. Código: `src/ui/textbox.js` (dibujo) y `src/ui/pixel-font.js` (la fuente, Spleen 6×12 con acentos, ñ, ¿ y ¡).

@@ -1,6 +1,6 @@
 // Coronda Studio: servidor local sin dependencias (solo Node 18+).
 // Uso, desde la carpeta del proyecto:   node studio/server.js        (o:  node studio/server.js ruta/al/proyecto)
-// Después abrí  http://localhost:5173/__studio
+// Después abrí  http://localhost:5173/__studio   (diálogos con nodos: http://localhost:5173/__dialogos)
 const http = require('http'), fs = require('fs'), path = require('path');
 
 const ROOT = path.resolve(process.argv[2] || path.join(__dirname, '..'));
@@ -52,6 +52,7 @@ http.createServer((req, res) => {
     return;
   }
   if (pathname === '/__studio') return serve(res, path.join(__dirname, 'studio.html'));
+  if (pathname === '/__dialogos') { res.writeHead(302, { Location: '/studio/dialogos/' }); return res.end(); } // editor de diálogos (nodos + probar + variables)
 
   if (pathname.startsWith('/__api/')) {
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host || '')) return send(res, 403, 'Host no permitido');
@@ -88,7 +89,7 @@ http.createServer((req, res) => {
   try { if (fs.statSync(f).isDirectory()) f = path.join(f, 'index.html'); } catch { /* 404 abajo */ }
   serve(res, f);
 }).listen(PORT, '127.0.0.1', () => {
-  console.log(`Coronda Studio\n  Proyecto: ${ROOT}\n  Abrí:     http://localhost:${PORT}/__studio\n  (Ctrl+C para cerrar)`);
+  console.log(`Coronda Studio\n  Proyecto: ${ROOT}\n  Abrí:     http://localhost:${PORT}/__studio\n  Diálogos: http://localhost:${PORT}/__dialogos\n  (Ctrl+C para cerrar)`);
 });
 
 // Cambios hechos desde afuera (Blender exportando un .glb, VS Code, etc.) también refrescan la vista

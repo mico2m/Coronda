@@ -104,7 +104,8 @@ export function toJSON(doc) {
   out.nodes = {};
   for (const [id, n] of Object.entries(doc.nodes)) {
     const o = {};
-    const pages = n.text.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+    // un "\n" escrito a mano también es un salto de línea
+    const pages = n.text.replace(/\\n/g, '\n').split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
     if (pages.length === 1) o.text = pages[0]; else if (pages.length > 1) o.text = pages;
     const choices = n.choices.filter((c) => c.text.trim()).map((c) => {
       const o2 = { text: c.text.trim() };
@@ -198,3 +199,24 @@ export function layout(doc, { width = 280, gap = 90 } = {}) {
 }
 
 export const needsLayout = (doc) => !doc.startPos || Object.values(doc.nodes).some((n) => !Number.isFinite(n.x) || !Number.isFinite(n.y));
+
+// ---- Colores del texto (para el editor) ----
+// Devuelve HTML ya escapado: {animación} con su color, saltos de línea (↵) y cambios de página (¶) marcados sin ocupar lugar,
+// y un "\n" escrito a mano resaltado. Los marcadores miden 0 de ancho para que el texto se acomode igual que en la caja de edición.
+const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export function highlightText(text) {
+  const re = /\{[^{}]*\}|\\n|\n(?:[ \t]*\n)+|\n/g;
+  let out = '';
+  let last = 0;
+  let m;
+  while ((m = re.exec(text))) {
+    out += esc(text.slice(last, m.index));
+    const t = m[0];
+    if (t[0] === '{') out += `<span class="hl-anim">${esc(t)}</span>`;
+    else if (t === '\\n') out += `<span class="hl-lit">${esc(t)}</span>`;
+    else if (t === '\n') out += '<span class="hl-nl"></span>\n';
+    else out += `<span class="hl-page"></span>${t}`;
+    last = m.index + t.length;
+  }
+  return `${out}${esc(text.slice(last))}\u200b`;
+}

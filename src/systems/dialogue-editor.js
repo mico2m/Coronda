@@ -3,12 +3,14 @@
 // - Cada cuadro es un nodo de data/dialogues/<nombre>.json: arrastrá desde el círculo de una salida
 //   hasta otro nodo para conectarlos; soltando en el vacío se crea un nodo nuevo ahí; un clic en el
 //   círculo desconecta. Rueda = zoom, arrastrar el fondo = mover la vista.
-// - Textos: una línea en blanco separa las páginas. Condiciones y flags en una línea: "hablo_tokse, !tiene_espada, veces_tokse>=3".
+// - Textos: un clic en el texto de un nodo abre una caja grande para escribir. {animación} sale de otro color, un salto de línea
+//   se marca con ↵ y una línea en blanco (otra página) con ¶; escribir \n también hace un salto de línea.
+//   Una línea en blanco separa las páginas. Condiciones y flags en una línea: "hablo_tokse, !tiene_espada, veces_tokse>=3".
 // - En Chrome/Edge: "Carpeta" te deja elegir data/dialogues una vez (el navegador se acuerda) y "Guardar" escribe
 //   directo en el archivo. En otros navegadores: "Abrir…" y "Guardar" (descarga el .json para copiarlo a la carpeta).
 // El formato del JSON y el significado de cada campo están en systems/dialogue.js; el modelo, en dialogue-doc.js.
 import { forgetJSON } from '../core/assets.js';
-import { emptyDoc, fromJSON, toJSON, layout, needsLayout, addNode, removeNode, renameNode, cleanId, problems } from './dialogue-doc.js';
+import { emptyDoc, fromJSON, toJSON, layout, needsLayout, addNode, removeNode, renameNode, cleanId, problems, highlightText } from './dialogue-doc.js';
 
 const DIR = 'data/dialogues/';
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -29,7 +31,6 @@ function svgEl(tag, attrs = {}, parent) {
   return e;
 }
 const curve = (a, b) => { const d = Math.max(40, Math.abs(b.x - a.x) / 2); return `M${a.x},${a.y} C${a.x + d},${a.y} ${b.x - d},${b.y} ${b.x},${b.y}`; };
-const autosize = (ta) => { ta.style.height = 'auto'; ta.style.height = `${ta.scrollHeight + 2}px`; };
 
 // Guardar la carpeta elegida entre sesiones (IndexedDB)
 const idb = () => new Promise((res, rej) => {
@@ -277,11 +278,14 @@ export function createDialogueEditor({ host = document.querySelector('.app') ?? 
     makeDraggable(head, node, n);
 
     const body = el('div', 'de-body', node);
-    const ta = el('textarea', 'de-text', body);
-    ta.value = n.text; ta.rows = 3; ta.spellcheck = true;
-    ta.placeholder = 'Lo que dice. Una línea en blanco = otra página.';
-    ta.addEventListener('input', () => { n.text = ta.value; autosize(ta); changed(); redraw(); });
-    requestAnimationFrame(() => { autosize(ta); drawLinks(); });
+    const prev = el('div', 'de-preview', body);
+    prev.tabIndex = 0;
+    prev.setAttribute('role', 'button');
+    prev.title = 'Clic para escribir el texto';
+    if (n.text.trim()) prev.innerHTML = highlightText(n.text); // el texto va escapado dentro de highlightText
+    else el('span', 'de-ph', prev, 'Clic para escribir lo que dice…');
+    prev.addEventListener('click', () => openText(id));
+    prev.addEventListener('keydown', (e) => { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); openText(id); } });
 
     if (!n.choices.length) {
       const row = el('div', 'de-row', body);
@@ -316,12 +320,75 @@ export function createDialogueEditor({ host = document.querySelector('.app') ?? 
     return node;
   }
 
+  // ---------- Caja grande para escribir ----------
+  const modal = el('div', 'de-modal', root);
+  modal.hidden = true;
+  const mcard = el('div', 'de-modal-card', modal);
+  const mhead = el('div', 'de-modal-head', mcard);
+  const mtitle = el('strong', '', mhead);
+  const mclose = el('button', 'de-btn', mhead, 'Listo');
+  mclose.type = 'button';
+  const mwrap = el('div', 'de-hl-wrap', mcard);
+  const mpre = el('pre', 'de-hl', mwrap);
+  mpre.setAttribute('aria-hidden', 'true');
+  const mta = el('textarea', 'de-hl-input', mwrap);
+  mta.spellcheck = true;
+  mta.placeholder = 'Lo que dice. Una línea en blanco = otra página.';
+  const mfoot = el('div', 'de-legend', mcard);
+  mfoot.innerHTML = '<span class="hl-anim">{animación}</span> clip del NPC · <span class="hl-nl-demo">↵</span> salto de línea (también podés escribir \\n) · <span class="hl-page-demo">¶</span> otra página (línea en blanco)';
+  const mcount = el('span', 'de-count', mfoot);
+  let editing = null;
+
+  function syncText() {
+    mpre.innerHTML = highlightText(mta.value);
+    mpre.scrollTop = mta.scrollTop;
+    const pages = mta.value.split(/\n\s*\n/).filter((t) => t.trim()).length;
+    mcount.textContent = pages ? `${pages} página${pages > 1 ? 's' : ''}` : '';
+  }
+  function openText(id) {
+    if (!doc?.nodes[id]) return;
+    editing = id;
+    mtitle.textContent = `Texto de «${id}»`;
+    mta.value = doc.nodes[id].text;
+    modal.hidden = false;
+    syncText();
+    mta.focus();
+    mta.setSelectionRange(mta.value.length, mta.value.length);
+    mta.scrollTop = mta.scrollHeight;
+  }
+  function closeText() {
+    if (modal.hidden) return;
+    modal.hidden = true;
+    editing = null;
+    render();
+  }
+  mta.addEventListener('input', () => {
+    // Escribir "\n" hace un salto de línea de verdad
+    if (mta.value.includes('\\n')) {
+      const pos = mta.selectionStart;
+      const before = mta.value.slice(0, pos).replace(/\\n/g, '\n').length;
+      mta.value = mta.value.replace(/\\n/g, '\n');
+      mta.setSelectionRange(before, before);
+    }
+    if (editing && doc?.nodes[editing]) { doc.nodes[editing].text = mta.value; changed(); }
+    syncText();
+  });
+  mta.addEventListener('scroll', () => { mpre.scrollTop = mta.scrollTop; });
+  mclose.addEventListener('click', closeText);
+  modal.addEventListener('pointerdown', (e) => { if (e.target === modal) closeText(); });
+  modal.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); closeText(); }
+    else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') { e.preventDefault(); e.stopPropagation(); save(); }
+  });
+
   // ---------- Archivos ----------
   function load(data, name, fh) {
     doc = fromJSON(data, name);
     if (!Object.keys(doc.nodes).length) doc.nodes.inicio = emptyDoc(name).nodes.inicio;
     if (needsLayout(doc)) layout(doc);
     fileHandle = fh ?? null;
+    modal.hidden = true;
+    editing = null;
     dirty = false;
     view.x = 30; view.y = 30; view.k = 1; applyView();
     render();

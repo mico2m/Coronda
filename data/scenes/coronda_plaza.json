@@ -44,7 +44,7 @@
   ],
   "objects": [],
   "actors": [
-    { "empty": "npc_prueba", "id": "tokse" }
+    { "empty": "npc_tokse, "id": "tokse" }
   ],
   "doors": [
     {

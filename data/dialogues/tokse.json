@@ -1,13 +1,25 @@
 {
   "speaker": "Tokse",
   "start": [
-    { "if": { "veces_tokse": ">=3" }, "goto": "pesado" },
-    { "if": { "hablo_tokse": true }, "goto": "otra_vez" },
-    { "goto": "inicio" }
+    {
+      "if": {
+        "veces_tokse": ">=3"
+      },
+      "goto": "pesado"
+    },
+    {
+      "if": {
+        "hablo_tokse": true
+      },
+      "goto": "otra_vez"
+    },
+    {
+      "goto": "inicio"
+    }
   ],
   "nodes": {
     "inicio": {
-      "text": ["¡Hola! No te había visto por la plaza.", "Acá siempre pasa algo, aunque no lo parezca."],
+      "text": "Hola putita {saludar}",
       "next": "menu"
     },
     "otra_vez": {
@@ -15,28 +27,81 @@
       "next": "menu"
     },
     "pesado": {
-      "text": ["Ya hablamos un montón, ¿no?", "Bueno, preguntá lo que quieras."],
+      "text": [
+        "Ya hablamos un montón, ¿no?",
+        "Bueno, preguntá lo que quieras."
+      ],
       "next": "menu"
     },
     "menu": {
       "text": "¿Necesitás algo?",
       "choices": [
-        { "text": "¿Qué hay para hacer?", "next": "que_hacer" },
-        { "text": "¿Hay alguna casa para visitar?", "next": "casa" },
-        { "text": "Nada, gracias.", "next": "chau" }
+        {
+          "text": "¿Qué hay para hacer?",
+          "next": "que_hacer"
+        },
+        {
+          "text": "¿Hay alguna casa para visitar?",
+          "next": "casa"
+        },
+        {
+          "text": "Nada, gracias.",
+          "next": "chau"
+        }
       ]
     },
     "que_hacer": {
-      "text": ["Caminá, mirá los árboles, sentate un rato.", "Y hablá con todos los que encuentres."],
+      "text": [
+        "Caminá, mirá los árboles, sentate un rato.",
+        "Y hablá con todos los que encuentres."
+      ],
       "next": "menu"
     },
     "casa": {
       "text": "Sí. Cuando estés cerca de una puerta te aparece el aviso: apretá E para entrar.",
-      "set": { "sabe_de_puertas": true },
-      "next": "menu"
+      "next": "menu",
+      "set": {
+        "sabe_de_puertas": true
+      }
     },
     "chau": {
-      "text": "¡Cuidate! Nos vemos."
+      "text": "{idle}¡Cuidate! Nos vemos."
+    }
+  },
+  "editor": {
+    "nodes": {
+      "inicio": {
+        "x": 390,
+        "y": 40
+      },
+      "otra_vez": {
+        "x": 390,
+        "y": 268
+      },
+      "pesado": {
+        "x": 390,
+        "y": 464
+      },
+      "menu": {
+        "x": 760,
+        "y": 40
+      },
+      "que_hacer": {
+        "x": 1130,
+        "y": 40
+      },
+      "casa": {
+        "x": 1130,
+        "y": 268
+      },
+      "chau": {
+        "x": 1130,
+        "y": 464
+      }
+    },
+    "start": {
+      "x": 20,
+      "y": 40
     }
   }
 }

@@ -1,9 +1,21 @@
 {
   "speaker": "Tokse",
-  "start": "inicio",
+  "start": [
+    { "if": { "veces_tokse": ">=3" }, "goto": "pesado" },
+    { "if": { "hablo_tokse": true }, "goto": "otra_vez" },
+    { "goto": "inicio" }
+  ],
   "nodes": {
     "inicio": {
       "text": ["¡Hola! No te había visto por la plaza.", "Acá siempre pasa algo, aunque no lo parezca."],
+      "next": "menu"
+    },
+    "otra_vez": {
+      "text": "¿Otra vez vos? Contame, ¿necesitás algo?",
+      "next": "menu"
+    },
+    "pesado": {
+      "text": ["Ya hablamos un montón, ¿no?", "Bueno, preguntá lo que quieras."],
       "next": "menu"
     },
     "menu": {
@@ -20,6 +32,7 @@
     },
     "casa": {
       "text": "Sí. Cuando estés cerca de una puerta te aparece el aviso: apretá E para entrar.",
+      "set": { "sabe_de_puertas": true },
       "next": "menu"
     },
     "chau": {

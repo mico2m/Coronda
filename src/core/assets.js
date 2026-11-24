@@ -13,6 +13,9 @@ export async function loadJSON(url) {
   return data;
 }
 
+// Olvida un JSON cacheado (el editor de diálogos lo usa después de guardar, para que el juego lea la versión nueva)
+export function forgetJSON(url) { jsonCache.delete(url); }
+
 export function loadGLB(url, onProgress) {
   return new Promise((resolve, reject) => {
     gltfLoader.load(

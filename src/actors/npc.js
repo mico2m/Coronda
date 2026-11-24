@@ -12,7 +12,7 @@
 //       npc_escala = 1              tamaño
 //       npc_radio  = 0.4            qué tan "ancho" es para que el jugador no lo atraviese (m)
 //       npc_giro   = 0              grados extra de giro
-//     Para hablarle (npc_texto, npc_dialogo, npc_nombre, npc_hablar_radio, npc_hablar_texto, npc_mirar, npc_anim_hablar) ver src/systems/dialogue.js.
+//     Para hablarle (npc_texto, npc_texto_repetir, npc_pone, npc_dialogo, npc_nombre, npc_hablar_radio, npc_hablar_texto, npc_mirar, npc_anim_hablar) ver src/systems/dialogue.js.
 //
 // También se pueden definir/ajustar en el JSON de la escena (data/scenes/*.json > "actors"):
 //   { "empty": "npc_vecino", "animation": "idle", "scale": 1 }                 ajusta el que viene del .glb
@@ -38,7 +38,7 @@ const flag = (v, d) => (v === undefined || v === '' || v === null ? d : !(v === 
 const humanize = (id) => { const t = String(id).replace(/_+/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
 // "Hola|¿Cómo andás?" -> ["Hola", "¿Cómo andás?"]; un \n escrito en Blender (barra y n) es un salto de línea
 const splitPages = (v) => String(v ?? '').split('|').map((t) => t.replace(/\\n/g, '\n').trim()).filter(Boolean);
-const TALK_KEYS = ['speaker', 'text', 'dialogue', 'talkRadius', 'talkLabel', 'look', 'talkAnim'];
+const TALK_KEYS = ['speaker', 'text', 'repeatText', 'setFlag', 'dialogue', 'talkRadius', 'talkLabel', 'look', 'talkAnim'];
 const ANIM_FADE = 0.2; // segundos de transición entre animaciones
 const TAU = Math.PI * 2;
 const num = (v, d) => (v !== undefined && v !== '' && v !== null && Number.isFinite(Number(v)) ? Number(v) : d);
@@ -71,7 +71,7 @@ export function createNpcs() {
           name: o.name,
           id: m[1].replace(/\d{3}$/, ''), // npc_vecino.001 -> (three lo guarda como npc_vecino001) -> vecino
           model: u.npc_modelo, animation: u.npc_anim, scale: u.npc_escala, radius: u.npc_radio, yawOffset: u.npc_giro,
-          speaker: u.npc_nombre, text: u.npc_texto, dialogue: u.npc_dialogo,
+          speaker: u.npc_nombre, text: u.npc_texto, repeatText: u.npc_texto_repetir, setFlag: u.npc_pone, dialogue: u.npc_dialogo,
           talkRadius: u.npc_hablar_radio, talkLabel: u.npc_hablar_texto, look: u.npc_mirar, talkAnim: u.npc_anim_hablar,
           position: p, yaw: Math.atan2(f.x, f.z),
         });
@@ -88,7 +88,7 @@ export function createNpcs() {
           defs.push({
             name: a.id ?? name ?? 'npc', id: a.id ?? (String(name ?? '').replace(/^npc_/i, '') || 'npc'),
             model: a.model, animation: a.animation, scale: a.scale, radius: a.radius, yawOffset: a.yawOffset,
-            speaker: a.speaker, text: a.text, dialogue: a.dialogue, talkRadius: a.talkRadius, talkLabel: a.talkLabel, look: a.look, talkAnim: a.talkAnim,
+            speaker: a.speaker, text: a.text, repeatText: a.repeatText, setFlag: a.setFlag, dialogue: a.dialogue, talkRadius: a.talkRadius, talkLabel: a.talkLabel, look: a.look, talkAnim: a.talkAnim,
             position: new THREE.Vector3(...a.position), yaw: (a.yaw ?? 0) * DEG,
           });
         } else if (name) {
@@ -154,6 +154,8 @@ export function createNpcs() {
           speaker: String(d.speaker ?? '').trim() || null,   // el que pusiste vos (npc_nombre)
           defaultSpeaker: humanize(d.id),                    // si no pusiste nombre
           pages, dialogue: dialogue || null,
+          repeatPages: Array.isArray(d.repeatText) ? d.repeatText.map(String) : splitPages(d.repeatText), // 2ª vez en adelante
+          sets: (Array.isArray(d.setFlag) ? d.setFlag : String(d.setFlag ?? '').split(',')).map((f) => String(f).trim()).filter(Boolean),
           radius: num(d.talkRadius, 2.5),
           label: String(d.talkLabel ?? '').trim() || 'Hablar',
           look: flag(d.look, true),

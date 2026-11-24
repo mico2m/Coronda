@@ -7,6 +7,8 @@
 //                       ({} vuelve al idle). La marca no se ve en pantalla. También sirve dentro de los textos del JSON.
 //   npc_dialogo       = "tokse"               conversación con opciones: usa data/dialogues/tokse.json (ver README)
 //   npc_nombre        = "Tokse"               nombre que se ve arriba de la caja (por defecto, el del Empty sin "npc_")
+//   npc_texto_repetir = "Ah, sos vos|¿Algo más?"  lo que dice de la 2ª vez en adelante (como los Kokiri de Ocarina)
+//   npc_pone          = "conoce_tokse"       flag(s) que se prenden al hablarle (varios con coma); ver flags.js
 //   npc_hablar_radio  = 2.5                   a cuántos metros aparece el aviso
 //   npc_hablar_texto  = "Hablar"              lo que dice el aviso
 //   npc_mirar         = 1                     0 = el NPC no se da vuelta hacia vos
@@ -23,8 +25,12 @@
 // Cada nodo tiene "text" (un texto o una lista de páginas), y opcionalmente "choices" (opciones), "next" (a qué nodo
 // sigue al terminar de leer), "speaker" y "anim" (clip del NPC que se reproduce al llegar a ese nodo; "" = vuelve al idle;
 // si termina en "_vuelve" se reproduce una vez y vuelve solo). Sin "next" ni "choices" la conversación termina.
-// Una opción sin "next" también termina. Al cerrarse la charla el NPC vuelve a su animación de siempre.
+// Una opción sin "next" también termina.
+// Memoria (ver flags.js): "start" puede ser una lista de reglas; gana la primera cuya condición se cumple:
+//   "start": [ { "if": { "hablo_tokse": true }, "goto": "otra_vez" }, { "goto": "inicio" } ]
+// Un nodo puede tener "set": { "flag": true } (se aplica al llegar) y una opción puede tener "if" (solo aparece si se cumple). Al cerrarse la charla el NPC vuelve a su animación de siempre.
 import { loadJSON } from '../core/assets.js';
+import { flags } from './flags.js';
 
 const DIR = 'data/dialogues/';
 const CPS = 45; // letras por segundo de la máquina de escribir
@@ -80,9 +86,19 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
       pages: asPages(raw.text),
       next: raw.next ?? null,
       choices: (Array.isArray(raw.choices) ? raw.choices : [])
+        .filter((c) => flags.check(c?.if))
         .map((c) => ({ text: String(c?.text ?? ''), next: c?.next ?? null }))
         .filter((c) => c.text),
     };
+  }
+
+  // "start" puede ser un nodo, o una lista de reglas { if, goto } evaluadas en orden con los flags
+  function pickStart(start, nodes) {
+    if (Array.isArray(start)) {
+      for (const r of start) if (r?.goto && flags.check(r.if)) return r.goto;
+      return Object.keys(nodes)[0];
+    }
+    return start ?? Object.keys(nodes)[0];
   }
 
   async function buildScript(entry) {
@@ -91,7 +107,7 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
       try {
         const data = await loadJSON(dialoguePath(t.dialogue));
         const nodes = data.nodes ?? {};
-        const start = data.start ?? Object.keys(nodes)[0];
+        const start = pickStart(data.start, nodes);
         if (!nodes[start]) throw new Error(`no tiene el nodo inicial "${start}"`);
         return { nodes, start, speaker: data.speaker ? String(data.speaker) : null };
       } catch (err) {
@@ -99,7 +115,8 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
         if (!t.pages.length) throw err;
       }
     }
-    return { nodes: { start: { text: t.pages } }, start: 'start', speaker: null };
+    const again = t.repeatPages.length && flags.get(`hablo_${entry.id}`);
+    return { nodes: { start: { text: again ? t.repeatPages : t.pages } }, start: 'start', speaker: null };
   }
 
   // ---- Inicio y fin ----
@@ -117,6 +134,10 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
       return;
     }
     busy = false;
+    // Recordar que ya le hablaste (después de elegir qué decir, así la 1ª vez sale el texto de la 1ª vez)
+    flags.set(`hablo_${entry.id}`, true);
+    flags.inc(`veces_${entry.id}`);
+    for (const f of entry.talk.sets) flags.set(f, true);
     host.classList.add('talking'); // esconde la ayuda y los botones mientras se habla
     s = { entry, script, node: null, pages: [], page: 0, text: '', shown: 0, choices: [], sel: 0, picking: false };
     box.hidden = false;
@@ -141,6 +162,7 @@ export function createDialogue({ stage, npcs, onStart, onEnd, onError }) {
   function goto(id) {
     const raw = s.script.nodes[id];
     if (!raw) { console.warn(`Diálogo: no existe el nodo "${id}".`); end(); return; }
+    if (raw.set && typeof raw.set === 'object') for (const [k, v] of Object.entries(raw.set)) flags.set(k, v);
     s.node = normalize(raw);
     if (raw.anim !== undefined) npcs.play(s.entry, raw.anim); // sin "anim" sigue la que estaba
     s.pages = s.node.pages.length ? s.node.pages : [''];

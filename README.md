@@ -268,6 +268,12 @@ Orden de prioridad: `spawn` de la puerta en el JSON → `empty_spawn_<origen>` �
 ## Versión final y modo desarrollador
 
 - `index.html`: la versión final, limpia y sin herramientas.
+- **Editor de diálogos por nodos** (solo `dev.html`, botón **Diálogos** arriba a la izquierda): cada cuadro es un nodo de `data/dialogues/<nombre>.json`.
+  Se conectan arrastrando desde el círculo de una salida hasta otro nodo (soltando en el vacío se crea uno nuevo; un clic en el círculo desconecta).
+  Una línea en blanco en el texto separa las páginas; las condiciones y flags se escriben en una línea (`hablo_tokse, !tiene_espada, veces_tokse>=3`).
+  En Chrome/Edge, **Carpeta** te deja elegir `data/dialogues` una vez y **Guardar** escribe directo en el archivo (también `Ctrl+S`); en otros navegadores
+  usá **Abrir…** y **Guardar** (descarga el `.json` para copiarlo a la carpeta). La posición de los nodos se guarda en el mismo JSON, bajo `"editor"`.
+  Al guardar, el juego lee la versión nueva la próxima vez que le hablás a un NPC (no hace falta recargar).
 - `dev.html`: el mismo mundo con un **inspector**. Hay una mira en el centro y, al apuntar a un objeto, muestra su nombre, archivo de origen, tamaño en metros, texturas, triángulos y distancia. Se activa y desactiva con la tecla **I**.
 
 Los dos usan el mismo motor (`src/game.js`). La versión final no descarga el código del inspector.

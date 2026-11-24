@@ -3,7 +3,7 @@
   "start": [
     {
       "if": {
-        "veces_tokse": ">=3"
+        "veces_tokse": ">=2"
       },
       "goto": "pesado"
     },
@@ -27,11 +27,8 @@
       "next": "menu"
     },
     "pesado": {
-      "text": [
-        "Ya hablamos un montón, ¿no?",
-        "Bueno, preguntá lo que quieras."
-      ],
-      "next": "menu"
+      "text": "No rompas los cocos.",
+      "next": "chau"
     },
     "menu": {
       "text": "¿Necesitás algo?",
@@ -65,7 +62,7 @@
       }
     },
     "chau": {
-      "text": "{idle}¡Cuidate! Nos vemos."
+      "text": "{idle}¡Adios!"
     }
   },
   "editor": {
@@ -100,8 +97,8 @@
       }
     },
     "start": {
-      "x": 20,
-      "y": 40
+      "x": -80,
+      "y": 90
     }
   }
 }

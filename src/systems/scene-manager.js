@@ -1,5 +1,15 @@
 // Gestor de escenas: lee data/scenes/<id>.json, arma el entorno, carga las salas (.glb) y la música.
 // Idea tomada de Ocarina of Time: una escena = ambiente + salas; los datos van aparte del código.
+//
+// OBJETOS REUTILIZABLES (prefabs): un Empty de la escena con la Custom Property
+//   objeto = "puerta_casa"   -> carga assets/models/objects/puerta_casa.glb y lo pone ahí (con la posición, giro y
+//                               escala del Empty). También acepta una ruta: "assets/models/otros/x.glb".
+// Se modela y anima una sola vez y se usa en todas las escenas que quieras. Lo que va adentro del archivo (sus
+// animaciones, sus col_…, sus propiedades) viaja con él; lo que cambia en cada escena (ej. "puerta" = destino) va en el Empty.
+// Usá Display As = Plain Axes o Arrows con escala 1 (si escalás el Empty, el objeto también se escala).
+// Para VERLO en Blender mientras lo ubicás: File > Link > puerta_casa.blend > Collection, y Add > Collection Instance.
+// Esa instancia es un Empty que muestra la puerta: ponele "objeto" ahí. Si el exportador mete una copia de la puerta
+// adentro del Empty, el juego la saca y pone la del .glb (que es la que trae la animación), así no queda duplicada.
 import * as THREE from 'three';
 import { loadJSON, loadGLB } from '../core/assets.js';
 import { makeUnlit, setShade, isSkyName } from './shading.js';
@@ -49,6 +59,47 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     }
   }
 
+  const objectUrl = (v) => {
+    const s = String(v).trim();
+    return /[/\\]|\.glb$/i.test(s) ? s : `assets/models/objects/${s}.glb`;
+  };
+
+  // Empties con "objeto": carga cada archivo una vez por escena y pone una copia en cada Empty
+  async function placeObjects(group) {
+    const spots = [];
+    group.traverse((o) => {
+      const v = o.userData?.objeto;
+      if (typeof v === 'string' && v.trim() && !o.userData.objectPlaced) spots.push(o);
+    });
+    if (!spots.length) return;
+    const unlit = current?.data.environment?.shading !== 'lit';
+    const files = new Map(); // url -> Promise<gltf>
+    const failed = new Set();
+    await Promise.all(spots.map(async (spot) => {
+      const url = objectUrl(spot.userData.objeto);
+      if (!files.has(url)) files.set(url, loadGLB(url));
+      let gltf;
+      try { gltf = await files.get(url); } catch (err) {
+        if (!failed.has(url)) { failed.add(url); console.warn(`Objeto "${spot.name}": no se pudo cargar ${url}.`, err.message); }
+        return;
+      }
+      // lo que Blender exportó adentro del Empty (la vista previa de la Collection Instance) se reemplaza
+      for (const c of [...spot.children]) {
+        spot.remove(c);
+        c.traverse((o) => { o.geometry?.dispose?.(); });
+      }
+      const inst = gltf.scene.clone(true);
+      inst.name = `objeto:${spot.userData.objeto}`;
+      // sus animaciones (ej. abrir la puerta) se reproducen sobre ESTA copia (ver doors.js)
+      inst.userData = { animations: gltf.animations, objectFile: url };
+      inst.traverse((o) => { o.userData.sourceFile = url; o.userData.roomId = spot.userData.roomId; });
+      if (unlit) { makeUnlit(inst); setShade(inst, shade); }
+      spot.add(inst);
+      spot.userData.objectPlaced = true;
+    }));
+    if (failed.size) ui.setStatus(`Objetos: no se encontró ${[...failed].join(', ')}`);
+  }
+
   async function loadScene(id, { spawn, spawnName } = {}) {
     const fromId = current?.data.id ?? null; // escena de la que venimos (para spawn_<origen>)
     const entry = scenesTable[id];
@@ -76,6 +127,7 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
         gltf.scene.name = `room:${room.id}`;
         // Para el inspector: de qué archivo y sala viene cada objeto
         gltf.scene.userData.isRoomRoot = true;
+        gltf.scene.userData.animations = gltf.animations; // animaciones de objetos de la sala (ej. puertas, ver doors.js)
         gltf.scene.traverse((o) => {
           o.userData.sourceFile = room.model;
           o.userData.roomId = room.id;
@@ -101,6 +153,9 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
         missing.push(room.model);
       }
     }
+
+    // Objetos reutilizables (Empties con "objeto"): se cargan antes de las colisiones, puertas y NPC
+    await placeObjects(group);
 
     // Posición inicial, por orden de prioridad (los spawns se explican en spawns.js):
     //  1) "spawn" de la puerta por la que entraste (JSON)

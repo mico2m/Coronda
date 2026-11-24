@@ -114,6 +114,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     // Punto que se compara con puertas y NPC: el jugador (a la altura del pecho) o la cámara libre
     const focus = mode === 'player' && player ? _focus.copy(player.position).setY(player.position.y + 1) : camera.position;
     dialogue?.update(focus, dt);
+    doors?.tick(dt);
     doors?.update(focus);
     renderer.render(scene, camera);
     textbox.render(); // caja de diálogo, encima del mundo
@@ -175,8 +176,19 @@ export async function startGame({ dev = false, retro = null } = {}) {
       blocked: () => dialogue?.blocked ?? false, // las charlas con NPC usan la misma tecla E
       isScene: (id) => !!scenesTable[id],
       onEnter: async (door) => {
-        player.frozen = true; // no se mueve durante el fundido
+        player.frozen = true; // no se mueve durante la animación ni el fundido
         if (mode === 'free') controls.setEnabled(false);
+        // Animación de abrir la puerta (ver doors.js > puerta_anim): mira a la puerta, la hace y recién ahí el fundido
+        // ...y la puerta se abre (su propia animación del .glb, si tiene): se espera a la más larga de las dos
+        const animar = mode !== 'free' && door.anim !== null;
+        // 1) se para en el pos_jugador de la puerta (el más cercano), como cuando animaste a Link con la puerta
+        const at = animar ? doors.pointFor(door, player.position) : null;
+        if (at) await player.alignTo(at);
+        // 2) Link y la puerta animan a la vez; el fundido espera a la más larga
+        const doorSecs = doors.openDoor(door);
+        const doorWait = new Promise((r) => setTimeout(r, (door.wait ?? doorSecs) * 1000));
+        if (animar) await player.interact(door.anim, { face: at ? null : door.center, wait: door.wait });
+        await doorWait;
         await fade.fadeOut();
         try {
           if (door.scene === sceneManager.current?.id) {
@@ -191,6 +203,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
           console.error(err);
           ui.setStatus(String(err.message || err));
         }
+        player.endInteract(); // por si no hubo viaje (destino inexistente)
+        doors.closeDoor(door); // al volver, la puerta está cerrada
         await fade.fadeIn();
         player.frozen = false;
         if (mode === 'free') controls.setEnabled(true);

@@ -13,6 +13,11 @@
 // Opcional, en player.json > actions: { "acostarse": { "key": "KeyL", "label": "Acostarse" } }
 // (también "loop": true/false y "hold": true/false para pisar lo que dice el nombre).
 // Para usar un clip que ya existe sin renombrarlo: { "caer": { "clip": "nombre_exacto_del_clip", "label": "Caerse" } }.
+// Para que una acción NO tenga botón ni tecla: { "saludar": { "hidden": true } }.
+//
+// ABRIR PUERTAS: un clip llamado abrirpuerta / abrir_puerta (o accion_abrirpuerta) se usa solo al apretar E en una
+// puerta (ver systems/doors.js > puerta_anim): Link mira a la puerta, hace la animación y después viene el fundido.
+// Ese clip no aparece como botón de acción.
 import * as THREE from 'three';
 import { loadGLB } from '../core/assets.js';
 import { makeUnlit, setShade } from '../systems/shading.js';
@@ -38,6 +43,8 @@ const DEFAULTS = {
 };
 
 const ACTION_RE = /^(?:accion|action)_(.+)$/i;
+// Clip por defecto para abrir puertas (con o sin accion_, con o sin guion bajo, sufijos .001 incluidos)
+const DOOR_CLIP_RE = /^(?:(?:accion|action)_)?abrir_?puerta(?:[._]\d+)?$/i;
 // "accion_saludar_vuelve.001" -> { id: "saludar", mode: "vuelve" }
 function parseActionName(clipName) {
   const m = ACTION_RE.exec(String(clipName).replace(/\.\d+$/, ''));
@@ -52,6 +59,7 @@ const humanize = (id) => { const t = id.replace(/_+/g, ' ').trim(); return t.cha
 const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
 const ALIAS = { ArrowUp: 'KeyW', ArrowDown: 'KeyS', ArrowLeft: 'KeyA', ArrowRight: 'KeyD', ShiftRight: 'ShiftLeft' };
 const TAU = Math.PI * 2;
+const INTERACT = 'interactuar'; // clave de la animación de puertas en `clips`
 
 export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   const cfg = { ...DEFAULTS, ...config, camera: { ...DEFAULTS.camera, ...config.camera }, animation: { ...DEFAULTS.animation, ...config.animation }, collision: { ...DEFAULTS.collision, ...config.collision } };
@@ -104,13 +112,17 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
         else if (o?.clip && !clip) console.warn(`Acción "${id}": no hay un clip llamado "${o.clip}" en el .glb`);
       }
       found.sort((a, b) => a.id.localeCompare(b.id));
-      found.forEach(({ clip, id, mode }, i) => {
+      let shown = 0;
+      found.forEach(({ clip, id, mode }) => {
         const o = cfg.actions?.[id] ?? {};
         const loop = o.loop ?? mode === 'loop';
         const act = mixer.clipAction(clip);
         act.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
         act.clampWhenFinished = true; // se queda en la última pose
         clips[`accion:${id}`] = act;
+        // sin botón: las marcadas "hidden" en player.json y la de abrir puertas (la usa doors.js)
+        if (o.hidden ?? DOOR_CLIP_RE.test(clip.name)) return;
+        const i = shown++;
         actions.push({ id, label: o.label ?? humanize(id), key: o.key ?? (i < 9 ? `Digit${i + 1}` : null), hold: o.hold ?? mode !== 'vuelve' });
       });
       mixer.addEventListener('finished', (e) => {
@@ -252,6 +264,26 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   // Hacia dónde mira la cámara con ese yaw -> ángulo de giro del modelo (el frente del modelo es +Z)
   const facingFromYaw = (yaw) => Math.atan2(-Math.sin(yaw), -Math.cos(yaw));
 
+  // Se desliza (rápido, ~0,25 s) hasta un punto { x, y, z, yaw } girando hacia yaw. Mientras, camina en el lugar.
+  function slideTo(at) {
+    const sx = root.position.x, sy = root.position.y, sz = root.position.z, f0 = facing;
+    const f1 = facingFromYaw(at.yaw ?? 0);
+    const dist = Math.hypot(at.x - sx, at.z - sz);
+    const dur = Math.min(0.5, 0.12 + dist / 4);
+    keys = {};
+    doing = INTERACT; // que el update no lo pase a quieto mientras se acomoda
+    if (dist > 0.05) playClip('walk');
+    return new Promise((res) => {
+      const t0 = performance.now();
+      (function step() {
+        const t = Math.min(1, (performance.now() - t0) / 1000 / dur), e = t * (2 - t);
+        root.position.set(sx + (at.x - sx) * e, sy + ((at.y ?? sy) - sy) * e, sz + (at.z - sz) * e);
+        facing = angleLerp(f0, f1, e); pivot.rotation.y = facing;
+        if (t < 1) requestAnimationFrame(step); else { facing = f1; pivot.rotation.y = f1; res(); }
+      })();
+    });
+  }
+
   return {
     animations,
     loadError,
@@ -265,6 +297,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
 
     // Ponerlo en un punto (pies) mirando hacia `yaw` (mismo criterio que la cámara)
     place([x, y, z], yaw = 0) {
+      if (doing === INTERACT) { doing = null; playClip('idle'); } // llegó al destino de una puerta: vuelve a quieto
       root.position.set(x, y, z);
       const g = groundY(x, y, z, 2); // al aparecer se tolera que el punto esté hasta 2 m más abajo del suelo
       if (g !== null) root.position.y = g;
@@ -273,6 +306,52 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       pivot.rotation.y = facing;
       cam.yaw = yaw;
     },
+    // Animación de interactuar (abrir una puerta…): mira hacia `face` ({x,z}), reproduce el clip una vez y
+    // espera a que termine (o `wait` segundos). Se queda en la última pose hasta que se mueva o se lo ubique de nuevo.
+    //   name: nombre del clip (con o sin accion_); undefined = el de abrir puertas (abrirpuerta / abrir_puerta)
+    // Devuelve false si no hay clip (no hace nada).
+    // at: { x, y, z, yaw } -> antes de animar se desliza hasta ese punto (pies) mirando hacia `yaw` (como los spawns)
+    async interact(name, { face = null, wait = null, at = null } = {}) {
+      if (!active) return false;
+      if (at) await slideTo(at);
+      if (!mixer) return false;
+      const want = name === undefined ? null : String(name).trim();
+      const clip = want
+        ? animations.find((c) => c.name.toLowerCase() === want.toLowerCase())
+          ?? animations.find((c) => c.name.toLowerCase() === `accion_${want.toLowerCase()}`)
+          ?? animations.find((c) => c.name.toLowerCase().startsWith(want.toLowerCase()))
+        : animations.find((c) => DOOR_CLIP_RE.test(c.name));
+      if (!clip) {
+        if (want) console.warn(`Puerta: el personaje no tiene un clip "${want}". Clips: ${animations.map((c) => c.name).join(', ')}`);
+        return false;
+      }
+      if (face) {
+        const dx = face.x - root.position.x, dz = face.z - root.position.z;
+        if (Math.hypot(dx, dz) > 0.05) { facing = Math.atan2(dx, dz); pivot.rotation.y = facing; }
+      }
+      keys = {};
+      const act = mixer.clipAction(clip);
+      act.setLoop(THREE.LoopOnce, 1);
+      act.clampWhenFinished = true;
+      act.setEffectiveTimeScale(1);
+      clips[INTERACT] = act;
+      currentClip = currentClip === act ? null : currentClip; // fuerza a reiniciarlo si ya era el actual
+      doing = INTERACT;
+      playClip(INTERACT);
+      const secs = Number.isFinite(Number(wait)) && wait !== null && wait !== '' ? Math.max(0, Number(wait)) : clip.duration;
+      await new Promise((res) => {
+        const t = setTimeout(done, (secs + 0.5) * 1000); // por si el evento no llega
+        function done() { clearTimeout(t); mixer.removeEventListener('finished', onFin); res(); }
+        function onFin(e) { if (e.action === act && wait == null) done(); }
+        mixer.addEventListener('finished', onFin);
+        if (wait != null) { clearTimeout(t); setTimeout(done, secs * 1000); }
+      });
+      return true;
+    },
+    // Se acomoda en un punto { x, y, z, yaw } (pies) antes de interactuar, ej. el pos_jugador de una puerta
+    alignTo(at) { return active && at ? slideTo(at) : Promise.resolve(); },
+    // Termina la animación de interactuar (ej. la puerta no llevaba a ningún lado) y vuelve a quieto
+    endInteract() { if (doing === INTERACT) { doing = null; playClip('idle'); } },
     // NPC u otros obstáculos redondos: lista de { x, z, r } (se lee en cada cuadro, puede cambiar)
     setObstacles(list) { obstacles = list ?? []; },
     // El mundo de colisión de la escena actual (lo arma buildCollision en collision.js)
@@ -299,7 +378,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       // Movimiento relativo a la cámara
       const fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
       const side = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
-      if (doing && (fwd || side)) doing = null; // moverse cancela la acción (te levantás)
+      if (doing && !frozen && (fwd || side)) doing = null; // moverse cancela la acción (te levantás)
       if (!frozen && !doing && (fwd || side)) {
         const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
         let dx = -sy * fwd + cy * side;

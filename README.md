@@ -88,6 +88,20 @@ El jugador se mueve en tercera persona con la cámara siguiéndolo. Código en `
   - Para que los pies no resbalen, en `player.json > animation` poné `walkAnimSpeed` / `runAnimSpeed` = la velocidad (m/s) a la que está animado cada ciclo. Con 0 no se ajusta.
 - **Modo dev:** `dev.html` arranca con la cámara libre; la tecla `C` alterna con el personaje. `index.html` arranca directo con el personaje.
 
+## Objetos reutilizables (prefabs)
+
+Un objeto que se modela **una sola vez** en su propio archivo y se usa en todas las escenas que quieras (puertas, cofres, faroles, árboles…). Código: `src/systems/scene-manager.js`.
+
+1. Modelalo (y animalo, si hace falta) en un `.blend` propio y exportalo a `assets/models/objects/<nombre>.glb`, con **Custom Properties** y **Animation** tildados. El origen del archivo es el punto que se apoya en la escena (por ejemplo, el piso en el centro de la puerta).
+2. En la escena, poné un **Empty** (*Display As: Plain Axes* o *Arrows*, **escala 1**) donde va el objeto y agregale la Custom Property **`objeto` = `<nombre>`** (ej. `puerta_casa`). El juego carga el archivo y pone una copia ahí, con la posición y el giro del Empty.
+
+- **Lo que va adentro del archivo** viaja con él: su animación, sus colisiones (`col_…`), sus propiedades fijas.
+- **Lo que cambia en cada escena va en el Empty.** Por ejemplo, una puerta reutilizable: Empty con `objeto = puerta_casa` + `puerta = scene_casa1`. La animación de abrir que trae `puerta_casa.glb` se reproduce sola al apretar E, y cada copia se abre por separado.
+- Si escalás el Empty, el objeto también se escala.
+- **Dónde se para Link para abrir una puerta:** dentro de la puerta (en `puerta_casa.blend`), un Empty **`pos_jugador`** en el piso, justo donde estaban los pies de Link cuando animaste los dos juntos, con la **flecha verde** hacia donde mira Link. Al apretar E, Link se desliza ahí, gira, y recién entonces arrancan su animación y la de la puerta, a la vez. Para abrirla desde los dos lados: `pos_jugador_1` y `pos_jugador_2` (usa el más cercano). Sin `pos_jugador`, la abre desde donde esté, girando hacia la puerta.
+- **Origen del archivo vs. origen de la puerta:** el objeto se coloca en la escena desde el **0,0,0 del mundo** de su `.blend` (ponelo en el piso, en el centro de la puerta), no desde el origen del objeto. La hoja de la puerta puede tener su origen en la bisagra para girar bien.
+- **Para verlo en Blender mientras lo ubicás** (recomendado): guardá la puerta en una colección (ej. `puerta_casa`) de su `.blend`. En la escena, *File > Link* > ese `.blend` > *Collection* > `puerta_casa`, y después *Add > Collection Instance > puerta_casa*. Esa instancia es un Empty que **muestra** la puerta: movela, girala y ponele ahí las Custom Properties (`objeto`, `puerta`). Si cambiás el `.blend` de la puerta, se actualiza en todas las escenas. Si al exportar Blender mete una copia de la puerta adentro del Empty, el juego la reemplaza por la de `puerta_casa.glb`, así no queda duplicada.
+
 ## Colisiones
 
 Qué objetos son sólidos se decide **en Blender**, con propiedades personalizadas (las mismas que usan las puertas). Código: `src/systems/collision.js`.

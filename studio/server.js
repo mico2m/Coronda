@@ -16,7 +16,6 @@ const MIME = {
 };
 const ext = (p) => path.extname(p).slice(1).toLowerCase();
 const clients = new Set();      // pestañas del Studio escuchando cambios
-let blenderInbox = [], blenderSeen = 0; // órdenes del juego para el addon de Blender, y cuándo preguntó por última vez
 const mine = new Map();         // archivos que guardó el propio Studio (para no avisar dos veces)
 
 const send = (res, code, body, type = 'text/plain; charset=utf-8') => {
@@ -52,37 +51,21 @@ http.createServer((req, res) => {
     req.on('close', () => clients.delete(res));
     return;
   }
-  // Buzón para Blender: lo que el juego le pide (cambiar un código, elegir un objeto). El addon lo lee cada 1/4 s.
-  if (pathname === '/__blender/inbox') { blenderSeen = Date.now(); const out = blenderInbox; blenderInbox = []; return send(res, 200, JSON.stringify(out), MIME.json); }
-  if (pathname === '/__blender/estado') return send(res, 200, JSON.stringify({ blender: Date.now() - blenderSeen < 3000 }), MIME.json);
-  // El addon de Blender (blender/coronda_vivo.py) le manda órdenes al juego: { cmd: 'view' | 'play', … }
-  // y el juego le manda órdenes a Blender: { cmd: 'setprop' | 'select', object, key, value }
-  if (pathname === '/__blender' && req.method === 'POST') {
+  // GitHub: estado del repositorio y "Enviar a GitHub" (add + commit + pull --rebase + push). Ver gitRun más abajo.
+  if (pathname.startsWith('/__git/')) {
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host || '')) return send(res, 403, 'Host no permitido');
-    const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', () => {
-      let m; try { m = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return send(res, 400, 'JSON inválido'); }
-      if (m?.cmd === 'exported') { // acaba de exportar un .glb: aviso directo (más rápido y seguro que esperar a que lo note el sistema)
-        const key = String(m.path || '').replace(/\\/g, '/').replace(/^\/+/, '');
-        if (!/\.glb$/i.test(key) || !resolveIn(key)) return send(res, 400, 'Ruta no permitida');
-        mine.set(key, Date.now()); // así la vigilancia de archivos no avisa dos veces
-        broadcast({ path: key, ext: true });
-        return send(res, 200, 'ok');
-      }
-      if (m?.cmd === 'setprop' || m?.cmd === 'select') {
-        const okVal = m.value === null || m.value === undefined || ['string', 'number', 'boolean'].includes(typeof m.value);
-        if (typeof m.object !== 'string' || !m.object || (m.cmd === 'setprop' && (!/^[A-Za-z_]\w*$/.test(m.key || '') || !okVal))) return send(res, 400, 'Orden inválida');
-        if (Date.now() - blenderSeen > 3000) return send(res, 409, 'Blender no está conectado');
-        blenderInbox.push(m.cmd === 'setprop' ? { cmd: 'setprop', object: m.object, key: m.key, value: m.value ?? null } : { cmd: 'select', object: m.object });
-        if (blenderInbox.length > 200) blenderInbox.shift();
-        return send(res, 200, 'ok');
-      }
-      if (!['view', 'play'].includes(m?.cmd)) return send(res, 400, 'Orden desconocida');
-      broadcast({ type: 'blender', ...m });
-      send(res, 200, 'ok');
-    });
-    return;
+    const reply = (p) => p.then((r) => send(res, 200, JSON.stringify(r), MIME.json)).catch((e) => send(res, 200, JSON.stringify({ ok: false, error: e.message }), MIME.json));
+    if (pathname === '/__git/estado' && req.method === 'GET') return reply(gitStatus());
+    if ((pathname === '/__git/enviar' || pathname === '/__git/traer') && req.method === 'POST') {
+      const chunks = [];
+      req.on('data', (c) => chunks.push(c));
+      req.on('end', () => {
+        let m = {}; try { m = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { /* vacío */ }
+        reply(pathname === '/__git/enviar' ? gitSend(String(m.mensaje || '').trim()) : gitPull());
+      });
+      return;
+    }
+    return send(res, 404, 'No existe');
   }
   if (pathname === '/__studio') return serve(res, path.join(__dirname, 'studio.html'));
   if (pathname === '/__dialogos') { res.writeHead(302, { Location: '/studio/dialogos/' }); return res.end(); } // editor de diálogos (nodos + probar + variables)
@@ -136,3 +119,84 @@ try {
     timer = setTimeout(() => broadcast({ path: key, ext: true }), 150);
   });
 } catch { console.log('  (Sin vigilancia de cambios externos: hace falta Node 20+ en Linux)'); }
+
+// ---------------- GitHub (git en esta PC) ----------------
+// Usa el git instalado (o el que trae GitHub Desktop) con tu usuario de siempre: nada de contraseñas acá.
+const { execFile } = require('child_process');
+let gitExe = null;
+function findGit() {
+  if (gitExe) return gitExe;
+  const cands = ['git'];
+  const local = process.env.LOCALAPPDATA;
+  if (local) { // GitHub Desktop trae su propio git
+    try {
+      const d = path.join(local, 'GitHubDesktop');
+      const apps = fs.readdirSync(d).filter((n) => /^app-/.test(n)).sort().reverse();
+      for (const a of apps) cands.push(path.join(d, a, 'resources', 'app', 'git', 'cmd', 'git.exe'));
+    } catch { /* no está */ }
+  }
+  for (const p of ['C:\\Program Files\\Git\\cmd\\git.exe', 'C:\\Program Files (x86)\\Git\\cmd\\git.exe']) cands.push(p);
+  return cands;
+}
+function git(args, timeout = 90000) {
+  const list = gitExe ? [gitExe] : findGit();
+  return new Promise((resolve, reject) => {
+    const tryAt = (i) => {
+      if (i >= list.length) return reject(new Error('No encuentro git. Instalá Git (git-scm.com) o GitHub Desktop.'));
+      execFile(list[i], args, { cwd: ROOT, timeout, windowsHide: true, maxBuffer: 4 << 20, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' } }, (err, stdout, stderr) => {
+        if (err && err.code === 'ENOENT') return tryAt(i + 1);
+        gitExe = list[i];
+        resolve({ code: err ? (typeof err.code === 'number' ? err.code : 1) : 0, out: String(stdout), err: String(stderr) });
+      });
+    };
+    tryAt(0);
+  });
+}
+async function gitStatus() {
+  const inside = await git(['rev-parse', '--is-inside-work-tree']);
+  if (inside.code) return { ok: false, error: 'Esta carpeta no es un repositorio de git.' };
+  const st = await git(['status', '--porcelain=v1', '-b', '--untracked-files=all']);
+  const lines = st.out.split('\n').filter(Boolean);
+  const head = lines.shift() || '';
+  const m = /^## ([^.\s]+)(?:\.\.\.(\S+))?(?: \[(.*)\])?/.exec(head) || [];
+  const ahead = +(/ahead (\d+)/.exec(m[3] || '')?.[1] || 0), behind = +(/behind (\d+)/.exec(m[3] || '')?.[1] || 0);
+  const remote = (await git(['remote', 'get-url', 'origin'])).out.trim();
+  const files = lines.map((l) => ({ code: l.slice(0, 2).trim() || '?', path: l.slice(3).replace(/^"|"$/g, '') }));
+  return { ok: true, branch: m[1] || '?', upstream: m[2] || null, ahead, behind, remote, files };
+}
+const explainGit = (t) => {
+  if (/Authentication failed|could not read Username|terminal prompts disabled|403|denied/i.test(t)) return 'GitHub no aceptó tu usuario desde acá. Los cambios quedaron guardados en un commit: abrí GitHub Desktop y apretá "Push origin" (o iniciá sesión en Git una vez).';
+  if (/Please tell me who you are|user\.email/i.test(t)) return 'Git no sabe tu nombre: en GitHub Desktop andá a File > Options > Git y completá nombre y email.';
+  if (/CONFLICT|could not apply|Resolve all conflicts/i.test(t)) return 'Tus cambios chocan con cambios que ya estaban en GitHub. Resolvelo en GitHub Desktop.';
+  if (/Could not resolve host|unable to access/i.test(t)) return 'Sin conexión con GitHub.';
+  return '';
+};
+async function gitSend(message) {
+  const log = [];
+  const step = async (label, args) => { const r = await git(args); log.push(`$ git ${args.join(' ')}`, (r.out + r.err).trim()); if (r.code) { const e = new Error(explainGit(r.out + r.err) || `Falló: ${label}`); e.log = log; throw e; } return r; };
+  try {
+    const st = await gitStatus();
+    if (!st.ok) return st;
+    if (st.files.length) {
+      await step('agregar', ['add', '-A']);
+      await step('commit', ['commit', '-m', message || `Cambios desde el Studio (${new Date().toLocaleString('es-AR')})`]);
+    } else if (!st.ahead) return { ok: true, nothing: true, log: ['No hay cambios para enviar.'] };
+    if (st.upstream) {
+      const pull = await git(['pull', '--rebase', '--autostash']);
+      log.push('$ git pull --rebase --autostash', (pull.out + pull.err).trim());
+      if (pull.code) { await git(['rebase', '--abort']); throw Object.assign(new Error(explainGit(pull.out + pull.err) || 'No se pudo traer lo que había en GitHub.'), { log }); }
+      await step('enviar', ['push']);
+    } else {
+      await step('enviar', ['push', '-u', 'origin', st.branch]);
+    }
+    return { ok: true, log };
+  } catch (e) {
+    return { ok: false, error: e.message, log: e.log || log };
+  }
+}
+async function gitPull() {
+  const r = await git(['pull', '--rebase', '--autostash']);
+  const t = (r.out + r.err).trim();
+  if (r.code) { await git(['rebase', '--abort']); return { ok: false, error: explainGit(t) || 'No se pudo traer los cambios.', log: ['$ git pull --rebase --autostash', t] }; }
+  return { ok: true, log: ['$ git pull --rebase --autostash', t] };
+}

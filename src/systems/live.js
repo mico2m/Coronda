@@ -1,11 +1,9 @@
-// En vivo con Blender (solo en dev.html y con el servidor del proyecto: node studio/server.js).
-// El addon blender/coronda_vivo.py exporta el .glb cada vez que cambiás algo; el servidor avisa por /__events y acá
-// se vuelve a armar la escena SIN recargar la página: quedás en el mismo lugar, mirando hacia el mismo lado.
-// También recibe órdenes del addon: "view" (la cámara libre copia la vista de Blender) y "play" (el personaje aparece
-// donde está el cursor 3D).
+// En vivo (solo en dev.html y con el servidor del proyecto: node studio/server.js).
+// Cuando exportás un .glb desde Blender, el servidor avisa por /__events y acá se vuelve a armar la escena SIN recargar
+// la página: quedás en el mismo lugar, mirando hacia el mismo lado.
 //
-//   connectLive({ onFiles(paths), onBlender(msg) })
-export function connectLive({ onFiles, onBlender }) {
+//   connectLive({ onFiles(paths) })
+export function connectLive({ onFiles }) {
   if (!window.EventSource) return null;
   let opened = false, timer = 0;
   const pending = new Set();
@@ -16,10 +14,9 @@ export function connectLive({ onFiles, onBlender }) {
   es.onmessage = (e) => {
     let m;
     try { m = JSON.parse(e.data); } catch { return; }
-    if (m.type === 'blender') { onBlender?.(m); return; }
     if (!m.path) return;
     pending.add(m.path);
-    clearTimeout(timer); // varios archivos juntos (ej. el .glb y su .bin) = una sola actualización
+    clearTimeout(timer); // varios archivos juntos = una sola actualización
     timer = setTimeout(() => { const list = [...pending]; pending.clear(); onFiles?.(list); }, 200);
   };
   return { close: () => es.close() };

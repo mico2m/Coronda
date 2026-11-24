@@ -40,7 +40,21 @@ details > div { padding-left: 12px; }
 #app { grid-template-columns: 300px minmax(0,1fr) 6px var(--pw, 45%); }
 #sideTabs { display: flex; border-bottom: 1px solid var(--bd); } #sideTabs button { flex: 1; border: 0; border-radius: 0; background: transparent; padding: 7px; color: var(--mu); border-bottom: 2px solid transparent; }
 #sideTabs button.on { color: var(--tx); border-bottom-color: var(--ac); }
-#filesPane, #npcPane { flex: 1; min-height: 0; display: flex; flex-direction: column; } #npcPane[hidden], #filesPane[hidden] { display: none; }
+#filesPane, #npcPane, #gitPane { flex: 1; min-height: 0; display: flex; flex-direction: column; } #npcPane[hidden], #filesPane[hidden], #gitPane[hidden] { display: none; }
+#gitPane { overflow: auto; } #gitHead { padding: 8px 10px; border-bottom: 1px solid var(--bd); display: grid; gap: 3px; }
+#gitHead .k { color: var(--mu); } #gitHead a { color: var(--ac); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#gitFiles { padding: 4px 0; border-bottom: 1px solid var(--bd); max-height: 40vh; overflow: auto; }
+.gf { display: flex; gap: 8px; padding: 2px 10px; white-space: nowrap; cursor: pointer; } .gf:hover { background: #2f3136; }
+.gf b { width: 16px; flex: none; font-family: ui-monospace, monospace; } .gf span { overflow: hidden; text-overflow: ellipsis; }
+.gf .M { color: #e5c07b; } .gf .A, .gf .\?\? { color: #98c379; } .gf .D { color: #e06c75; } .gf .R { color: #61afef; }
+#gitForm { padding: 8px 10px; display: grid; gap: 6px; }
+#gitMsg { width: 100%; min-height: 54px; resize: vertical; background: #1b1c1f; color: var(--tx); border: 1px solid var(--bd); border-radius: 4px; padding: 6px 8px; font: inherit; }
+#gitMsg:focus { outline: none; border-color: var(--ac); }
+#gitForm .row { display: flex; gap: 6px; } #gitForm .row button { flex: 1; padding: 6px 8px; }
+#bGitSend { background: #2b5ea8; border-color: #2b5ea8; } #bGitSend:hover { background: #3570c4; } #bGitSend:disabled { opacity: .5; cursor: default; }
+#gitLog { margin: 0 10px 10px; padding: 8px; background: #1b1c1f; border-radius: 4px; color: var(--mu); font: 11.5px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+#gitLog:empty { display: none; } #gitLog .ok { color: #98c379; } #gitLog .err { color: #e06c75; }
+#gitNote { padding: 0 10px 10px; color: var(--mu); font-size: 12px; }
 #npcHead { display: flex; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--bd); } #npcSel { flex: 1; min-width: 0; }
 #npcInfo { padding: 6px 10px; border-bottom: 1px solid var(--bd); display: grid; gap: 3px; }
 #npcInfo .k { color: var(--mu); display: inline-block; width: 64px; } #npcInfo .m { color: var(--mu); } #npcInfo code { color: var(--ac); }
@@ -160,10 +174,18 @@ details > div { padding-left: 12px; }
 <body>
 <div id="app">
   <div id="side">
-    <div id="sideTabs"><button id="tFiles" class="on">Archivos</button><button id="tNpc">NPC</button></div>
+    <div id="sideTabs"><button id="tFiles" class="on">Archivos</button><button id="tNpc">NPC</button><button id="tGit" title="Enviar los cambios al repositorio de GitHub">GitHub</button></div>
     <div id="filesPane">
       <div class="bar"><b id="proj">Proyecto</b><button id="bDlg" title="Diálogo nuevo">+ Diálogo</button><button id="bRoute" title="Ruta de NPC nueva">+ Ruta</button><button id="bNew" title="Archivo nuevo">+</button><button id="bRef" title="Actualizar árbol">⟳</button></div>
       <div id="tree"></div>
+    </div>
+    <div id="gitPane" hidden>
+      <div id="gitHead"><span class="k">Cargando…</span></div>
+      <div id="gitFiles"></div>
+      <form id="gitForm"><textarea id="gitMsg" placeholder="Qué cambiaste (opcional). Ej: Puerta de la torre y diálogo de Tokse" spellcheck="false"></textarea>
+        <div class="row"><button type="submit" id="bGitSend">⇪ Enviar a GitHub</button><button type="button" id="bGitPull" title="Traer lo que haya en GitHub que todavía no tenés">⇩ Traer</button><button type="button" id="bGitRef" title="Actualizar">⟳</button></div></form>
+      <div id="gitLog"></div>
+      <div id="gitNote">Enviar = guardar todo en un commit y subirlo (antes trae lo que haya en GitHub). Usa tu usuario de git o de GitHub Desktop.</div>
     </div>
     <div id="npcPane" hidden>
       <div id="npcHead"><select id="npcSel" title="NPC de la escena"></select><button id="bNpcGo" title="Lleva la cámara libre frente al NPC">Ir</button><button id="bNpcRef" title="Actualizar la lista (al cambiar de escena)">⟳</button></div>
@@ -185,7 +207,7 @@ details > div { padding-left: 12px; }
       <b>Vista previa</b>
       <select id="page"><option value="/dev.html">dev.html</option><option value="/index.html">index.html</option></select>
       <label><input type="checkbox" id="live" checked> Recarga auto</label>
-      <button id="bFlags" title="Borra lo que los NPC recuerdan (hablo_, veces_ y tus flags)">Reiniciar flags</button><button id="bReload" title="Recargar">⟳</button>
+      <button id="bFlags" title="Borra lo que los NPC recuerdan (hablo_, veces_ y tus flags)">Reiniciar flags</button><button id="bStart" title="Volver a empezar desde el spawn (al recargar, el juego sigue donde estabas)">Desde el inicio</button><button id="bReload" title="Recargar (seguís donde estabas)">⟳</button>
     </div>
     <iframe id="pv"></iframe>
   </div>
@@ -205,6 +227,7 @@ const RT = (n) => `{\n  "speed": 1.4,\n  "start": "a",\n  "nodes": {\n    "a": {
 const dlgName = (p) => p.split('/').pop().replace(/\.json$/i, '');
 const ext = (p) => (p.split('.').pop() || '').toLowerCase();
 const api = (p) => '/__api/file?p=' + encodeURIComponent(p);
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const expanded = new Set(['data', 'src', 'data/dialogues', 'data/scenes']);
 const quiet = new Map(); // archivos que guardó el propio Studio y ya están aplicados en vivo
 let files = [], open = new Map(), tabs = [], active = null, ed = null, nodeEd = null, routeEd = null;
@@ -400,10 +423,50 @@ const npcFoot = (m, err) => { const f = $('#npcFoot'); f.textContent = m; f.clas
 
 function showTab(which) {
   npcTab = which === 'npc';
-  $('#filesPane').hidden = npcTab; $('#npcPane').hidden = !npcTab;
-  $('#tFiles').classList.toggle('on', !npcTab); $('#tNpc').classList.toggle('on', npcTab);
+  $('#filesPane').hidden = which !== 'files'; $('#npcPane').hidden = !npcTab; $('#gitPane').hidden = which !== 'git';
+  $('#tFiles').classList.toggle('on', which === 'files'); $('#tNpc').classList.toggle('on', npcTab); $('#tGit').classList.toggle('on', which === 'git');
   if (npcTab) refreshNpc(true); else stopPreview(true);
+  if (which === 'git') gitRefresh();
 }
+
+// ---------- GitHub ----------
+const GIT_LBL = { M: 'modificado', A: 'nuevo', D: 'borrado', R: 'renombrado', '??': 'nuevo' };
+let gitBusy = false;
+async function gitRefresh() {
+  let r;
+  try { r = await (await fetch('/__git/estado')).json(); } catch { r = { ok: false, error: 'Sin servidor' }; }
+  const head = $('#gitHead'), list = $('#gitFiles');
+  if (!r.ok) { head.innerHTML = `<span class="k">${esc(r.error || 'Error')}</span>`; list.innerHTML = ''; $('#bGitSend').disabled = true; return; }
+  const web = (r.remote || '').replace(/\.git$/, '').replace(/^git@github\.com:/, 'https://github.com/');
+  const sync = [r.ahead && `${r.ahead} commit${r.ahead > 1 ? 's' : ''} sin subir`, r.behind && `${r.behind} nuevo${r.behind > 1 ? 's' : ''} en GitHub (Traer)`].filter(Boolean).join(' · ');
+  head.innerHTML = `<div><span class="k">Rama</span> <b>${esc(r.branch)}</b></div>${web ? `<a href="${esc(web)}" target="_blank" rel="noopener">${esc(web.replace(/^https?:\/\//, ''))}</a>` : ''}<div class="k">${r.files.length ? `${r.files.length} archivo${r.files.length > 1 ? 's' : ''} con cambios` : 'Sin cambios sin enviar'}${sync ? ' · ' + esc(sync) : ''}</div>`;
+  list.innerHTML = r.files.map((f) => { const c = f.code.replace('?', '??').slice(0, 2); const k = c === '??' ? '??' : c[0]; return `<div class="gf" data-p="${esc(f.path)}" title="${esc(GIT_LBL[k] || f.code)}"><b class="${k === '??' ? 'A' : k}">${esc(k === '??' ? 'N' : k)}</b><span>${esc(f.path)}</span></div>`; }).join('');
+  $('#bGitSend').disabled = gitBusy || (!r.files.length && !r.ahead);
+}
+function gitLog(lines, ok, msg) {
+  const el = $('#gitLog');
+  el.innerHTML = `<div class="${ok ? 'ok' : 'err'}">${esc(msg)}</div>${esc((lines || []).filter(Boolean).join('\n'))}`;
+}
+async function gitDo(url, body, label) {
+  if (gitBusy) return;
+  gitBusy = true; $('#bGitSend').disabled = true; $('#bGitPull').disabled = true;
+  $('#gitLog').innerHTML = `<div>${esc(label)}…</div>`;
+  let r;
+  try { r = await (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) })).json(); }
+  catch { r = { ok: false, error: 'Sin servidor' }; }
+  gitBusy = false; $('#bGitPull').disabled = false;
+  gitLog(r.log, r.ok, r.ok ? (r.nothing ? 'No había nada para enviar.' : `${label}: listo ✓`) : r.error);
+  if (r.ok && url.endsWith('enviar') && !r.nothing) { $('#gitMsg').value = ''; toast('Enviado a GitHub'); }
+  if (!r.ok) toast(r.error, true);
+  await gitRefresh();
+  if (url.endsWith('traer') && r.ok) loadTree();
+}
+$('#tGit').onclick = () => showTab('git');
+$('#gitForm').onsubmit = (e) => { e.preventDefault(); gitDo('/__git/enviar', { mensaje: $('#gitMsg').value }, 'Enviando a GitHub'); };
+$('#gitMsg').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('#gitForm').requestSubmit(); } });
+$('#bGitPull').onclick = () => gitDo('/__git/traer', {}, 'Trayendo de GitHub');
+$('#bGitRef').onclick = gitRefresh;
+$('#gitFiles').addEventListener('click', (e) => { const f = e.target.closest('.gf'); if (f && files.some((x) => x.p === f.dataset.p && x.t)) { showTab('files'); openFile(f.dataset.p); } });
 async function loadNpcTable() {
   try { const r = await fetch(api(NPC_TABLE)); npcTable = r.ok ? JSON.parse(await r.text()) : {}; } catch { npcTable = {}; }
 }
@@ -535,6 +598,9 @@ setInterval(() => { if (npcTab) refreshNpc(false); }, 800);
 $('#bNew').onclick = newFile; $('#bDlg').onclick = newDialogue; $('#bRoute').onclick = newRoute; $('#mNodes').onclick = () => setMode('nodes'); $('#mCode').onclick = () => setMode('code'); $('#bRef').onclick = loadTree; $('#bSave').onclick = () => save();
 $('#bFlags').onclick = () => { try { pv.contentWindow.flags.reset(); toast('Flags reiniciados'); } catch { toast('La vista previa todavía no cargó', true); } };
 $('#bReload').onclick = setPreview; $('#page').onchange = setPreview;
+// Al recargar, el juego (dev.html) sigue donde estabas; este botón lo hace arrancar de nuevo desde el spawn
+$('#bStart').onclick = () => { pv.src = 'about:blank'; setTimeout(() => { try { sessionStorage.removeItem('coronda.dev.lugar'); } catch {} setPreview(); }, 80); };
+setInterval(() => { if (!$('#gitPane').hidden && !gitBusy) gitRefresh(); }, 5000);
 const sp = $('#split');
 sp.onpointerdown = (e) => {
   sp.setPointerCapture(e.pointerId); pv.style.pointerEvents = 'none';

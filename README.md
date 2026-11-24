@@ -395,23 +395,13 @@ Código: `src/systems/spawns.js`.
 
 Los dos usan el mismo motor (`src/game.js`). La versión final no descarga el código del inspector.
 
-## Blender en vivo (addon)
+## Studio: editar y ver al instante
 
-`blender/coronda_vivo.py` hace que lo que cambiás en Blender aparezca en el juego al instante, sin exportar a mano y sin recargar la página (quedás en el mismo lugar del mundo).
+Con `node studio/server.js` corriendo, abrí **http://localhost:5173/__studio**: a la izquierda el árbol de archivos, al medio el editor (código, o nodos para diálogos y rutas) y a la derecha el juego.
 
-**Instalar (una vez):** en Blender, *Edit > Preferences > Add-ons*, flechita de arriba a la derecha > *Install from Disk…* > `blender/coronda_vivo.py`, y tildalo. Si tus `.blend` no están adentro de la carpeta de Coronda, en las preferencias del addon elegí la **Carpeta del proyecto**.
-
-**Usar:** en la Vista 3D apretá `N` > pestaña **Coronda**.
-- **Exportar a:** el `.glb` de esta escena. *Automático* busca uno con el mismo nombre que el `.blend` (ej. `Coronda_Plaza.blend` → `assets/models/worlds/Coronda_Plaza.glb`).
-- **Abrir Coronda:** enciende el servidor del proyecto sin terminal (si no estaba andando) y abre `dev.html` en una ventana propia, para tenerla al lado de Blender.
-- **En vivo:** cada vez que cambiás algo (mover, modelar, materiales, Custom Properties…) exporta el `.glb` un instante después de que soltás (*Espera*, 0,6 s). El juego vuelve a armar la escena en el lugar donde estabas. Mientras estás en modo edición espera a que vuelvas a modo objeto.
-- **Seguir la vista:** la cámara libre del juego copia tu vista de Blender mientras la movés. **Ir a la vista** lo hace una vez.
-- **Jugar desde el cursor:** el personaje aparece donde está el cursor 3D, mirando hacia donde mira tu vista.
-- **Revisión:** cuenta spawns, puertas, colisiones, NPC y objetos, y avisa lo que el juego no va a encontrar (falta el `spawn`, una puerta apunta a un spawn que no existe, un `objeto` sin su `.glb`).
-
-**Árbol de objetos en el juego:** en `dev.html` apretá `O`. Aparecen todos los objetos de la escena con sus códigos (las Custom Properties: `puerta`, `objeto`, `colision`, `npc_dialogo`…). Elegís uno (en Blender también queda elegido), cambiás o agregás un código con Enter y **se guarda en Blender**: el addon lo pone en el objeto, exporta y el juego se actualiza solo. Blender tiene que estar abierto con el addon (arriba del árbol dice *Blender conectado*). Para que quede también en el `.blend`, guardalo con `Ctrl+S` (el panel del addon te lo recuerda). Doble clic en un objeto (o *Ir*): la cámara va a mirarlo. Código: `src/systems/object-tree.js`.
-
-Exporta con las Custom Properties (*extras*), con los modificadores aplicados y con las animaciones. Si cambia el personaje (`personaje.glb`), el juego se recarga entero. Del lado del juego lo hace `src/systems/live.js` (solo en `dev.html`, y solo con `node studio/server.js`).
+- **Cada vez que guardás** (`Ctrl+S`, o con *Autoguardar*), el juego se actualiza solo **y seguís donde estabas**: misma escena, mismo lugar, mirando para el mismo lado (no vuelve a empezar). Los estilos (`.css`) y los diálogos se cambian sin recargar siquiera; los `.glb` que exportás desde Blender rearman el mundo sin recargar la página (`src/systems/live.js`).
+- **Desde el inicio** (arriba de la vista previa) arranca de nuevo desde el spawn de la escena inicial.
+- **Pestaña GitHub:** muestra qué archivos cambiaron y con **Enviar a GitHub** los sube: guarda todo en un commit (con el mensaje que escribas), trae lo que haya en GitHub y lo sube. **Traer** baja lo que haya en GitHub que todavía no tenés. Usa el git de tu PC (o el de GitHub Desktop) con tu usuario de siempre; si GitHub no acepta el usuario desde ahí, el commit igual queda hecho y lo subís con *Push origin* en GitHub Desktop.
 
 ## Probar en local
 

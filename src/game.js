@@ -59,7 +59,6 @@ export async function startGame({ dev = false, retro = null } = {}) {
   let inspector = null;
   let collisionDebug = null;
   let spawnDebug = null;
-  let objectTree = null; // árbol de objetos (solo dev)
   const npcs = createNpcs();
   const followers = createFollowers(); // objetos con la propiedad `seguir` (ver systems/followers.js)
   let dialogue = null;
@@ -113,7 +112,6 @@ export async function startGame({ dev = false, retro = null } = {}) {
     player?.update(dt);
     npcs.update(dt);
     inspector?.update(dt);
-    objectTree?.update();
     world?.updateSky(camera.position);
     // Punto que se compara con puertas y NPC: el jugador (a la altura del pecho) o la cámara libre
     const focus = mode === 'player' && player ? _focus.copy(player.position).setY(player.position.y + 1) : camera.position;
@@ -166,7 +164,6 @@ export async function startGame({ dev = false, retro = null } = {}) {
       player.setShade(sceneManager.shade); // mismo tono y brillo que la escena
       const sp = sceneManager.spawn;
       if (sp) player.place([sp.position[0], sp.position[1] - EYE, sp.position[2]], sp.yaw ?? 0);
-      objectTree?.setRoot(sceneManager.root);
     }
     // Mueve al jugador (o a la cámara libre) a un punto { position (ojos), yaw } sin cambiar de escena
     function moveTo(sp) {
@@ -226,9 +223,6 @@ export async function startGame({ dev = false, retro = null } = {}) {
         collisionDebug = createCollisionDebug();
         const { createSpawnDebug } = await import('./systems/spawn-debug.js');
         spawnDebug = createSpawnDebug();
-        // Árbol de objetos (tecla O): los códigos de cada objeto, que se guardan en Blender en tiempo real
-        const { createObjectTree } = await import('./systems/object-tree.js');
-        objectTree = createObjectTree({ scene, camera, controls, setStatus: (t) => { ui.setStatus(t); setTimeout(() => ui.clearStatus(), 1500); } });
       } catch (err) {
         // Si el inspector no carga, el mundo igual se muestra
         console.error(err);
@@ -236,7 +230,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       }
     }
 
-    // En vivo con Blender (solo dev): ver systems/live.js y blender/coronda_vivo.py
+    // En vivo (solo dev): al exportar un .glb desde Blender, la escena se vuelve a armar sin recargar (systems/live.js)
     if (dev) {
       const { connectLive } = await import('./systems/live.js');
       const embedded = window.parent !== window; // dentro del Coronda Studio: él recarga lo demás
@@ -272,26 +266,28 @@ export async function startGame({ dev = false, retro = null } = {}) {
           if (sceneFile && paths.includes(sceneFile)) { refreshScene(sceneFile.split('/').pop()); return; }
           if (!embedded && paths.some((p) => /\.(js|css|html)$/i.test(p) || /^data\/tables\//.test(p))) location.reload();
         },
-        onBlender(m) {
-          const pos = Array.isArray(m.pos) && m.pos.length === 3 && m.pos.every(Number.isFinite) ? m.pos : null;
-          if (!pos || player.frozen) return;
-          if (m.cmd === 'view') {
-            if (mode !== 'free') setMode('free');
-            camera.position.set(...pos);
-            controls.setLook(Number(m.yaw) || 0, Number(m.pitch) || 0);
-          }
-          if (m.cmd === 'play') {
-            if (mode !== 'player') setMode('player');
-            player.place(pos, Number(m.yaw) || 0);
-          }
-        },
       });
       window.addEventListener('pagehide', () => live?.close());
     }
 
-    const startId = Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0];
-    await enterScene(startId);
-    setMode(dev ? 'free' : 'player');
+    // Modo desarrollador: al recargar (guardaste un archivo en el Studio) seguís donde estabas, no desde el principio
+    const KEEP = 'coronda.dev.lugar';
+    let kept = null;
+    if (dev) {
+      try { kept = JSON.parse(sessionStorage.getItem(KEEP)); } catch { kept = null; }
+      if (!kept || !scenesTable[kept.scene] || Date.now() - kept.t > 2 * 3600e3 || !Array.isArray(kept.pos)) kept = null;
+      window.addEventListener('pagehide', () => {
+        const id = sceneManager.current?.id;
+        if (!id || !player) return;
+        const asPlayer = mode === 'player';
+        const pos = asPlayer ? [player.position.x, player.position.y + EYE, player.position.z] : camera.position.toArray();
+        try { sessionStorage.setItem(KEEP, JSON.stringify({ t: Date.now(), scene: id, mode, pos, yaw: asPlayer ? player.yaw : controls.getYaw(), pitch: controls.getPitch() })); } catch { /* sin almacenamiento */ }
+      });
+    }
+    const startId = kept?.scene ?? Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0];
+    await enterScene(startId, kept ? { position: kept.pos, yaw: kept.yaw } : undefined);
+    setMode(kept?.mode ?? (dev ? 'free' : 'player'));
+    if (kept && mode === 'free') controls.setLook(kept.yaw, kept.pitch ?? 0);
     // si el personaje o sus animaciones tienen problemas, se avisa en pantalla
     const notice = player.loadError ?? player.animNotice;
     if (notice) ui.setStatus(notice);

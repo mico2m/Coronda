@@ -1,6 +1,6 @@
 {
   "id": "coronda_plaza",
-  "name": "Plaza de Coronda",
+  "name": "Coronda",
   "environment": {
     "shading": "unlit",
     "tint": "#ffffff",
@@ -18,7 +18,7 @@
     },
     "sun": {
       "color": "#ffffff",
-      "intensity": 2,
+      "intensity": 1,
       "position": [
         30,
         50,

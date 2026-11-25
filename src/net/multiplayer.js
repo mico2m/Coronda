@@ -1,5 +1,6 @@
 // Multijugador sin servidor propio: los navegadores se conectan entre sí (WebRTC) con Trystero.
 // Para encontrarse usan relays públicos de Nostr y trackers de WebTorrent (gratis, sin cuentas). Ver src/vendor/trystero.js.
+// Además todo viaja por brokers públicos de MQTT (src/net/mqtt.js): anda aunque la conexión directa no se pueda armar.
 //
 // Qué se comparte: posición, hacia dónde mira, la animación, el personaje elegido, el nombre y la escena.
 // Cada jugador ve a los otros que están en su misma escena. Los diálogos, flags y NPC son de cada uno.
@@ -55,9 +56,9 @@ function localRoom(roomId) {
 // Relays de Nostr conocidos y con mucho uso (los que Trystero elige solo a veces están caídos)
 const NOSTR_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://relay.nostr.band', 'wss://purplerelay.com'];
 
-// Se entra a la sala por dos caminos a la vez (Nostr y BitTorrent): si uno anda mal, el otro igual conecta.
+// Se entra a la sala por varios caminos a la vez (MQTT, Nostr y BitTorrent): si uno anda mal, otro igual conecta.
 // Desde afuera se ve como una sola sala; un jugador conectado por los dos caminos cuenta una vez.
-function mergeRooms(rooms, selfId, status) {
+function mergeRooms(rooms, selfId, status, names = []) {
   const via = new Map(); // peerId -> Set(índice de sala)
   const actions = new Map();
   const merged = {
@@ -89,7 +90,7 @@ function mergeRooms(rooms, selfId, status) {
       const set = via.get(id) ?? new Set();
       const isNew = !set.size;
       set.add(i); via.set(id, set);
-      console.info(`Multijugador: se conectó ${id} (${i ? 'BitTorrent' : 'Nostr'})`);
+      console.info(`Multijugador: se conectó ${id} (${names[i] ?? i})`);
       if (isNew) merged.onPeerJoin?.(id);
     };
     r.onPeerLeave = (id) => {
@@ -103,22 +104,26 @@ function mergeRooms(rooms, selfId, status) {
 }
 
 async function openRoom(roomId) {
-  const local = new URLSearchParams(location.search).get('mp') === 'local';
-  if (local) return localRoom(roomId);
+  const mode = new URLSearchParams(location.search).get('mp'); // local | p2p | mqtt (para probar un solo camino)
+  if (mode === 'local') return localRoom(roomId);
   const t = await import('../vendor/trystero.js');
-  const rooms = [];
-  try { rooms.push(t.joinNostr({ appId: APP_ID, relayConfig: { urls: NOSTR_RELAYS } }, roomId)); } catch (err) { console.warn('Multijugador (Nostr):', err); }
-  try { rooms.push(t.joinTorrent({ appId: APP_ID }, roomId)); } catch (err) { console.warn('Multijugador (BitTorrent):', err); }
+  const { joinMqtt } = await import('./mqtt.js');
+  const rooms = [], names = [], sockets = [];
+  const add = (name, fn, sock) => { try { rooms.push(fn()); names.push(name); if (sock) sockets.push(sock); } catch (err) { console.warn(`Multijugador (${name}):`, err); } };
+  // 1) Por un broker MQTT: los mensajes pasan por un servidor público. Anda en cualquier red y navegador.
+  if (mode !== 'p2p') add('MQTT', () => joinMqtt(APP_ID, roomId, t.selfId), () => rooms[names.indexOf('MQTT')]?.sockets());
+  // 2) Directo entre navegadores (WebRTC), encontrándose por Nostr y por BitTorrent: más rápido cuando conecta.
+  if (mode !== 'mqtt') {
+    add('Nostr', () => t.joinNostr({ appId: APP_ID, relayConfig: { urls: NOSTR_RELAYS } }, roomId), t.nostrSockets);
+    add('BitTorrent', () => t.joinTorrent({ appId: APP_ID }, roomId), t.torrentSockets);
+  }
   if (!rooms.length) throw new Error('no se pudo entrar a la sala');
-  // Cuántos relays/trackers están conectados (para ver si la red anda)
   const status = () => {
     let open = 0, total = 0;
-    for (const get of [t.nostrSockets, t.torrentSockets]) {
-      for (const ws of Object.values(get?.() ?? {})) { total++; if (ws?.readyState === 1) open++; }
-    }
+    for (const get of sockets) for (const ws of Object.values(get?.() ?? {})) { total++; if (ws?.readyState === 1) open++; }
     return { open, total };
   };
-  const room = mergeRooms(rooms, t.selfId, status);
+  const room = mergeRooms(rooms, t.selfId, status, names);
   addEventListener('pagehide', () => room.leave());
   return room;
 }

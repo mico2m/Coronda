@@ -100,7 +100,7 @@ async function conWorkersAI(env, mensajes) {
       tools: [{ name: f.name, description: f.description, parameters: f.parameters }],
     });
   } catch (e) {
-    if (/429|limit|quota|capacity/i.test(String(e?.message))) throw { limite: true };
+    if (/429|4006|limit|quota|capacity|allocation|neurons/i.test(String(e?.message))) throw { limite: true }; // cupo del día agotado
     throw new Error('Workers AI: ' + (e?.message || 'error'));
   }
   // Según el modelo, la respuesta viene como { response, tool_calls } o en formato OpenAI ({ choices }).

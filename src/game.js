@@ -11,6 +11,7 @@ import { createDoors } from './systems/doors.js';
 import { createLotes } from './systems/lotes.js';
 import { createInventario } from './systems/inventario.js';
 import { createTienda } from './systems/tienda.js';
+import { createTiempo } from './systems/tiempo.js';
 import { createCasas } from './systems/casas.js';
 import { createFollowers } from './systems/followers.js';
 import { createPlayer } from './actors/player.js';
@@ -72,6 +73,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
   let dialogue = null;
   let inventario = null; // mochila del jugador (ver systems/inventario.js)
   let tienda = null;     // la Carpintería de Claude (ver systems/tienda.js)
+  let tiempo = null;     // hora del juego y día/noche (ver systems/tiempo.js)
   let doors = null;
   let lotes = null; // lotes que los jugadores pueden adquirir (ver systems/lotes.js)
   let minimap = null; // ver ui/minimap.js
@@ -146,6 +148,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     lotes?.update(focus, feetY, dt); // después de las puertas: si hay una puerta cerca, la E es de ella
     casas?.update(focus);
     tienda?.update(focus);
+    tiempo?.update(dt);
     minimap?.update({
       me: mode === 'player' && player ? { x: player.position.x, z: player.position.z, facing: player.facing } : { x: camera.position.x, z: camera.position.z, facing: controls.getYaw() + Math.PI },
       others: net?.positions?.() ?? [],
@@ -340,6 +343,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
     });
     tienda = createTienda({ getRoot: () => sceneManager.root });
+    // Hora del juego, día y noche y reloj (la misma hora para todos: sale del reloj de la compu)
+    tiempo = createTiempo({ scene, stage, dev, getSceneData: () => sceneManager.current, getBaseShade: () => sceneManager.shade });
+    window.corondaTiempo = tiempo;
 
     // Claude: uno solo para todo el servidor, charla de a uno y (si hay IA configurada) le podés escribir
     {
@@ -522,5 +528,5 @@ export async function startGame({ dev = false, retro = null } = {}) {
     ui.setStatus(String(err.message || err));
   }
   // Para las herramientas del modo desarrollador (panel de NPC, etc.)
-  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null, getInventario: () => inventario, getTienda: () => tienda };
+  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null, getInventario: () => inventario, getTienda: () => tienda, getTiempo: () => tiempo };
 }

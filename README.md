@@ -554,3 +554,13 @@ inv.remove('muebles', 'mesa', 1)      // lo pone en la casa
 inv.onChange((tipo, id, delta, total) => …)
 ```
 En `dev.html` está en la consola como `inventario` (ej. `inventario.add('recursos','madera',20)`), y el Studio lo ve con `iframe.contentWindow.coronda.getInventario()`. Como los lotes, no hay validación de servidor: un jugador tramposo puede editar sus datos.
+
+## Hora del juego y día/noche
+
+`src/systems/tiempo.js` · configuración en `data/tables/tiempo.json` (y en el Studio).
+
+- **Misma hora para todos:** sale del reloj de cada compu, así no hace falta mandarla por la red. Un día entero dura `dia_minutos` minutos reales (24 = 1 minuto real por hora del juego). `desfase_horas` corre el reloj.
+- **Reloj** arriba a la izquierda: hora y momento del día (Mañana, Tarde, Atardecer, Noche…).
+- **Cómo se ve:** cada `momento` tiene `tinte` y `brillo` (multiplican los colores de todo) y `fondo` (cielo y niebla; `null` = el de la escena). Se mezcla de uno al siguiente. Adentro de las casas no cambia (`environment.ciclo = false`).
+- **Horario de la tienda:** `tienda.abre` / `tienda.cierra`.
+- Desde la consola del juego: `corondaTiempo.texto()`, `corondaTiempo.abierta()`, `corondaTiempo.setConfig({ desfase_horas: 6 })`.

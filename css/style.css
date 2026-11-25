@@ -375,7 +375,7 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 
 /* ---------- Música de las casas (src/ui/house-music.js): arriba a la izquierda, solo "Sonando: …" ---------- */
 .casa-music {
-  position: absolute; top: 12px; left: 12px; z-index: 4; width: max-content; max-width: min(300px, calc(100% - 170px)); display: grid; gap: 6px; padding: 6px;
+  position: absolute; top: 54px; left: 12px; z-index: 4; width: max-content; max-width: min(300px, calc(100% - 170px)); display: grid; gap: 6px; padding: 6px;
   border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font: 500 13px var(--font-body);
 }
 .casa-music[hidden], .casa-music [hidden] { display: none !important; }
@@ -443,3 +443,12 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .inv-n { font-variant-numeric: tabular-nums; }
 .inv-empty { opacity: 0.55; font-style: italic; }
 @media (pointer: coarse) { .inv-btn { top: 160px; } .inv-panel { top: 210px; } }
+
+/* ---------- Reloj del juego (src/systems/tiempo.js): arriba a la izquierda ---------- */
+.reloj { position: absolute; top: 12px; left: 12px; z-index: 4; display: flex; align-items: baseline; gap: 7px; padding: 6px 12px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--line); font: 500 13px var(--font-body); color: var(--fg, #f6f9fa); pointer-events: none; }
+.reloj-ico { font-size: 15px; color: #ffd36e; }
+.reloj.noche .reloj-ico { color: #c9d4ff; }
+.reloj-h { font-size: 16px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.reloj-m { color: var(--muted); font-size: 12px; }
+body:has(.talking) .reloj { opacity: 0.4; }

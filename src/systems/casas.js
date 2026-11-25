@@ -176,7 +176,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
       id,
       data: {
         id,
-        environment: { background: '#1c1815', shading: 'unlit', tint: getShade()?.tint ?? '#ffffff', brightness: 1 },
+        environment: { background: '#1c1815', shading: 'unlit', ciclo: false, tint: getShade()?.tint ?? '#ffffff', brightness: 1 },
         rooms: glb ? [{ id: 'interior', model: file }] : [],
         spawn: { position: [0, 1.7, d / 2 - 2.4], yaw: 0 }, // si el modelo tiene un Empty "spawn", se usa ese
         collision: { default: 'none' },

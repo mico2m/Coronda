@@ -1,0 +1,21 @@
+{
+  "speaker": "Villager1",
+  "start": "inicio",
+  "nodes": {
+    "inicio": {
+      "text": "Hola."
+    }
+  },
+  "editor": {
+    "nodes": {
+      "inicio": {
+        "x": 390,
+        "y": 40
+      }
+    },
+    "start": {
+      "x": 20,
+      "y": 40
+    }
+  }
+}

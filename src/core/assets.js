@@ -5,13 +5,19 @@ import { padUVTextures } from './texture-padding.js';
 const jsonCache = new Map();
 const gltfLoader = new GLTFLoader();
 
+// Avisa qué archivo empieza y termina de bajar (la pantalla de carga lo muestra abajo, ver ui/boot.js)
+const avisar = (url, on) => { try { dispatchEvent(new CustomEvent('coronda:carga', { detail: { url, on } })); } catch { /* sin ventana */ } };
+
 export async function loadJSON(url) {
   if (jsonCache.has(url)) return jsonCache.get(url);
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`No se pudo leer ${url} (${res.status})`);
-  const data = await res.json();
-  jsonCache.set(url, data);
-  return data;
+  avisar(url, true);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`No se pudo leer ${url} (${res.status})`);
+    const data = await res.json();
+    jsonCache.set(url, data);
+    return data;
+  } finally { avisar(url, false); }
 }
 
 // Olvida un JSON cacheado (el editor de diálogos lo usa después de guardar, para que el juego lea la versión nueva)

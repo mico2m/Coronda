@@ -42,6 +42,7 @@ const DEFAULTS = {
     lookSpeed: 120,     // flechas: grados por segundo
     lookReturn: 2.5,    // al soltar, qué tan rápido vuelve (más alto = más rápido)
     recenterTime: 0.25, // Z: segundos que tarda en ponerse detrás
+    eyes: 1.6,          // primera persona: altura de los ojos (m). Se entra acercando la cámara al máximo con la rueda
   },
   // Animaciones: se buscan por nombre en el .glb (idle, walk, run).
   // fade = segundos de transición. walkAnimSpeed/runAnimSpeed = a qué velocidad (m/s) fue animado el ciclo;
@@ -179,6 +180,19 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
   const look = { yaw: 0, pitch: 0 };   // flechas: desvío de la mirada (radianes), vuelve solo a 0
   let recenter = null;                 // Z: { from, to, pitchFrom, t }
   let preset = null;                   // cámara fija por un rato (ej. adentro de una casa): { distance, pitch, locked }
+  // Primera persona: con la cámara ya lo más cerca posible, una vuelta más de la rueda (o pellizcar) entra a la vista desde
+  // los ojos; alejar la rueda vuelve a la tercera persona. El personaje se oculta (los demás lo siguen viendo).
+  let fp = false, fpPull = 0;
+  const onFpChange = new Set();
+  function setFirstPerson(on) {
+    on = !!on && !preset?.locked;
+    if (on === fp) return;
+    fp = on; fpPull = 0; recenter = null; look.yaw = look.pitch = 0;
+    pivot.visible = !fp;
+    if (fp) cam.pitch = 0.05; // mirando al frente
+    else { cam.dist = cfg.camera.minDistance * 1.25; cam.pitch = cfg.camera.pitch; }
+    onFpChange.forEach((f) => { try { f(fp); } catch (e) { console.error(e); } });
+  }
   let keys = {};
   let world = null;   // mundo de colisión de la escena actual (ver collision.js)
   let fallSpeed = 0;  // m/s hacia abajo
@@ -240,6 +254,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
 
   // Z: la cámara se pone detrás del personaje (a la altura de siempre), en un ratito
   function centerCamera() {
+    if (fp) { cam.pitch = 0.05; look.yaw = look.pitch = 0; return; } // primera persona: mirar al frente
     const to = facing - Math.PI; // yaw de la cámara que queda detrás de hacia donde mira
     recenter = { from: cam.yaw, to: cam.yaw + angleDiff(cam.yaw, to), pitchFrom: cam.pitch, t: 0 };
   }
@@ -262,14 +277,17 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
     p.x = e.clientX; p.y = e.clientY;
     if (pointers.size >= 2) { // dos dedos: zoom (pellizcar), sin girar
       if (pinch && !preset?.locked) {
-        cam.dist = THREE.MathUtils.clamp(pinch.dist * (pinch.d / Math.max(1, pair())), cfg.camera.minDistance, cfg.camera.maxDistance);
+        const want = pinch.dist * (pinch.d / Math.max(1, pair()));
+        if (!fp && want < cfg.camera.minDistance * 0.7) { setFirstPerson(true); pinch = { d: Math.max(1, pair()), dist: cfg.camera.minDistance }; }
+        else if (fp && want > cfg.camera.minDistance * 1.3) { setFirstPerson(false); pinch = { d: Math.max(1, pair()), dist: cam.dist }; }
+        else if (!fp) cam.dist = THREE.MathUtils.clamp(want, cfg.camera.minDistance, cfg.camera.maxDistance);
       }
       return;
     }
     recenter = null;
     // En pantalla táctil el dedo recorre menos que el mouse: más sensible
     cam.yaw -= dx * (p.touch ? 0.009 : 0.005);
-    cam.pitch = THREE.MathUtils.clamp(cam.pitch + dy * (p.touch ? 0.007 : 0.004), -0.1, 1.3);
+    cam.pitch = THREE.MathUtils.clamp(cam.pitch + dy * (p.touch ? 0.007 : 0.004), fp ? -1.25 : -0.1, fp ? 1.35 : 1.3);
   });
   const endDrag = (e) => {
     const p = pointers.get(e.pointerId);
@@ -289,6 +307,9 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
     if (!active) return;
     e.preventDefault();
     if (preset?.locked) return; // la distancia está fija (ej. adentro de una casa)
+    if (fp) { if (e.deltaY > 0) setFirstPerson(false); return; } // alejar: vuelve a la tercera persona
+    if (e.deltaY < 0 && cam.dist <= cfg.camera.minDistance + 1e-3) { if (++fpPull >= 2) setFirstPerson(true); return; } // ya está lo más cerca: dos vueltas más entran
+    fpPull = 0;
     cam.dist = THREE.MathUtils.clamp(cam.dist * (e.deltaY < 0 ? 0.9 : 1.1), cfg.camera.minDistance, cfg.camera.maxDistance);
   }, { passive: false });
 
@@ -346,6 +367,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
     // Cámara fija (ej. adentro de una casa: lejos y desde arriba, sin zoom). null = la de siempre
     setCameraPreset(p) {
       if (!p && !preset) return; // ya estaba la de siempre: no se toca el zoom que eligió el jugador
+      if (p?.locked) setFirstPerson(false); // adentro de una casa la cámara es fija
       preset = p ?? null;
       cam.dist = preset?.distance ?? cfg.camera.distance;
       cam.pitch = preset?.pitch ?? cfg.camera.pitch;
@@ -355,6 +377,10 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
     // Nombre real del clip que se está viendo y hacia dónde mira (para el multijugador)
     get clipName() { return currentClip?.getClip?.().name ?? null; },
     get facing() { return facing; },
+    // Primera persona (ver setFirstPerson): player.firstPerson = true/false · player.onFirstPerson((on) => …)
+    get firstPerson() { return fp; },
+    set firstPerson(on) { setFirstPerson(on); },
+    onFirstPerson(fn) { onFpChange.add(fn); return () => onFpChange.delete(fn); },
     get actions() { return actions; },
     triggerAction,
     get position() { return root.position; },
@@ -519,7 +545,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
         cam.yaw = recenter.from + (recenter.to - recenter.from) * k;
         cam.pitch = recenter.pitchFrom + ((preset?.pitch ?? cc.pitch) - recenter.pitchFrom) * k;
         if (recenter.t >= 1) recenter = null;
-      } else if (moving && cc.follow > 0 && !pointers.size) {
+      } else if (moving && cc.follow > 0 && !pointers.size && !fp) {
         // Caminando te sigue de atrás de a poco; si venís hacia la cámara no da la vuelta
         const d = angleDiff(cam.yaw, facing - Math.PI);
         if (Math.abs(d) < 2.2) cam.yaw += d * Math.min(1, cc.follow * dt * Math.min(1, Math.abs(d) * 1.5));
@@ -534,6 +560,17 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
       if (ly && !frozen) look.pitch = THREE.MathUtils.clamp(look.pitch + ly * spd, -lim(cc.lookPitch), lim(cc.lookPitch));
       else look.pitch -= look.pitch * back;
 
+      if (fp) {
+        // Primera persona: el cuerpo mira hacia donde mirás y la cámara va en los ojos
+        facing = facingFromYaw(cam.yaw); pivot.rotation.y = facing;
+        const yaw = cam.yaw + look.yaw;
+        const pitch = THREE.MathUtils.clamp(cam.pitch - look.pitch, -1.3, 1.4);
+        const cp = Math.cos(pitch), sp = Math.sin(pitch);
+        camera.position.set(root.position.x - Math.sin(yaw) * 0.12, root.position.y + (cc.eyes ?? 1.6), root.position.z - Math.cos(yaw) * 0.12);
+        target.set(camera.position.x - Math.sin(yaw) * cp, camera.position.y - sp, camera.position.z - Math.cos(yaw) * cp);
+        camera.lookAt(target);
+        return;
+      }
       target.copy(root.position).y += cc.height;
       // La cámara gira alrededor de la cabeza: hacia arriba con la flecha arriba (mira hacia arriba, baja la cámara)
       const yaw = cam.yaw + look.yaw;

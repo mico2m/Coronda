@@ -596,6 +596,10 @@ Claude atiende la tienda y fabrica muebles a cambio de madera. Código: `src/sys
 - **Modo diseño con la mochila:** en tu casa solo podés poner los muebles que tenés en la mochila (los retirados de la tienda); al colocarlos salen de la mochila y si quitás uno ya puesto vuelve a la mochila. Los pósters siguen siendo gratis.
 - **Consola:** `corondaClaude.state`, `coronda.getTienda().pedidos()` (en `dev.html`).
 
+## Primera persona
+
+- **Primera persona:** con la cámara ya lo más cerca posible, seguí girando la rueda hacia adelante (o pellizcá en el celular) y la vista pasa a los ojos del personaje; alejá la rueda para volver. Adentro de las casas (cámara fija) no se activa. Altura de los ojos: `camera.eyes` en `data/tables/player.json`.
+
 ## Chat de voz por proximidad y menú de Esc
 
 - **Esc** abre el menú (en el celular, el botón ⚙️). Si hay otra cosa abierta (una charla, la mochila, el chat), Esc cierra esa cosa primero.

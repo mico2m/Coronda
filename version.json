@@ -1,5 +1,5 @@
 {
-  "v": 1795630044674,
-  "fecha": "2026-11-25T18:07:24.674Z",
-  "mensaje": "Arreglado: el juego no arrancaba (error horario). Studio muestra el .glb de cada modelo"
+  "v": 1795630502291,
+  "fecha": "2026-11-25T18:15:02.291Z",
+  "mensaje": "Primera persona con la rueda, la pantalla de carga muestra qué archivos baja, arreglo del error horario"
 }

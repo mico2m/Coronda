@@ -263,6 +263,8 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .boot-text { font: 500 15px var(--font-body); }
 .boot-tip { font-size: 12px; color: rgba(244, 248, 250, 0.85); }
 @media (prefers-reduced-motion: reduce) { .boot-bar i { animation: none; } }
+.boot-files { position: absolute; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom, 0px)); text-align: center; font: 500 11px var(--font-body);
+  color: rgba(244, 248, 250, 0.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 
 /* ---------- Lista de jugadores (Tab, src/ui/players.js) ---------- */
 .players { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(5, 10, 14, 0.35); }

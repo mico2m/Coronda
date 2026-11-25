@@ -9,13 +9,8 @@
     },
     "fuente": {
       "point": "ruta_tokse_1",
-      "wait": 2,
+      "wait": 10,
       "waitMax": 0,
-      "next": "parada"
-    },
-    "parada": {
-      "point": "ruta_tokse_3",
-      "wait": 4,
       "next": "inicio"
     }
   }

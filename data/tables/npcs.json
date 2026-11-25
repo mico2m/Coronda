@@ -1,4 +1,6 @@
 {
   "_ayuda": "Opcional. Define cuál es el idle de cada modelo de NPC (clave = nombre del .glb sin extensión). Vale para todos los NPC que usan ese modelo; npc_anim en el Empty o 'animation' en la escena lo pisan. Si no ponés nada, el motor detecta el idle solo.",
-  "_ejemplo": { "idle": "nombre_exacto_del_clip" }
+  "_ejemplo": {
+    "idle": "nombre_exacto_del_clip"
+  }
 }

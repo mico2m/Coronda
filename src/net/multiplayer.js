@@ -247,6 +247,7 @@ export async function connectServer(roomId = 'coronda') {
   net.casas = channel('casas', 'casa~'); // ver systems/casas.js (interiores)
   net.bosque = channel('bosque', 'bosque~'); // ver systems/bosque.js (árboles caídos)
   net.tienda = channel('tienda', 'tienda~'); // ver systems/tienda.js (pedidos de muebles)
+  net.admin = channel('admin', 'admin~');    // ver systems/admin.js (comandos de admin firmados por el worker)
   const SEEN = 'visto~';                 // última conexión de cada jugador (ver players())
   const NAME = 'nombre~';                // registro de nombres: cada nombre es de un solo jugador (ver checkName)
   room.onPersisted = (key, data) => {

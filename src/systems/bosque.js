@@ -189,6 +189,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     update, setConfig,
     get config() { return { ...cfg }; },
     get near() { return !!near; },
+    recargar() { res = { dia: hoy(), usados: 0 }; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }, // (admin)
     get resistencia() { const q = quedan(); return { quedan: Number.isFinite(q) ? q : null, max: cfg.resistencia_por_dia, dia: res.dia }; },
     get trees() { return trees.map((t) => ({ id: t.id, caido: isDown(t), hasta: fallen.get(t.key) ?? 0 })); },
   };

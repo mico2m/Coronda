@@ -160,6 +160,34 @@ function carpinteriaTexto(c) {
   return NL + taller + (extra ? NL + extra : '') + NL + (mis.length ? 'Pedidos del que te habla (los únicos que conocés de él):' + NL + mis.join(NL) : 'El que te habla no tiene pedidos en la Carpintería.');
 }
 
+// ---------- Admin: comandos del chat firmados (ver src/systems/admin.js) ----------
+// Secreto ADMIN_KEY (Settings -> Variables and Secrets): la clave del admin. Nunca está en el juego ni en GitHub.
+//   /admin/login      { clave }        -> { ok }            ¿la clave es correcta?
+//   /admin/firmar     { clave, cmd }   -> { ok, firma }     el admin pide la firma de un comando
+//   /admin/verificar  { cmd, firma }   -> { ok }            cada jugador pregunta si la firma es válida antes de aplicarlo
+const enc8 = (t) => new TextEncoder().encode(t);
+async function hmac(clave, texto) {
+  const k = await crypto.subtle.importKey('raw', enc8('coronda-admin:' + clave), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return [...new Uint8Array(await crypto.subtle.sign('HMAC', k, enc8(texto)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+function igual(a, b) { a = String(a); b = String(b); let r = a.length ^ b.length; for (let i = 0; i < Math.max(a.length, b.length); i++) r |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0); return r === 0; }
+const canon = (o) => JSON.stringify(Object.keys(o).sort().reduce((x, k) => { x[k] = o[k]; return x; }, {}));
+async function admin(ruta, body, env, h) {
+  if (!env.ADMIN_KEY) return json({ ok: false, error: 'falta el secreto ADMIN_KEY en Cloudflare (Settings -> Variables and Secrets)' }, 500, h);
+  const cmd = body?.cmd && typeof body.cmd === 'object' && !Array.isArray(body.cmd) ? body.cmd : null;
+  if (ruta === '/admin/verificar') {
+    const firma = String(body?.firma ?? '');
+    return json({ ok: !!cmd && /^[0-9a-f]{64}$/.test(firma) && igual(await hmac(env.ADMIN_KEY, canon(cmd)), firma) }, 200, h);
+  }
+  if (!igual(String(body?.clave ?? ''), env.ADMIN_KEY)) return json({ ok: false, error: 'clave' }, 403, h);
+  if (ruta === '/admin/login') return json({ ok: true }, 200, h);
+  if (ruta === '/admin/firmar') {
+    if (!cmd || JSON.stringify(cmd).length > 600) return json({ ok: false, error: 'comando' }, 400, h);
+    return json({ ok: true, firma: await hmac(env.ADMIN_KEY, canon(cmd)) }, 200, h);
+  }
+  return json({ ok: false, error: 'ruta' }, 404, h);
+}
+
 function cors(env, req) {
   const origin = req.headers.get('Origin') || '';
   const ok = !env.ORIGENES || env.ORIGENES.split(',').map((s) => s.trim()).includes(origin);
@@ -189,6 +217,8 @@ export default {
 
     let body;
     try { body = await req.json(); } catch { return json({ error: 'json' }, 400, h); }
+    const ruta = new URL(req.url).pathname.replace(/\/+$/, '');
+    if (ruta.startsWith('/admin')) return admin(ruta, body, env, h);
     const saludo = body?.modo === 'saludo';           // un jugador se le acerca: saludo preparado por adelantado
     const informe = body?.modo === 'informe';          // volvió de un mandado: cuenta lo que pasó
     const encargo = body?.modo === 'encargo';          // el juego hizo la cuenta de un encargo: Claude la cuenta

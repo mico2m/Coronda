@@ -179,6 +179,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   let keys = {};
   let world = null;   // mundo de colisión de la escena actual (ver collision.js)
   let fallSpeed = 0;  // m/s hacia abajo
+  let lastSafe = null; // último punto con suelo (si se cae del mapa, vuelve ahí)
   let obstacles = []; // círculos { x, z, r } que no se atraviesan (NPC)
   const target = new THREE.Vector3();
 
@@ -388,6 +389,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     setWorld(collisionWorld) {
       world = collisionWorld;
       fallSpeed = 0;
+      lastSafe = null;
     },
     setActive(v) {
       active = v;
@@ -448,10 +450,15 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       // Si no hay suelo en absoluto debajo (fuera del mapa) se queda a esa altura.
       const g = groundY(root.position.x, root.position.y, root.position.z);
       if (g === null) {
-        fallSpeed = 0;
+        if (world?.hasGround && lastSafe) {      // fuera del mapa (la escena sí tiene suelo): cae, y si se va muy abajo vuelve al último lugar seguro
+          fallSpeed = Math.min(fallSpeed + col.gravity * dt, 40);
+          root.position.y -= fallSpeed * dt;
+          if (root.position.y < lastSafe[1] - 15) { root.position.set(lastSafe[0], lastSafe[1] + 0.1, lastSafe[2]); fallSpeed = 0; }
+        } else fallSpeed = 0;                    // escena sin suelo sólido: se queda a esa altura
       } else if (g >= root.position.y - 0.12) {   // sube, o baja un poquito (rampa / escalón)
         root.position.y += (g - root.position.y) * Math.min(1, dt * 18);
         fallSpeed = 0;
+        if (Math.abs(g - root.position.y) < 0.3) (lastSafe ??= [0, 0, 0]), (lastSafe[0] = root.position.x, lastSafe[1] = root.position.y, lastSafe[2] = root.position.z);
       } else {                                    // vacío: caída libre hasta el suelo
         fallSpeed = Math.min(fallSpeed + col.gravity * dt, 40);
         root.position.y = Math.max(g, root.position.y - fallSpeed * dt);

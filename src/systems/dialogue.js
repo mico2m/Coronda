@@ -132,18 +132,18 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
   }
 
   // ---- Inicio y fin ----
-  async function start(entry) {
-    if (s || busy || performance.now() < cooldownUntil) return;
+  async function start(entry, custom = null) { // custom: un diálogo armado al vuelo { nodes, start } (sin permiso previo ni banderas)
+    if (s || busy || (!custom && performance.now() < cooldownUntil)) return;
     busy = true;
     setNear(null);
-    if (hooks.gate) {
+    if (!custom && hooks.gate) {
       let ok = true;
       try { ok = await hooks.gate(entry); } catch { ok = true; }
       if (ok !== true) { busy = false; cooldownUntil = performance.now() + 600; if (ok) onError?.(String(ok)); return; }
     }
     let script;
     try {
-      script = await buildScript(entry);
+      script = custom ?? await buildScript(entry);
     } catch (err) {
       console.error(err);
       onError?.(`Diálogo: ${err.message}`);
@@ -152,9 +152,11 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
     }
     busy = false;
     // Recordar que ya le hablaste (después de elegir qué decir, así la 1ª vez sale el texto de la 1ª vez)
-    flags.set(`hablo_${entry.id}`, true);
-    flags.inc(`veces_${entry.id}`);
-    for (const f of entry.talk.sets) flags.set(f, true);
+    if (!custom) {
+      flags.set(`hablo_${entry.id}`, true);
+      flags.inc(`veces_${entry.id}`);
+      for (const f of entry.talk.sets) flags.set(f, true);
+    }
     host.classList.add('talking'); // esconde la ayuda y los botones mientras se habla
     s = { entry, script, node: null, pages: [], page: 0, count: 0, shown: 0, choices: [], sel: 0, picking: false };
     onStart?.(entry);
@@ -412,6 +414,8 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
       entries = npcs.list.filter((n) => n.talk);
     },
     get active() { return !!s; },
+    // Abre una charla armada al vuelo (ej. Claude viene a preguntarte algo). true si se abrió.
+    async startCustom(entry, nodes, startId) { await start(entry, { id: '__custom', nodes, start: startId, speaker: null }); return !!s && s.entry === entry; },
     get entry() { return s?.entry ?? null; },
     // Cierra la charla desde afuera (ej. Claude se fue a otra parte)
     close() { end(); },

@@ -14,11 +14,11 @@ function ago(t) {
   return new Date(t).toLocaleDateString('es-AR');
 }
 const pingClass = (ms) => (ms == null ? '' : ms < 120 ? 'ok' : ms < 300 ? 'mid' : 'bad');
-// "coronda_plaza" -> "Plaza", "casa~coronda_plaza.lote_01" -> "Casa (lote 01)"
+// "coronda_plaza" -> "Plaza", "scene_lote04_mirko" -> "Casa de mirko (lote 04)"
 function place(id) {
   const s = String(id ?? '');
-  const casa = /^casa_.*lote_(.+)$/i.exec(s);
-  if (casa) return `Casa (lote ${casa[1]})`;
+  const casa = /^scene_lote([a-z0-9]+)_(.+)$/i.exec(s);
+  if (casa) return `Casa de ${casa[2]} (lote ${casa[1]})`;
   const t = s.replace(/^scene_/, '').replace(/^coronda_/, '').replace(/[_.-]+/g, ' ').trim();
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
 }

@@ -9,7 +9,7 @@ import { createUI } from './ui/ui.js';
 import { createFade } from './systems/fade.js';
 import { createDoors } from './systems/doors.js';
 import { createLotes } from './systems/lotes.js';
-import { createCasas, houseSceneId } from './systems/casas.js';
+import { createCasas } from './systems/casas.js';
 import { createFollowers } from './systems/followers.js';
 import { createPlayer } from './actors/player.js';
 import { buildCollision } from './systems/collision.js';
@@ -152,6 +152,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
     // Menú de inicio (index): elegir personaje y jugar solo o en el servidor (ver ui/start-menu.js y net/multiplayer.js).
     // En dev no aparece, salvo con ?menu en la dirección.
     const params = new URLSearchParams(location.search);
+    // Aviso de actualización: cuando se sube una versión nueva, a los que están jugando les avisa (ver ui/update-notice.js)
+    if (!dev) import('./ui/update-notice.js').then((m) => m.createUpdateNotice()).catch(() => {});
     if (!dev || params.has('menu')) {
       const { findCharacters, showStartMenu } = await import('./ui/start-menu.js');
       const { connectServer } = await import('./net/multiplayer.js');
@@ -214,6 +216,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
         ui.setStatus(`Lotes: ${err.message || err}`);
       }
       casas?.afterScene(sceneManager.current.id);
+      // Adentro de una casa la cámara va lejos y desde arriba (sin techo se ve todo), con el zoom fijo al máximo
+      player.setCameraPreset(casas?.inside ? { distance: player.maxDistance, pitch: 1.05, locked: true } : null);
       minimap?.capture(sceneManager.root); // el mapa desde arriba, antes de que aparezcan los NPC
       spawnDebug?.attach(sceneManager.root, sceneManager.current, doors.list); // después de las colisiones: los postes no chocan
       // NPC: Empties npc_* del .glb + "actors" del JSON (ver src/actors/npc.js). Van después de armar las colisiones.
@@ -315,9 +319,11 @@ export async function startGame({ dev = false, retro = null } = {}) {
       if (mode === 'free') controls.setEnabled(true);
     }
     function goToHouse(key, back) {
-      const id = houseSceneId(key);
-      scenesTable[id] = casas.sceneEntry(key, back);
-      return travel(() => enterScene(id));
+      return travel(async () => {
+        const entry = await casas.sceneEntry(key, back); // scene_lote<nro>_<dueño> (ver systems/casas.js)
+        scenesTable[entry.id] = entry;
+        await enterScene(entry.id);
+      });
     }
     casas.setOnExit(() => {
       const b = casas.inside?.back;

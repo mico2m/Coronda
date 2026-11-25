@@ -171,6 +171,15 @@ const explainGit = (t) => {
   if (/Could not resolve host|unable to access/i.test(t)) return 'Sin conexión con GitHub.';
   return '';
 };
+// version.json: cada envío a GitHub le pone una versión nueva. Los jugadores que tienen el juego abierto la revisan cada
+// minuto y, si cambió, les aparece "Hay una nueva actualización" (ver src/ui/update-notice.js). Se escribe después de
+// traer lo de GitHub, en su propio commit, así nunca choca con otro cambio.
+async function stampVersion(message, step) {
+  const v = { v: Date.now(), fecha: new Date().toISOString(), mensaje: String(message || '').slice(0, 200) };
+  fs.writeFileSync(path.join(ROOT, 'version.json'), JSON.stringify(v, null, 2) + '\n');
+  await step('versión', ['add', 'version.json']);
+  await step('versión', ['commit', '-m', `Versión ${new Date(v.v).toLocaleString('es-AR')}`]);
+}
 async function gitSend(message) {
   const log = [];
   const step = async (label, args) => { const r = await git(args); log.push(`$ git ${args.join(' ')}`, (r.out + r.err).trim()); if (r.code) { const e = new Error(explainGit(r.out + r.err) || `Falló: ${label}`); e.log = log; throw e; } return r; };
@@ -185,8 +194,10 @@ async function gitSend(message) {
       const pull = await git(['pull', '--rebase', '--autostash']);
       log.push('$ git pull --rebase --autostash', (pull.out + pull.err).trim());
       if (pull.code) { await git(['rebase', '--abort']); throw Object.assign(new Error(explainGit(pull.out + pull.err) || 'No se pudo traer lo que había en GitHub.'), { log }); }
+      await stampVersion(message, step);
       await step('enviar', ['push']);
     } else {
+      await stampVersion(message, step);
       await step('enviar', ['push', '-u', 'origin', st.branch]);
     }
     return { ok: true, log };

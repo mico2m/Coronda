@@ -1,14 +1,15 @@
-// Interiores de las casas de los lotes: cada casa tiene su propia escena ("casa_<lote>").
+// Interiores de las casas de los lotes: cada casa tiene su propia escena "scene_lote<nro>_<dueño>"
+// (ej. scene_lote04_mirko), armada con el modelo base del interior: assets/models/interiores/interior_base.glb.
 //
-// - Se crea cuando alguien adquiere el lote (vacía) y se borra entera cuando el dueño destruye la casa (ver lotes.js).
+// - Se crea cuando alguien adquiere el lote (vacía) y se borra entera cuando el dueño destruye o cede el lote (ver lotes.js).
 //   Cada vez que un lote se adquiere de nuevo la casa tiene otro id (c): un interior viejo nunca reaparece.
 // - Se entra desde el menú del lote (E). Todos pueden visitar; solo el dueño puede diseñar.
 // - Salida: la puerta del frente ("E Salir"), te deja delante del lote.
 //
 // El cascarón (piso y paredes):
-//   - Si la casa tiene "interior" en data/casas.json, se usa ese .glb (con su piso col_/colision, su Empty "spawn"
-//     donde aparecés y un Empty "salida" donde está la puerta para salir).
-//   - Si no, se arma una habitación simple de "tamano": [ancho, largo, alto] metros (por defecto 10 × 10 × 3,2).
+//   - assets/models/interiores/interior_base.glb (o el "interior" de esa casa en data/casas.json), con su piso
+//     sólido (col_… o colision = 1), un Empty "spawn" donde aparecés y un Empty "salida" en la puerta para salir.
+//   - Mientras ese archivo no exista, se arma una habitación simple de "tamano": [ancho, largo, alto] metros (10 × 10 × 3,2).
 //
 // Muebles: data/muebles.json  { "muebles": [{ id, nombre, archivo, caja: [ancho, alto, largo] }] }
 //   El .glb va en assets/models/muebles/ (origen en la base del mueble, al centro). Si no existe se muestra una
@@ -40,7 +41,15 @@ const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); 
 const snap = (v) => Math.round(v / GRID) * GRID;
 const beats = (a, b) => !b || a.v > b.v || (a.v === b.v && (a.o ?? '') < (b.o ?? ''));
 
-export const houseSceneId = (loteKey) => `casa_${loteKey}`;
+// Modelo base del interior (una casa vacía). Lo modelás vos: ver el README, "Interiores de las casas".
+export const INTERIOR_BASE = 'assets/models/interiores/interior_base.glb';
+const norm = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+// "coronda_plaza.lote_04" + dueño "Mirko" -> "scene_lote04_mirko"
+export function houseSceneId(loteKey, ownerName) {
+  const lot = String(loteKey).replace(/^.*\.lote_?/i, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+  return `scene_lote${lot}_${norm(ownerName) || 'casa'}`;
+}
+async function fileExists(url) { try { return (await fetch(url, { method: 'HEAD' })).ok; } catch { return false; } }
 
 // opts: net, uid, lotes (para saber de quién es cada lote), stage, camera, getPlayer(), getShade(), notify(msg),
 //       blocked() (otra cosa usa las teclas), onDesign(on) (para frenar/soltar al jugador), onChange() (rehacer colisiones)
@@ -127,25 +136,32 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
 
   // ---------- Escena del interior ----------
   // Datos de la escena para el gestor de escenas (scene-manager.js): se registra en la tabla de escenas
-  function sceneEntry(key, back) {
+  // Escena del interior: scene_lote<nro>_<dueño>. Usa el modelo base (INTERIOR_BASE, o el "interior" de esa casa en
+  // data/casas.json); si todavía no existe, una habitación simple para poder probar.
+  async function sceneEntry(key, back) {
+    await ready;
     const lot = lotes.record(key);
     const def = houseDefs.get(lot?.m) ?? {};
     const [w, d, h] = Array.isArray(def.tamano) ? def.tamano.map(Number) : DEFAULT_SIZE;
-    const id = houseSceneId(key);
+    const id = houseSceneId(key, lot?.n);
+    const file = def.interior || INTERIOR_BASE;
+    const glb = await fileExists(file);
+    if (!glb) console.info(`Casas: todavía no existe ${file}; se arma una habitación simple de ${w} × ${d} m.`);
     return {
+      id,
       data: {
         id,
         environment: { background: '#1c1815', shading: 'unlit', tint: getShade()?.tint ?? '#ffffff', brightness: 1 },
-        rooms: def.interior ? [{ id: 'interior', model: def.interior }] : [],
-        spawn: { position: [0, 1.7, d / 2 - 2.4], yaw: 0 },
+        rooms: glb ? [{ id: 'interior', model: file }] : [],
+        spawn: { position: [0, 1.7, d / 2 - 2.4], yaw: 0 }, // si el modelo tiene un Empty "spawn", se usa ese
         collision: { default: 'none' },
       },
-      build: async (group) => { await ready; await buildInterior(group, key, { w, d, h, glb: !!def.interior, back }); },
+      build: async (group) => { await buildInterior(group, key, { id, w, d, h, glb, back }); },
     };
   }
 
   function wallMat(color) { return new THREE.MeshBasicMaterial({ color }); }
-  async function buildInterior(group, key, { w, d, h, glb, back }) {
+  async function buildInterior(group, key, { id, w, d, h, glb, back }) {
     let exit = new THREE.Vector3(0, 0, d / 2 - 0.3);
     if (!glb) { // habitación simple: piso, paredes y techo (todo sólido)
       const shell = new THREE.Group();
@@ -162,9 +178,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
         m.position.set(x, y, z); m.userData.colision = 1; m.name = `pared_${i}`;
         shell.add(m);
       });
-      const ceil = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, d), wallMat(0xf1ebe0));
-      ceil.position.y = h + 0.05; ceil.name = 'techo';
-      shell.add(ceil);
+      // Sin techo: así la cámara ve todo desde arriba
       // La puerta para salir (un dibujo en la pared del frente)
       const door = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.2, 0.05), wallMat(0x5b3a24));
       door.position.set(0, 1.1, d / 2 - 0.12); door.name = 'salida-puerta';
@@ -173,6 +187,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     } else {
       const s = group.getObjectByName('salida');
       if (s) exit = s.getWorldPosition(new THREE.Vector3());
+      // El techo no se ve (la cámara mira desde arriba): todo lo que se llame techo…, roof… o ceiling…
+      group.traverse((o) => { if (/^(?:techo|roof|ceiling)/i.test(o.name ?? '')) o.visible = false; });
     }
     if (getShade && group) setShade(group, getShade());
     const items = new THREE.Group();
@@ -180,7 +196,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     group.add(items);
     // Hasta dónde se puede llevar un mueble (en la habitación armada: adentro de las paredes)
     const bounds = glb ? null : { x: w / 2 - 0.35, z: d / 2 - 0.35 };
-    inside = { key, group, itemsGroup: items, items: new Map(), exit, back, bounds };
+    inside = { key, id, group, itemsGroup: items, items: new Map(), exit, back, bounds };
     await renderItems();
   }
 
@@ -361,7 +377,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     sceneEntry,
     // Después de cargar cualquier escena: si no es un interior, se apaga todo lo de las casas
     afterScene(sceneId) {
-      if (inside && houseSceneId(inside.key) !== sceneId) inside = null;
+      if (inside && inside.id !== sceneId) inside = null;
       if (!inside) { design = false; carry = null; ui.hidden = true; exitPrompt.hidden = true; }
       else drawUI();
     },

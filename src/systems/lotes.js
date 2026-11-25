@@ -15,7 +15,8 @@
 // Si el archivo todavía no existe se muestra una caja de prueba (así se puede probar el sistema antes de modelar).
 //
 // Cómo se juega: al entrar a la zona de un lote libre aparece "E Adquirir lote"; se elige el modelo de casa.
-// Tu propio lote: "E Tu casa" para cambiar el modelo o liberar el lote. Un lote ajeno solo muestra de quién es.
+// Tu propio lote: "E Tu casa" para entrar, cederlo o destruir la casa. El modelo queda fijo: para cambiarlo hay que
+// destruirla y volver a adquirir el lote (se pierde todo). Un lote ajeno se puede visitar.
 //
 // Cómo se comparte (sin servidor propio, ver net/multiplayer.js):
 //   - cada cambio se manda en vivo a los demás jugadores,
@@ -114,6 +115,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       if (rec.o === uid) mine.set(key, rec); else mine.delete(key);
       writeJSON(MINE_STORE, Object.fromEntries(mine));
     }
+    if (rec.o === uid && cur?.o && cur.o !== uid) notify(`${cur.n || 'Alguien'} te cedió un lote: ¡ya es tuyo!`);
     if (cur?.o === uid && rec.o !== uid) notify(rec.o ? `${rec.n || 'Alguien'} adquirió el lote antes que vos` : 'Tu lote quedó libre');
     if (panelKey === key && rec.o && rec.o !== uid) closePanel();
     render(key);
@@ -153,6 +155,23 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     accept(key, rec);
     publish(key, rec);
     onReleased?.(key); // se borra el interior (ver casas.js)
+  }
+
+  // Ceder el lote a otro jugador (por su nombre): pasa a ser suyo, con una casa NUEVA (el interior se borra)
+  function cede(key, targetName) {
+    const cur = state.get(key);
+    if (cur?.o !== uid || solo) return 'no';
+    const who = net.findPlayer(targetName);
+    if (!who) return 'nadie';
+    if (who.u === uid) return 'vos';
+    const owned = [...state].filter(([k, r]) => r.o === who.u && k !== key).length;
+    if (owned >= casas.max) return 'lleno';
+    const c = Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    const rec = { o: who.u, n: String(who.n).slice(0, 20), m: cur.m, v: cur.v + 1, c };
+    accept(key, rec);
+    publish(key, rec);
+    onReleased?.(key); // se borra el interior (ver casas.js)
+    return 'ok';
   }
 
   // ---------- Red ----------
@@ -274,7 +293,13 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     const other = cur?.o && !own;
     const items = [...casas.map.values()];
     let body;
-    if (view === 'destroy') { // confirmación antes de destruir: se borra todo
+    if (view === 'cede') { // ceder a otro jugador: también se borra todo lo de adentro
+      body = `<h3>Ceder ${esc(s.label.toLowerCase())}</h3>
+        <label class="lote-field">Nombre del jugador<input class="lote-input" maxlength="20" autocomplete="off" spellcheck="false"></label>
+        <p class="lote-warn">El lote y la casa pasan a ser de ese jugador, pero <b>todo lo que tiene adentro se borra</b> (los muebles y el diseño). No se puede deshacer.</p>
+        <p class="lote-msg" aria-live="polite"></p>
+        <div class="lote-foot"><button type="button" data-act="cede" class="danger">Ceder lote</button><button type="button" data-act="back">Cancelar <kbd>Esc</kbd></button></div>`;
+    } else if (view === 'destroy') { // confirmación antes de destruir: se borra todo
       body = `<h3>¿Destruir tu casa?</h3>
         <p class="lote-warn">Se borra la casa y <b>todo lo que tiene adentro</b> (los muebles y el diseño). El lote queda libre para cualquiera. No se puede deshacer.</p>
         <div class="lote-foot"><button type="button" data-act="destroy" class="danger">Sí, destruir</button><button type="button" data-act="back">Cancelar <kbd>Esc</kbd></button></div>`;
@@ -283,14 +308,32 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
         <div class="lote-foot"><button type="button" data-act="enter">Visitar la casa <kbd>E</kbd></button><button type="button" data-act="close">Cancelar <kbd>Esc</kbd></button></div>`;
     } else {
       body = `<h3>${esc(s.label)}${own ? ' · tu casa' : ''}</h3>
-        ${own ? '<button type="button" data-act="enter" class="lote-enter">Entrar a la casa <kbd>E</kbd></button>' : ''}
-        <div class="lote-list">${own ? '<small>Cambiar el modelo:</small>' : ''}${items.map((c, i) => `<button type="button" data-id="${esc(c.id)}"${own && cur.m === c.id ? ' class="on"' : ''}><kbd>${i + 1}</kbd> ${esc(c.nombre)}${own && cur.m === c.id ? ' ✓' : ''}</button>`).join('') || '<p>No hay casas en data/casas.json</p>'}</div>
-        <div class="lote-foot">${own ? '<button type="button" data-act="ask-destroy" class="danger">Destruir casa</button>' : ''}<button type="button" data-act="close">Cancelar <kbd>Esc</kbd></button></div>`;
+        ${own ? `<button type="button" data-act="enter" class="lote-enter">Entrar a la casa <kbd>E</kbd></button>
+          <p class="lote-note">Tu casa: ${esc(casas.map.get(cur.m)?.nombre ?? cur.m)}. Para cambiar de modelo hay que destruirla y volver a adquirir el lote (se pierde todo lo de adentro).</p>`
+          : `<div class="lote-list">${items.map((c, i) => `<button type="button" data-id="${esc(c.id)}"><kbd>${i + 1}</kbd> ${esc(c.nombre)}</button>`).join('') || '<p>No hay casas en data/casas.json</p>'}</div>`}
+        <div class="lote-foot">${own && !solo ? '<button type="button" data-act="ask-cede">Ceder lote</button>' : ''}${own ? '<button type="button" data-act="ask-destroy" class="danger">Destruir casa</button>' : ''}<button type="button" data-act="close">Cancelar <kbd>Esc</kbd></button></div>`;
     }
     panel.innerHTML = `<div class="lote-box" data-view="${view}">${body}</div>`;
     panel.hidden = false;
     near = null; prompt.hidden = true; sig = '';
+    if (view === 'cede') setTimeout(() => panel.querySelector('.lote-input')?.focus(), 0);
     onOpen?.();
+  }
+  panel.addEventListener('keydown', (e) => {
+    if (!e.target.classList?.contains('lote-input')) return;
+    if (e.key === 'Enter') { e.preventDefault(); doCede(panelKey); }
+    else if (e.key === 'Escape') { e.preventDefault(); openPanel(panelKey); }
+    else panel.querySelector('.lote-msg').textContent = '';
+    e.stopPropagation(); // las letras no mueven al personaje
+  });
+  function doCede(key) {
+    const name = panel.querySelector('.lote-input')?.value.trim() ?? '';
+    const msg = panel.querySelector('.lote-msg');
+    const r = cede(key, name);
+    const texts = { nadie: `No hay ningún jugador llamado "${name}".`, vos: 'Ese sos vos.', lleno: `Ese jugador ya tiene ${casas.max} lote${casas.max > 1 ? 's' : ''}.`, no: 'No se puede ceder este lote.' };
+    if (r !== 'ok') { if (msg) msg.textContent = texts[r] ?? ''; return; }
+    closePanel();
+    notify(`Le cediste el lote a ${state.get(key)?.n ?? name}`);
   }
   function closePanel() {
     if (panelKey === null) return;
@@ -304,10 +347,12 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     const key = panelKey;
     if (b.dataset.act === 'close') closePanel();
     else if (b.dataset.act === 'ask-destroy') openPanel(key, 'destroy');
+    else if (b.dataset.act === 'ask-cede') openPanel(key, 'cede');
+    else if (b.dataset.act === 'cede') doCede(key);
     else if (b.dataset.act === 'back') openPanel(key);
     else if (b.dataset.act === 'destroy') { closePanel(); release(key); notify('Destruiste tu casa: el lote quedó libre'); }
     else if (b.dataset.act === 'enter') { closePanel(); onEnterHouse?.(key, spotInfo(key)); }
-    else if (b.dataset.id) { closePanel(); if (state.get(key)?.m !== b.dataset.id) claim(key, b.dataset.id); }
+    else if (b.dataset.id) { closePanel(); if (!state.get(key)?.o) claim(key, b.dataset.id); }
   });
 
   // ---------- Aviso "E Adquirir lote" ----------
@@ -323,9 +368,9 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     if (panelKey !== null) {
       const view = panel.querySelector('.lote-box')?.dataset.view;
       const r = state.get(panelKey);
-      if (e.code === 'Escape') { if (view === 'destroy') openPanel(panelKey); else closePanel(); }
+      if (e.code === 'Escape') { if (view === 'destroy' || view === 'cede') openPanel(panelKey); else closePanel(); }
       else if (e.code === 'KeyE' && !e.repeat && view === 'main' && r?.o) { const key = panelKey; closePanel(); onEnterHouse?.(key, spotInfo(key)); }
-      else if (/^Digit[1-9]$/.test(e.code) && view === 'main' && (!r?.o || r.o === uid)) {
+      else if (/^Digit[1-9]$/.test(e.code) && view === 'main' && !r?.o) { // solo para adquirir: el modelo no se cambia después
         const c = [...casas.map.values()][Number(e.code.slice(5)) - 1];
         const key = panelKey;
         if (c) { closePanel(); if (state.get(key)?.m !== c.id) claim(key, c.id); }

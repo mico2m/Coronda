@@ -449,7 +449,7 @@ Jugando solo, se guarda en `localStorage`.
 no garantizan guardar para siempre ni impiden que alguien escriba. Para algo serio (lotes que cuestan monedas, que no se puedan robar) hace falta un
 servidor propio que valide, y `lotes.js` ya está separado para eso: solo cambian `publish()` y la entrada de `receive()`.
 
-**Entrar y destruir:** en tu lote, **E** abre el menú: *Entrar a la casa*, cambiar el modelo o *Destruir casa* (pide confirmación: se borra la casa y todo lo que tiene adentro). En el lote de otro, **E** > *Visitar la casa*.
+**Entrar, ceder y destruir:** en tu lote, **E** abre el menú: *Entrar a la casa*, *Ceder lote* o *Destruir casa* (las dos últimas avisan antes: se borra todo lo de adentro). En el lote de otro, **E** > *Visitar la casa*.
 
 **Modo dev (`dev.html`):** cada lote muestra su zona (verde libre · celeste tuyo · rojo de otro). Para borrar el estado de prueba: `localStorage.removeItem('coronda.lotes.solo')` (solo)
 o `coronda.lotes.mios` (online).
@@ -457,13 +457,43 @@ o `coronda.lotes.mios` (online).
 
 ## Interiores de las casas (diseño)
 
-Cada casa de un lote tiene **su propia escena** (`casa_<lote>`). Se crea vacía cuando alguien adquiere el lote y se borra entera cuando el dueño la destruye; si el lote se vuelve a adquirir, el interior arranca de cero (cada casa tiene un id propio). Código: `src/systems/casas.js`.
+Cuando alguien adquiere un lote se crea la escena **`scene_lote<nro>_<dueño>`** (ej. `scene_lote04_mirko`) con el interior vacío. Si el dueño **destruye** la casa o **cede** el lote a otro jugador, todo lo que tenía esa escena se borra (avisa antes). El modelo de casa queda fijo: para cambiarlo hay que destruirla y volver a adquirir el lote. Código: `src/systems/casas.js`.
 
-- **Entrar:** desde el menú del lote (**E**). Todos pueden visitar; solo el dueño diseña. Para salir, la puerta del frente (**E Salir de la casa**): aparecés delante del lote.
-- **El cascarón:** si la casa tiene `"interior": "assets/models/interiores/….glb"` en `data/casas.json`, se usa ese modelo (con piso sólido, un Empty `spawn` donde aparecés y un Empty `salida` en la puerta). Si no, se arma una habitación simple de `"tamano": [ancho, largo, alto]` metros (por defecto 10 × 10 × 3,2).
-- **Muebles:** `data/muebles.json` → `{ "muebles": [{ "id", "nombre", "archivo", "caja": [ancho, alto, largo] }] }`. Los `.glb` van en `assets/models/muebles/` (origen en la base del mueble, al centro). Si el archivo no existe se ve una caja de prueba del tamaño de `caja`. Los `col_…` del mueble chocan.
-- **Modo diseño** (el dueño, adentro): **B** o el botón 🛠. Elegí un mueble y aparece delante tuyo; caminá para llevarlo, **Q**/**R** giran 15°, **clic** o **Enter** lo apoya, **Supr** lo borra, **Esc** cancela. Clic sobre un mueble puesto para moverlo. Se acomodan en una grilla de 25 cm. Máximo 150 por casa.
-- **Se comparte** igual que los lotes: en vivo y guardado en el broker MQTT (`casa~<lote>`). Jugando solo, en el navegador.
+- **Entrar:** desde el menú del lote (**E**). Todos pueden visitar; solo el dueño diseña. Para salir, la puerta (**E Salir de la casa**): aparecés delante del lote.
+- **Adentro** no se ve el techo y la cámara va lejos y desde arriba, con el zoom fijo al máximo, para moverse cómodo.
+- **Ceder:** en tu lote, *Ceder lote* > escribís el nombre del jugador. Pasa a ser suyo con una casa nueva (vacía).
+
+### El interior base (lo modelás vos)
+
+Guardalo en **`assets/models/interiores/interior_base.glb`**. Es la casa vacía que se usa para todos los lotes (si querés uno distinto para cada modelo de casa, poné `"interior": "assets/models/interiores/otro.glb"` en esa casa de `data/casas.json`).
+
+En Blender:
+- **Origen** (0, 0, 0) en el centro del piso. Metros reales.
+- **Piso sólido:** un objeto `col_piso` (o tu piso con la Custom Property `colision` = `malla`). Lo mismo para las paredes (`col_pared…` o `colision`).
+- **Techo:** llamalo `techo` (o `techo_…`): el juego lo oculta para que la cámara vea desde arriba.
+- **Empty `spawn`:** donde aparece el jugador al entrar (la flecha verde = hacia dónde mira).
+- **Empty `salida`:** en la puerta; ahí aparece *E Salir de la casa*.
+- Exportá como siempre (glTF Binary, +Y Up, con Custom Properties). Mientras el archivo no exista se arma una habitación de prueba de 10 × 10 m.
+
+### Los muebles (también los modelás vos)
+
+Cada mueble es un `.glb` aparte en **`assets/models/muebles/`** y se anota en **`data/muebles.json`**:
+
+```json
+{ "muebles": [
+  { "id": "mesa", "nombre": "Mesa", "archivo": "assets/models/muebles/mesa.glb", "caja": [1.4, 0.75, 0.8] }
+] }
+```
+
+- `id`: un nombre corto sin espacios (no lo cambies después: los muebles ya puestos lo usan).
+- `nombre`: lo que se lee en el catálogo del modo diseño.
+- `caja`: ancho, alto y largo en metros. Solo se usa mientras el `.glb` no existe (se ve una caja de ese tamaño).
+- En Blender: **origen en la base del mueble, al centro** (que apoye en el piso en Z = 0), metros reales, el frente mirando hacia **-Y**. Un solo objeto o una colección; si querés que choque, agregale un `col_…` (una caja simple) o la Custom Property `colision` = `caja`.
+- Exportá cada mueble a su archivo: *File → Export → glTF 2.0*, formato **glTF Binary (.glb)**, *Include → Selected Objects*, *+Y Up*. O con el addon GLB autosave: abrí el `.blend` del mueble y en "Otro" elegí `assets/models/muebles/mesa.glb`.
+
+### Modo diseño
+
+Adentro de tu casa: **B** o el botón 🛠. Elegí un mueble y aparece delante tuyo; caminá para llevarlo, **Q**/**R** giran 15°, **clic** o **Enter** lo apoya, **Supr** lo borra, **Esc** cancela. Clic sobre un mueble puesto para moverlo. Se acomodan en una grilla de 25 cm. Máximo 150 por casa. Se comparte igual que los lotes: en vivo y guardado en el broker MQTT (`casa~<lote>`); jugando solo, en el navegador.
 
 ## Servidor: jugadores, nombres, minimapa e inactividad
 
@@ -471,4 +501,5 @@ Cada casa de un lote tiene **su propia escena** (`casa_<lote>`). Se crea vacía 
 - **Nombres únicos:** cada nombre es de un solo jugador. El registro (`nombre~<nombre>` en el broker) se va llenando solo: cuando entrás al servidor tu nombre queda reservado para tu id. Si el nombre ya es de otro, el menú no te deja entrar con él. Nombre vacío = uno automático ("Viajero 4821"). Los lotes son de tu id y se guardan con tu nombre, así que nadie puede quedarse con tu lote poniéndose tu nombre. (Sin cuentas: si borrás los datos del sitio perdés tu id y, con él, tus lotes y tu nombre.)
 - **Minimapa:** arriba a la derecha, el mapa visto desde arriba en baja resolución (norte arriba). Vos sos la flecha amarilla, los otros jugadores los puntos celestes, los lotes libres cuadraditos amarillos y los tuyos celestes. **M** lo muestra u oculta. En `dev.html` aparece con `?minimapa`. Código: `src/ui/minimap.js`.
 - **Inactividad:** 5 minutos sin tocar nada → "¿Seguís ahí?". Si no respondés en 1 minuto, te desconecta del servidor (botón para volver a conectar). Código: `src/ui/afk.js`.
+- **Aviso de actualización:** cada vez que apretás *Enviar a GitHub* en el Studio se escribe `version.json` con una versión nueva (y tu mensaje). Los que tienen el juego abierto lo revisan cada minuto y les aparece *¡Hay una nueva actualización de Coronda!* con el botón *Actualizar*. El mensaje que escribas al enviar se muestra ahí como novedad. Código: `src/ui/update-notice.js`.
 - **Probar con dos jugadores en una PC:** `index.html?mp=local` en dos pestañas (cada pestaña es un jugador distinto).

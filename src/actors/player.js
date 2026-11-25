@@ -176,6 +176,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   const cam = { yaw: 0, pitch: cfg.camera.pitch, dist: cfg.camera.distance };
   const look = { yaw: 0, pitch: 0 };   // flechas: desvío de la mirada (radianes), vuelve solo a 0
   let recenter = null;                 // Z: { from, to, pitchFrom, t }
+  let preset = null;                   // cámara fija por un rato (ej. adentro de una casa): { distance, pitch, locked }
   let keys = {};
   let world = null;   // mundo de colisión de la escena actual (ver collision.js)
   let fallSpeed = 0;  // m/s hacia abajo
@@ -261,6 +262,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   stage.addEventListener('wheel', (e) => {
     if (!active) return;
     e.preventDefault();
+    if (preset?.locked) return; // la distancia está fija (ej. adentro de una casa)
     cam.dist = THREE.MathUtils.clamp(cam.dist * (e.deltaY < 0 ? 0.9 : 1.1), cfg.camera.minDistance, cfg.camera.maxDistance);
   }, { passive: false });
 
@@ -315,6 +317,14 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     loadError,
     get animNotice() { return animNotice; },
     get currentClip() { return currentName; },
+    // Cámara fija (ej. adentro de una casa: lejos y desde arriba, sin zoom). null = la de siempre
+    setCameraPreset(p) {
+      if (!p && !preset) return; // ya estaba la de siempre: no se toca el zoom que eligió el jugador
+      preset = p ?? null;
+      cam.dist = preset?.distance ?? cfg.camera.distance;
+      cam.pitch = preset?.pitch ?? cfg.camera.pitch;
+    },
+    get maxDistance() { return cfg.camera.maxDistance; },
     // Nombre real del clip que se está viendo y hacia dónde mira (para el multijugador)
     get clipName() { return currentClip?.getClip?.().name ?? null; },
     get facing() { return facing; },
@@ -471,7 +481,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
         recenter.t = Math.min(1, recenter.t + dt / Math.max(0.01, cc.recenterTime));
         const k = recenter.t * recenter.t * (3 - 2 * recenter.t);
         cam.yaw = recenter.from + (recenter.to - recenter.from) * k;
-        cam.pitch = recenter.pitchFrom + (cc.pitch - recenter.pitchFrom) * k;
+        cam.pitch = recenter.pitchFrom + ((preset?.pitch ?? cc.pitch) - recenter.pitchFrom) * k;
         if (recenter.t >= 1) recenter = null;
       } else if (moving && cc.follow > 0 && !dragging) {
         // Caminando te sigue de atrás de a poco; si venís hacia la cámara no da la vuelta

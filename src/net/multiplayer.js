@@ -288,6 +288,15 @@ export async function connectServer(roomId = 'coronda') {
     if (!room.status) return true; // prueba local entre pestañas
     return namesSince > 0 && performance.now() - namesSince > 2500;
   };
+  // Busca a un jugador por su nombre (registro de nombres o conectado ahora): { u: id, n: nombre } o null
+  net.findPlayer = (name) => {
+    const k = net.normName(name);
+    if (!k) return null;
+    const r = names.get(k);
+    if (r) return { u: r.u, n: r.n || name };
+    for (const p of peers.values()) if (p.data?.u && net.normName(p.data.n) === k) return { u: p.data.u, n: p.data.n };
+    return null;
+  };
   // Un nombre libre de la forma "Viajero 1234"
   net.freeName = (base = 'Viajero') => {
     for (let i = 0; i < 50; i++) { const n = `${base} ${Math.floor(1000 + Math.random() * 9000)}`; if (net.checkName(n) === 'libre') return n; }

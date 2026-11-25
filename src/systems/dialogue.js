@@ -53,12 +53,20 @@ function el(tag, className, parent) {
 //   ended(entry)           -> al terminar la charla
 //   choiceOk(choice, entry) -> false esconde esa opción (ej. "Decile algo" cuando la IA está descansando)
 //   ask(entry, texto)      -> Promise<{ text, choices? }>: nodo { "ask": true }: el jugador escribe y el NPC contesta
+//   dynamic(entry, nombre) -> { nodes, start } | { close: true } (o una Promise): nodo { "dinamico": "nombre" }; los nodos
+//                             se arman en el momento (ej. el catálogo de la tienda con lo que tenés en la mochila)
+//   idle(entry)            -> { secs, wait, msg } | null: si el jugador no avanza la charla en `secs` segundos, se corta
+//                             y no puede volver a hablarle hasta `wait` segundos después (muestra `msg`)
 export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, hooks = {} }) {
   const host = stage.parentElement;
   let entries = [];     // NPC con algo para decir
   let near = null;      // NPC al alcance
   let busy = false;     // cargando el archivo del diálogo
   let cooldownUntil = 0;
+  let lastInput = 0; // última vez que el jugador tocó algo (o apareció texto nuevo) en la charla
+  const touch = () => { lastInput = performance.now(); };
+  window.addEventListener('keydown', () => { if (s) touch(); }, true);
+  window.addEventListener('pointerdown', () => { if (s) touch(); }, true);
   const focus = { x: 0, y: 0, z: 0 };
   let s = null;         // conversación en curso
 
@@ -198,6 +206,26 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
     return pick;
   }
 
+  // Nodo armado en el momento (hooks.dynamic): mientras se arma dice "…"
+  async function runDynamic(name) {
+    const my = s;
+    let r = null;
+    try {
+      r = hooks.dynamic(s.entry, name);
+      if (r && typeof r.then === 'function') {
+        s.node = normalize({ text: '…' });
+        s.pages = [{ ...textbox.paginate('…', 0)[0] }];
+        s.page = 0;
+        showPage();
+        r = await r;
+      }
+    } catch (err) { console.error(err); r = null; }
+    if (s !== my) return;
+    if (!r || r.close) { end(); return; }
+    Object.assign(s.script.nodes, r.nodes ?? {});
+    goto(r.start);
+  }
+
   function goto(id, hops = 0) {
     let raw = s.script.nodes[id];
     if (!raw) { console.warn(`Diálogo: no existe el nodo "${id}".`); end(); return; }
@@ -213,6 +241,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
     }
     if (raw.set && typeof raw.set === 'object') for (const [k, v] of Object.entries(raw.set)) flags.set(k, v);
     if (raw.ask && hooks.ask) { openAsk(raw); return; }
+    if (raw.dinamico && hooks.dynamic) { runDynamic(String(raw.dinamico)); return; }
     s.node = normalize(raw);
     if (raw.anim !== undefined) npcs.play(s.entry, raw.anim); // sin "anim" sigue la que estaba
     // Cada página del texto se parte en las cajas que hagan falta (4 renglones). La última deja lugar a las opciones.
@@ -232,6 +261,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
   }
 
   function showPage() {
+    touch();
     const pg = s.pages[s.page];
     if (pg.anim !== undefined) npcs.play(s.entry, pg.anim);
     s.count = pg.count;
@@ -429,6 +459,14 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
         // Si el NPC se va (o el jugador se aleja) lo suficiente, la charla se corta sola
         const hp = s.entry.holder.position;
         if (Math.hypot(p.x - hp.x, p.z - hp.z) > Math.max(s.entry.talk.radius * 2, 6)) { end(); return; }
+        // Si el jugador no avanza la charla, se corta y tiene que esperar unos segundos (hooks.idle)
+        const idle = hooks.idle?.(s.entry);
+        if (idle?.secs > 0 && performance.now() - lastInput > idle.secs * 1000) {
+          end();
+          cooldownUntil = performance.now() + (idle.wait ?? 5) * 1000;
+          if (idle.msg) onError?.(idle.msg);
+          return;
+        }
         textbox.update(dt);
         if (s.shown < s.count) {
           const before = Math.floor(s.shown);

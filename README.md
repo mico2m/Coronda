@@ -575,3 +575,16 @@ En `dev.html` está en la consola como `inventario` (ej. `inventario.add('recurs
 - **Escena:** `data/scenes/bosque_coronda.json` + `assets/models/worlds/Bosque_Coronda.glb`. Es provisoria: la genera `blender -b -P blender/generar_bosque.py` (también deja `blender/bosque_coronda.blend` para editarla). Para la tuya, conservá los nombres: `arbol_001`, `arbol_002`… (cada árbol; adentro, lo que se llame `*_tocon` queda al talarlo y el resto desaparece), `col_arbol_…` (colisión del tronco), `spawn`, `cartel_volver`, `col_suelo`.
 - **Talar:** acercate a un árbol → **E Talar**. El personaje hace su clip `talar` (si no lo tiene, el árbol igual se sacude). Cada 3 golpes da 2 de madera; después de 3 tandas el árbol se cae y vuelve a crecer a los 5 minutos. Los árboles caídos son los mismos para todo el servidor.
 - **Configuración:** `data/tables/bosque.json` (`golpes_por_tanda`, `madera_por_tanda`, `tandas_por_arbol`, `rebrote_minutos`, `animacion`, `radio`). Código: `src/systems/bosque.js`. Sirve en cualquier escena que tenga objetos `arbol_…`.
+
+## La Carpintería: pedidos de muebles
+
+Claude atiende la tienda y fabrica muebles a cambio de madera. Código: `src/systems/tienda.js` (+ `claude-npc.js` para moverlo).
+
+- **Encargar:** hablale en el mostrador → *Encargar o retirar muebles* → *Encargar un mueble* → elegís y pagás con madera de la mochila. Precio y tiempo de cada mueble: `data/muebles.json` (`costo`, `tiempo_min`).
+- **Fila:** se fabrica por orden de pedido, de a uno. Cada pedido ocupa un lugar de la grilla del taller (`slot_01…50`) con una caja, el nombre del cliente, el mueble y una barra de progreso; cuando está listo aparece el mueble. El que se está haciendo se ve en `banco_obra`, creciendo, y Claude martillando al lado (animación `work`) si nadie lo espera en el mostrador.
+- **Mismos pedidos para todos:** se guardan como los lotes (`tienda~<id>`) y el progreso sale del reloj, así no depende de quién esté conectado.
+- **Retirar:** *Retirar mis pedidos* → uno o **todos**. Claude va al slot de cada uno, lo trae en brazos (animación `carry`) y te lo da: pasa a tu mochila. Mientras, nadie más le puede hablar.
+- **Charla de a uno:** si otro le habla, aparece *Claude está hablando con …*. Si no avanzás la charla en `inactividad_seg` (20 s), se corta y tenés que esperar `espera_seg` (5 s). Config: `data/tables/tienda.json`.
+- **Horario:** `data/tables/tiempo.json > tienda` (de 8 a 20). Cerrada, Claude no toma pedidos. Al cerrar sale a dejar una nota en el buzón (`lote_X_buzon`, o delante del lote) de cada dueño con pedidos listos, durante `reparto_horas`; si no le alcanza, sigue al día siguiente. En tu buzón: **E Leer la nota**. Sin casa no hay nota: hay que pasar a preguntar.
+- **Diálogos armados en el momento:** un nodo `{ "dinamico": "tienda_menu" }` le pide los nodos a la tienda (catálogo con tu madera, tus pedidos, etc.). Sirve para cualquier sistema (ver `hooks.dynamic` en `dialogue.js`).
+- **Consola:** `corondaClaude.state`, `coronda.getTienda().pedidos()` (en `dev.html`).

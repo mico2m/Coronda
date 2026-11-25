@@ -628,6 +628,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     get inside() { return inside; },
     get designing() { return design; },
     get music() { return music.state; },
+    // Un mueble del catálogo listo para poner en el mundo (lo usa la tienda: slots, banco de trabajo, lo que lleva Claude)
+    modelo(m) { return makeItem({ m, i: `tienda_${m}` }); },
     // Se destruyó la casa (lotes.js): se borra su interior para todos
     clear(key) {
       const cur = records.get(key);

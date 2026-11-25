@@ -109,6 +109,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
       choiceOk: (c) => claudeNpc?.choiceOk(c) ?? c?.needs !== 'ia',
       ask: (e, t) => claudeNpc?.ask(e, t) ?? Promise.resolve({ text: '…' }),
       greeting: (e) => claudeNpc?.greeting(e) ?? null,
+      dynamic: (e, name) => tienda?.dynamic(e, name) ?? null, // nodos de la tienda (catálogo, pedidos, retirar)
+      idle: (e) => tienda?.idle(e) ?? null,                   // si no avanzás la charla con Claude, se corta
     },
   });
 
@@ -155,7 +157,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     doors?.update(focus, feetY);
     lotes?.update(focus, feetY, dt); // después de las puertas: si hay una puerta cerca, la E es de ella
     casas?.update(focus);
-    tienda?.update(focus);
+    tienda?.update(focus, dt);
     tiempo?.update(dt);
     bosque?.update(mode === 'player' && player ? player.position : null, dt);
     minimap?.update({
@@ -351,7 +353,6 @@ export async function startGame({ dev = false, retro = null } = {}) {
       blocked: () => dialogue?.blocked ?? false,
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
     });
-    tienda = createTienda({ getRoot: () => sceneManager.root });
     // Hora del juego, día y noche y reloj (la misma hora para todos: sale del reloj de la compu)
     tiempo = createTiempo({ scene, stage, dev, getSceneData: () => sceneManager.current, getBaseShade: () => sceneManager.shade });
     window.corondaTiempo = tiempo;
@@ -382,6 +383,13 @@ export async function startGame({ dev = false, retro = null } = {}) {
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
       blocked: () => (dialogue?.blocked ?? false) || (lotes?.blocked ?? false),
       onChange: () => { rebuildCollision(); minimap?.capture(sceneManager.root); },
+    });
+    // La Carpintería de Claude: pedidos de muebles a cambio de madera, retiro y notas en los buzones (ver systems/tienda.js)
+    tienda = createTienda({
+      stage, net, claude: claudeNpc, inventario, tiempo, lotes, casas, myName: choice?.name ?? 'Viajero', myUid: lotes.uid,
+      getRoot: () => sceneManager.root, getSceneId: () => sceneManager.current?.id ?? null,
+      getPlayer: () => (mode === 'player' ? player : null),
+      notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 4500); },
     });
     async function travel(go, text) {
       player.frozen = true;

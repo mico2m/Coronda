@@ -246,6 +246,7 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
   .chat-open { display: block; }
 }
 .talking .chat-form { display: none; }
+.talking .chat { visibility: hidden; } /* hablando con un NPC: el 💬 y los mensajes no tapan la caja de diálogo; vuelven al terminar */
 
 /* ---------- Pantalla de carga (src/ui/boot.js) ---------- */
 .boot {
@@ -458,6 +459,25 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .inv-n { font-variant-numeric: tabular-nums; }
 .inv-empty { opacity: 0.55; font-style: italic; }
 @media (pointer: coarse) { .inv-btn { top: 160px; } .inv-panel { top: 210px; } }
+/* Compu: menú al centro estilo Minecraft (inventario.js le pone .inv-central) */
+.inv-panel.inv-central { position: absolute; inset: 0; top: 0; right: 0; width: auto; max-height: none; z-index: 30; padding: 0; border: 0; border-radius: 0; box-shadow: none; overflow: hidden;
+  display: grid; place-items: center; background: rgba(8, 10, 12, 0.55); color: #3f3f3f; }
+.inv-panel.inv-central[hidden] { display: none; }
+.inv-mc { --slot: 44px; padding: 10px 12px 12px; background: #c6c6c6; border: 3px solid; border-color: #ffffff #555555 #555555 #ffffff; outline: 2px solid #1d1d1d; border-radius: 4px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55); max-height: calc(100% - 40px); overflow: auto; user-select: none; }
+.inv-mc-head { display: flex; justify-content: space-between; align-items: center; font: 700 16px var(--font-display); color: #3f3f3f; }
+.inv-mc .inv-x { color: #3f3f3f; }
+.inv-mc-sec { margin: 8px 0 4px; font: 600 13px var(--font-display); color: #3f3f3f; }
+.inv-grid { display: grid; grid-template-columns: repeat(9, var(--slot)); gap: 0; }
+.inv-slot { position: relative; width: var(--slot); height: var(--slot); background: #8b8b8b; border: 2px solid; border-color: #373737 #ffffff #ffffff #373737; display: grid; place-items: center; box-sizing: border-box; }
+.inv-slot.lleno:hover { background: #a8a8a8; }
+.inv-slot .inv-ico { width: auto; font-size: 24px; line-height: 1; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.25)); }
+.inv-slot .inv-n { position: absolute; right: 2px; bottom: 0; font: 700 14px var(--font-display); color: #fff; text-shadow: 2px 2px 0 #3f3f3f; }
+.inv-mc-pie { margin-top: 8px; font-size: 11px; color: #555; text-align: right; }
+.inv-tip { position: absolute; z-index: 31; pointer-events: none; padding: 4px 8px; white-space: nowrap; font: 600 13px var(--font-display); color: #fff;
+  background: rgba(16, 0, 16, 0.94); border: 2px solid #2a0a5e; border-radius: 3px; }
+.inv-tip[hidden] { display: none; }
+@media (max-height: 560px) { .inv-mc { --slot: 36px; } }
 
 /* ---------- Reloj del juego (src/systems/tiempo.js): arriba a la izquierda ---------- */
 .reloj { position: absolute; top: 12px; left: 12px; z-index: 4; display: flex; align-items: baseline; gap: 7px; padding: 6px 12px; border-radius: 999px;
@@ -470,6 +490,12 @@ body:has(.talking) .reloj { opacity: 0.4; }
 
 /* ---------- Talar (src/systems/bosque.js) ---------- */
 .tala-prompt small { margin-left: 6px; opacity: 0.75; font-size: 0.8em; }
+.tala-prompt .tala-ico { font-size: 1.15em; line-height: 1; }
+.tala-prompt.busy { opacity: 0.55; pointer-events: none; } /* dando el hachazo */
+.tala-prompt .tala-res { margin-left: 6px; font: 700 0.8em var(--font-body); color: #fde047; }
+.tala-prompt .tala-res.poca { color: #fb923c; }
+.tala-prompt .tala-res.vacia { color: #f87171; }
+.tala-prompt.agotado { opacity: 0.6; filter: grayscale(0.6); } /* sin resistencia: se toca y avisa cuándo se recupera */
 .tala-pop { position: absolute; left: 50%; top: 38%; z-index: 6; transform: translate(-50%, 0); pointer-events: none;
   padding: 6px 14px; border-radius: 999px; background: rgba(12, 20, 26, 0.88); color: #ffe7a8; font: 700 18px var(--font-body); letter-spacing: 0.04em; }
 .tala-pop[hidden] { display: none; }
@@ -480,3 +506,126 @@ body:has(.talking) .reloj { opacity: 0.4; }
 .casa-cat button[disabled] { opacity: 0.45; cursor: not-allowed; }
 .casa-cat button small { opacity: 0.8; font-weight: 600; }
 .casa-hint { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+
+/* ---------- Chat de voz (systems/voz.js) y menú de Esc (ui/menu.js) ---------- */
+.voz-btn, .menu-btn { position: absolute; z-index: 3; width: 44px; height: 44px; padding: 0; font-size: 20px; line-height: 1; border-radius: 50%;
+  background: var(--panel); border: 1px solid var(--line); cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); touch-action: none; user-select: none; -webkit-user-select: none; }
+.voz-btn.apagado { opacity: 0.55; filter: grayscale(1); }
+.voz-btn.apagado::after { content: ""; position: absolute; left: 9px; right: 9px; top: 50%; height: 3px; border-radius: 2px; background: #e5484d; transform: rotate(-45deg); }
+.voz-btn.al-aire { background: #2fbf71; border-color: #1f8f53; box-shadow: 0 0 0 4px rgba(47, 191, 113, 0.35), 0 2px 8px rgba(0, 0, 0, 0.3); }
+.menu-btn { display: none; }
+.menu-esc { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(8, 10, 12, 0.6); padding: 16px; box-sizing: border-box; }
+.menu-esc[hidden] { display: none; }
+.menu-card { width: min(420px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box; padding: 16px 18px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5); font: 500 14px var(--font-body); color: var(--ink, inherit); }
+.menu-head { display: flex; justify-content: space-between; align-items: center; font: 700 20px var(--font-display); }
+.menu-x { padding: 2px 8px; border: 0; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
+.menu-card h3 { margin: 12px 0 2px; font: 700 15px var(--font-display); }
+.menu-nota { margin: 0 0 8px; font-size: 12.5px; opacity: 0.75; }
+.menu-sub { margin: 10px 0 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.65; }
+.menu-modos { display: grid; gap: 6px; }
+.menu-modo { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.menu-modo.sel { border-color: #2fbf71; box-shadow: inset 0 0 0 1px #2fbf71; }
+.menu-modo input { margin-top: 3px; accent-color: #2fbf71; }
+.menu-modo span { display: grid; gap: 2px; }
+.menu-modo small { font-size: 12px; opacity: 0.7; }
+.menu-nivel { height: 6px; margin: 8px 0 4px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.menu-nivel i { display: block; height: 100%; width: 0; background: #9aa5a8; transition: width 0.1s linear; }
+.menu-nivel.al-aire i { background: #2fbf71; }
+.menu-nivel.off { opacity: 0.35; }
+.menu-fila { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; cursor: pointer; }
+.menu-fila input[type="checkbox"] { order: -1; accent-color: #2fbf71; }
+.menu-fila:has(input[type="checkbox"]) { justify-content: flex-start; }
+.menu-fila input[type="range"] { flex: 1; max-width: 180px; accent-color: #2fbf71; }
+.menu-par { padding: 3px 0; }
+.menu-volver { display: block; width: 100%; margin-top: 14px; padding: 10px; border-radius: 10px; border: 0; background: #2fbf71; color: #fff; font: 700 15px var(--font-body); cursor: pointer; }
+
+/* ---------- Ubicación del HUD (va al final: pisa las posiciones de arriba) ----------
+   Respeta las zonas seguras del celular (notch, barra de inicio del iPhone, bordes redondeados): --edge-* es el margen
+   de cada lado, nunca menos de 12px. Columna derecha: minimapa y, debajo, 👥 y 🎒 lado a lado y centrados.
+   Abajo a la izquierda: joystick y 🎥 (ver ui/touch-controls.js); el chat va arriba del joystick, o al lado en horizontal. */
+:root {
+  --edge-t: max(12px, env(safe-area-inset-top, 0px));
+  --edge-r: max(12px, env(safe-area-inset-right, 0px));
+  --edge-b: max(12px, env(safe-area-inset-bottom, 0px));
+  --edge-l: max(12px, env(safe-area-inset-left, 0px));
+  --map: 132px; /* tamaño del minimapa */
+}
+.reloj { top: var(--edge-t); left: var(--edge-l); }
+.minimap { top: var(--edge-t); right: var(--edge-r); width: var(--map); height: var(--map); box-sizing: border-box; }
+.casa-music { top: calc(var(--edge-t) + 42px); left: var(--edge-l); }
+.casa-ui { top: var(--edge-t); }
+.update-notice { top: max(14px, env(safe-area-inset-top, 0px)); }
+.actions { right: var(--edge-r); bottom: var(--edge-b); }
+.chat { left: var(--edge-l); bottom: var(--edge-b); }
+.inv-btn { top: calc(var(--edge-t) + var(--map) + 10px); right: calc(var(--edge-r) + (var(--map) - 44px) / 2); }
+.inv-panel { top: calc(var(--edge-t) + var(--map) + 62px); right: var(--edge-r); max-height: calc(100% - var(--map) - 90px); }
+.voz-btn { top: calc(var(--edge-t) + var(--map) + 62px); right: calc(var(--edge-r) + (var(--map) - 44px) / 2); } /* debajo de 🎒 */
+@media (pointer: coarse) {
+  /* 👥 a la izquierda y 🎒 a la derecha, los dos debajo del minimapa */
+  .players-open, .inv-btn { top: calc(var(--edge-t) + var(--map) + 10px); width: 44px; height: 44px; padding: 0; font-size: 20px; line-height: 1;
+    display: grid; place-items: center; border-radius: 50%; }
+  .players-open { right: calc(var(--edge-r) + var(--map) / 2 + 6px); }
+  .inv-btn { right: calc(var(--edge-r) + var(--map) / 2 - 50px); }
+  .app:not(:has(.players-open)) .inv-btn { right: calc(var(--edge-r) + (var(--map) - 44px) / 2); } /* sin 👥 (jugando solo): 🎒 centrada */
+  /* 🎙️ y ⚙️ en una segunda fila, debajo de 👥 y 🎒 */
+  .voz-btn, .menu-btn { top: calc(var(--edge-t) + var(--map) + 62px); }
+  .voz-btn { right: calc(var(--edge-r) + var(--map) / 2 + 6px); }
+  .menu-btn { display: grid; place-items: center; right: calc(var(--edge-r) + var(--map) / 2 - 50px); }
+  .app:not(:has(.voz-btn)) .menu-btn { right: calc(var(--edge-r) + (var(--map) - 44px) / 2); } /* jugando solo: ⚙️ centrado */
+  .inv-panel { top: calc(var(--edge-t) + var(--map) + 114px); max-height: calc(100% - var(--map) - 140px); }
+  .pad { left: env(safe-area-inset-left, 0px); bottom: env(safe-area-inset-bottom, 0px); }
+  .chat { bottom: calc(var(--edge-b) + 160px); } /* arriba del joystick */
+  .chat-open { width: 44px; height: 44px; font-size: 20px; }
+}
+/* Celular en horizontal (poca altura): minimapa más chico y el chat al lado del 🎥, no arriba del joystick */
+@media (pointer: coarse) and (max-height: 500px) {
+  :root { --map: 108px; }
+  .chat { bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); left: calc(var(--edge-l) + 228px); width: min(360px, calc(100% - var(--edge-l) - var(--edge-r) - 240px)); }
+  .reloj { padding: 4px 10px; }
+}
+
+/* ---------- Avisos de interactuar en el celular ("Ir al Bosque", "Talar", "Hablar", "Salir de la casa"…) ----------
+   En el celular se tocan, así que no se muestra la tecla E: una píldora compacta, solo el texto, con borde turquesa
+   (se ve que es un botón), en una sola línea (si es muy largo termina en "…") y más arriba que el joystick, el 🎥 y el 💬. */
+@media (pointer: coarse) {
+  .door-prompt, .talk-prompt {
+    display: block; bottom: calc(var(--edge-b) + 24%); max-width: min(70vw, 320px); padding: 9px 18px; border-radius: 999px;
+    border: 1.5px solid var(--accent); font: 600 15px var(--font-body); text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; touch-action: manipulation;
+  }
+  .door-prompt kbd, .talk-prompt kbd { display: none; }
+  .door-prompt.lote-prompt { bottom: calc(var(--edge-b) + 34%); }
+  .door-prompt.lote-prompt.passive { border-color: var(--line); } /* solo informa, no se toca */
+}
+@media (pointer: coarse) and (max-height: 500px) {
+  .door-prompt, .talk-prompt { bottom: calc(var(--edge-b) + 84px); }
+  .door-prompt.lote-prompt { bottom: calc(var(--edge-b) + 136px); }
+}
+
+/* ---------- Talar en el celular: botón redondo 🪓 (src/systems/bosque.js) ----------
+   Aparece al acercarte a un árbol, en el mismo lugar que los demás avisos. Se toca para dar cada hachazo; la etiqueta
+   de abajo es el progreso del árbol (tandas). */
+@media (pointer: coarse) {
+  .door-prompt.tala-prompt:not([hidden]) {
+    display: grid; place-items: center; width: 72px; height: 72px; max-width: none; padding: 0; border-radius: 50%;
+    border-width: 2px; overflow: visible; font-size: 0; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); transition: transform 0.08s;
+  }
+  .tala-prompt .tala-ico { font-size: 36px; }
+  .tala-prompt .tala-txt { display: none; }
+  .tala-prompt small {
+    position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); margin: 0; padding: 1px 7px; border-radius: 999px;
+    font: 700 11px var(--font-body); background: var(--accent); color: var(--accent-fg); opacity: 1;
+  }
+  .door-prompt.tala-prompt:active { transform: translateX(-50%) scale(0.9); }
+  .tala-prompt .tala-res { position: absolute; top: -8px; right: -10px; margin: 0; padding: 1px 6px; border-radius: 999px;
+    font: 700 11px var(--font-body); background: #1f2937; border: 1.5px solid currentColor; }
+}
+
+/* ---------- Anuncio del admin (src/systems/admin.js) ---------- */
+.admin-anuncio { position: absolute; left: 50%; top: calc(var(--edge-t) + 56px); transform: translateX(-50%); z-index: 6;
+  max-width: min(86vw, 560px); padding: 10px 18px; border-radius: 12px; background: rgba(15, 23, 42, 0.92); color: #fde68a;
+  border: 2px solid #f59e0b; font: 700 16px var(--font-body); text-align: center; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  pointer-events: none; animation: admin-in 0.25s ease-out; }
+.admin-anuncio[hidden] { display: none; }
+@keyframes admin-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }

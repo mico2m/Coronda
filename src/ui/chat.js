@@ -4,7 +4,7 @@
 const SHOW_SECS = 12;   // s que queda visible cada mensaje en la lista
 const MAX_LINES = 7;
 
-export function createChat({ net, myName, blocked = () => false }) {
+export function createChat({ net, myName, blocked = () => false, onCommand = null }) {
   const app = document.querySelector('.app') ?? document.body;
   const box = document.createElement('div');
   box.className = 'chat';
@@ -64,7 +64,10 @@ export function createChat({ net, myName, blocked = () => false }) {
   }
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const sent = net.say(input.value);
+    const text = input.value;
+    // "/algo" = comando (ver systems/admin.js): nunca se manda al chat de los demás
+    if (text.trim().startsWith('/')) { hide(); onCommand?.(text); return; }
+    const sent = net.say(text);
     if (sent) add(myName, sent, true);
     hide();
   });

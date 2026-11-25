@@ -9,17 +9,20 @@
 //   rebrote_minutos    minutos reales hasta que vuelve a crecer         (5)
 //   animacion          clip del personaje al talar ("talar"; si tu personaje no lo tiene, el árbol igual se sacude)
 //   radio              a cuántos metros del tronco aparece "E Talar"
+//   resistencia_por_dia hachazos que podés dar por día del juego (30). Se recupera al empezar el día siguiente (00:00,
+//                      data/tables/tiempo.json). Se ve en el botón 🪓 (⚡) y se guarda en el navegador. 0 = sin límite.
 // Los árboles caídos son los mismos para todo el servidor (se guardan como los lotes: bosque~<escena>.<árbol>).
 import * as THREE from 'three';
 import { loadJSON } from '../core/assets.js';
 
-export const BOSQUE_DEFAULT = { golpes_por_tanda: 3, madera_por_tanda: 2, tandas_por_arbol: 3, rebrote_minutos: 5, animacion: 'talar', radio: 1.6, recurso: 'madera' };
+export const BOSQUE_DEFAULT = { golpes_por_tanda: 3, madera_por_tanda: 2, tandas_por_arbol: 3, rebrote_minutos: 5, animacion: 'talar', radio: 1.6, recurso: 'madera', resistencia_por_dia: 30 };
+const RES_KEY = 'coronda.bosque.resistencia'; // { dia, usados }
 const TREE_RE = /^arbol_\d+$/i;
 const STUMP_RE = /_tocon/i;
 const _v = new THREE.Vector3();
 
-// opts: stage, net, getRoot(), getSceneId(), getPlayer(), inventario, blocked(), notify(msg)
-export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer, inventario, blocked = () => false, notify = () => {} }) {
+// opts: stage, net, getRoot(), getSceneId(), getPlayer(), inventario, tiempo (reloj del juego), blocked(), notify(msg)
+export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer, inventario, tiempo = null, blocked = () => false, notify = () => {} }) {
   let cfg = { ...BOSQUE_DEFAULT };
   loadJSON('data/tables/bosque.json').then((c) => setConfig(c)).catch(() => {});
   function setConfig(c) {
@@ -28,6 +31,30 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     for (const k of ['golpes_por_tanda', 'madera_por_tanda', 'tandas_por_arbol']) cfg[k] = Math.max(1, Math.round(Number(cfg[k]) || BOSQUE_DEFAULT[k]));
     cfg.rebrote_minutos = Math.max(0.1, Number(cfg.rebrote_minutos) || BOSQUE_DEFAULT.rebrote_minutos);
     cfg.radio = Math.max(0.5, Number(cfg.radio) || BOSQUE_DEFAULT.radio);
+    cfg.resistencia_por_dia = Math.max(0, Math.round(Number(cfg.resistencia_por_dia ?? BOSQUE_DEFAULT.resistencia_por_dia) || 0));
+  }
+
+  // ---------- Resistencia: hachazos por día del juego ----------
+  const hoy = () => (tiempo ? tiempo.dia() : Math.floor(Date.now() / 864e5));
+  let res = { dia: hoy(), usados: 0 };
+  try { const g = JSON.parse(localStorage.getItem(RES_KEY)); if (g && Number.isFinite(g.dia)) res = { dia: g.dia, usados: Math.max(0, Number(g.usados) || 0) }; } catch { /* nada */ }
+  function quedan() {
+    if (!cfg.resistencia_por_dia) return Infinity;
+    if (res.dia !== hoy()) res = { dia: hoy(), usados: 0 }; // día nuevo: resistencia llena
+    return Math.max(0, cfg.resistencia_por_dia - res.usados);
+  }
+  function gastar() {
+    if (!cfg.resistencia_por_dia) return;
+    quedan(); res.usados++;
+    try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ }
+  }
+  // Cuándo se recupera: "a las 00:00 (en 7 minutos)" según el reloj del juego
+  function recupera() {
+    if (!tiempo) return 'mañana';
+    const ms = tiempo.hastaHora(0);
+    const min = Math.max(1, Math.round(ms / 60000));
+    return `a las 00:00 del juego (en ${min} minuto${min > 1 ? 's' : ''})`;
+  }
   }
 
   // ---------- Árboles de la escena ----------
@@ -80,7 +107,9 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
   const prompt = document.createElement('button');
   prompt.type = 'button';
   prompt.className = 'door-prompt tala-prompt';
+  prompt.setAttribute('aria-label', 'Talar');
   prompt.hidden = true;
+  let promptHtml = ''; // se reescribe solo si cambia: rehacerlo en cada cuadro hace perder toques en el celular
   stage.appendChild(prompt);
   const pop = document.createElement('div');
   pop.className = 'tala-pop';
@@ -106,8 +135,9 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     const t = near;
     const player = getPlayer?.();
     if (!t || busy || !player || isDown(t)) return;
-    busy = true;
-    prompt.hidden = true;
+    if (quedan() <= 0) { toast('😮‍💨 Sin fuerzas'); notify(`Estás agotado: no podés talar más hoy. Recuperás la resistencia ${recupera()}.`); return; }
+    gastar();
+    busy = true; // el botón sigue a la vista, atenuado, mientras da el hachazo
     const face = { x: t.pos.x, z: t.pos.z };
     let ok = false;
     try { ok = await player.interact(cfg.animacion, { face, wait: 0.55 }); } catch { ok = false; }
@@ -121,6 +151,9 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
       toast(`+${cfg.madera_por_tanda} 🪵 ${cfg.recurso === 'madera' ? 'madera' : cfg.recurso}`);
       if (t.tandas >= cfg.tandas_por_arbol) { fell(t); toast(`¡Cayó el árbol! +${cfg.madera_por_tanda} 🪵`); }
     } else toast(`${'●'.repeat(t.hits)}${'○'.repeat(cfg.golpes_por_tanda - t.hits)}`);
+    const q = quedan();
+    if (q === 0) setTimeout(() => notify(`Te quedaste sin fuerzas por hoy. Recuperás la resistencia ${recupera()}.`), 900);
+    else if (q === 5) setTimeout(() => notify('Te quedan 5 hachazos por hoy ⚡'), 900);
     busy = false;
   }
 
@@ -139,8 +172,17 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
       if (d < bd) { bd = d; best = t; }
     }
     near = best && bd <= cfg.radio + 0.4 && !blocked() ? best : null;
-    const show2 = !!near && !busy && !!getPlayer?.();
-    if (show2) prompt.innerHTML = `<kbd>E</kbd> Talar <small>${near.tandas}/${cfg.tandas_por_arbol}</small>`;
+    const show2 = !!near && !!getPlayer?.();
+    if (show2) {
+      // 🪓 = botón: en la PC "🪓 E Talar 1/3"; en el celular un botón redondo con el hacha y el progreso (ver css .tala-prompt)
+      // ⚡ = hachazos que te quedan hoy (resistencia)
+      const q = quedan();
+      const energia = Number.isFinite(q) ? `<b class="tala-res${q === 0 ? ' vacia' : q <= 5 ? ' poca' : ''}" title="Hachazos que te quedan hoy">⚡${q}</b>` : '';
+      const html = `<span class="tala-ico" aria-hidden="true">🪓</span><kbd>E</kbd><span class="tala-txt">${q === 0 ? 'Sin fuerzas' : 'Talar'}</span><small>${near.tandas}/${cfg.tandas_por_arbol}</small>${energia}`;
+      if (html !== promptHtml) { prompt.innerHTML = html; promptHtml = html; }
+    }
+    prompt.classList.toggle('busy', busy);
+    prompt.classList.toggle('agotado', show2 && quedan() === 0);
     prompt.hidden = !show2;
   }
 
@@ -148,6 +190,8 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     update, setConfig,
     get config() { return { ...cfg }; },
     get near() { return !!near; },
+    recargar() { res = { dia: hoy(), usados: 0 }; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }, // (admin)
+    get resistencia() { const q = quedan(); return { quedan: Number.isFinite(q) ? q : null, max: cfg.resistencia_por_dia, dia: res.dia }; },
     get trees() { return trees.map((t) => ({ id: t.id, caido: isDown(t), hasta: fallen.get(t.key) ?? 0 })); },
   };
 }

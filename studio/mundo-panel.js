@@ -25,6 +25,7 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {} }) {
       <label>Madera por tanda <input type="number" min="1" max="100" step="1" data-k="madera_por_tanda"></label>
       <label>Tandas hasta que cae <input type="number" min="1" max="50" step="1" data-k="tandas_por_arbol"></label>
       <label>Vuelve a crecer (min) <input type="number" min="0.1" max="600" step="0.5" data-k="rebrote_minutos"></label>
+      <label>Hachazos por día (0 = sin límite) <input type="number" min="0" max="999" step="1" data-k="resistencia_por_dia"></label>
       <label>Animación del personaje <input type="text" data-k="animacion"></label>
     </form>
     <form class="mp-sec" data-f="tienda"><b>Carpintería</b>

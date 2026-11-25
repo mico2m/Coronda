@@ -1,9 +1,10 @@
 // Cámara libre: mirar arrastrando, moverse con WASD, subir con Espacio, bajar con Shift.
-// La rueda del mouse cambia la velocidad. En pantallas táctiles se usan los botones de `pad`.
+// La rueda del mouse cambia la velocidad. En pantallas táctiles: el joystick (`touch`, ver ui/touch-controls.js)
+// mueve y los botones ▲ ▼ de `pad` suben y bajan.
 
 const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight']);
 
-export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
+export function createCameraControls(camera, stage, { pad, touch = null, speedOut } = {}) {
   camera.rotation.order = 'YXZ';
   let yaw = 0;
   let pitch = -0.2;
@@ -25,8 +26,9 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
   });
   stage.addEventListener('pointermove', (e) => {
     if (!enabled || !dragging) return;
-    yaw -= (e.clientX - lastX) * 0.004;
-    pitch -= (e.clientY - lastY) * 0.004;
+    const k = e.pointerType === 'touch' ? 0.007 : 0.004; // con el dedo, más sensible
+    yaw -= (e.clientX - lastX) * k;
+    pitch -= (e.clientY - lastY) * k;
     pitch = Math.max(-1.5, Math.min(1.5, pitch));
     lastX = e.clientX;
     lastY = e.clientY;
@@ -57,7 +59,7 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
   }, { passive: false });
 
   // Botones táctiles
-  pad?.querySelectorAll('button').forEach((b) => {
+  pad?.querySelectorAll('button[data-key]').forEach((b) => {
     const k = b.dataset.key;
     b.addEventListener('pointerdown', (e) => {
       if (enabled) keys[k] = true;
@@ -86,9 +88,16 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
       if (keys.KeyA) { mx -= rx; mz -= rz; }
       if (keys.Space) my += 1;
       if (keys.ShiftLeft) my -= 1;
+      // Joystick del celular (analógico): solo si no hay teclas de movimiento apretadas
+      let amount = 1;
+      const t = touch?.move;
+      if (t?.mag && !mx && !mz) {
+        mx += fx * t.y + rx * t.x; my += fy * t.y; mz += fz * t.y + rz * t.x;
+        amount = t.mag;
+      }
       const len = Math.hypot(mx, my, mz);
       if (len > 0) {
-        const s = (speed * dt) / len;
+        const s = (speed * dt * amount) / len;
         camera.position.x += mx * s;
         camera.position.y += my * s;
         camera.position.z += mz * s;

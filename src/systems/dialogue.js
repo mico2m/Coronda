@@ -37,7 +37,7 @@ import { flags } from './flags.js';
 
 const DIR = 'data/dialogues/';
 const CPS = 45; // letras por segundo de la máquina de escribir
-const CHOICE_PAUSE = 0.35; // segundos de pausa entre la pregunta y las opciones (que después se escriben como el texto)
+const CHOICE_PAUSE = 0.15; // segundos de pausa entre la pregunta y las opciones (que después aparecen todas juntas, de una)
 const reduceMotion = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const dialoguePath = (id) => (/[\\/]/.test(id) ? id : `${DIR}${id.replace(/\.json$/i, '')}.json`);
 
@@ -52,7 +52,7 @@ function el(tag, className, parent) {
 //   gate(entry)            -> Promise<true | "mensaje">: antes de empezar (ej. "Claude está charlando con Ana")
 //   ended(entry)           -> al terminar la charla
 //   choiceOk(choice, entry) -> false esconde esa opción (ej. "Decile algo" cuando la IA está descansando)
-//   ask(entry, texto)      -> Promise<{ text, choices? }>: nodo { "ask": true }: el jugador escribe y el NPC contesta
+//   ask(entry, texto)      -> Promise<{ text, choices?, nodes? }>: nodo { "ask": true }: el jugador escribe y el NPC contesta
 //   dynamic(entry, nombre) -> { nodes, start } | { close: true } (o una Promise): nodo { "dinamico": "nombre" }; los nodos
 //                             se arman en el momento (ej. el catálogo de la tienda con lo que tenés en la mochila)
 //   idle(entry)            -> { secs, wait, msg } | null: si el jugador no avanza la charla en `secs` segundos, se corta
@@ -369,6 +369,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
       { text: 'Chau', next: raw.bye ?? null },
     ];
     s.script.nodes.__ask = raw;
+    if (res?.nodes && typeof res.nodes === 'object') Object.assign(s.script.nodes, res.nodes); // ej. el botón "✅ Confirmar" de un encargo
     s.script.nodes[id] = { text: res?.text || '…', choices: choices.filter((c) => c.next !== undefined) };
     goto(id);
   }
@@ -475,11 +476,10 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
           else if (Math.floor(s.shown) !== before) paint();
         } else if (s.choices.length && !s.picking) { // escribiendo las opciones
           if (s.choiceWait > 0) s.choiceWait -= dt;
-          else {
-            const before = Math.floor(s.choiceShown);
-            s.choiceShown = Math.min(s.choiceTotal, s.choiceShown + CPS * dt);
-            if (s.choiceShown >= s.choiceTotal) s.picking = true;
-            if (s.picking || Math.floor(s.choiceShown) !== before) paint();
+          else { // las opciones (ej. el catálogo de la Carpintería) aparecen todas juntas, no letra por letra
+            s.choiceShown = s.choiceTotal;
+            s.picking = true;
+            paint();
           }
         }
         return;

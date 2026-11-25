@@ -34,7 +34,7 @@ const norm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const PLACE_NAMES = { mostrador: 'el mostrador de mi tienda', taller: 'el taller de mi tienda', casa: 'el lado este de la plaza, cerca de mi tienda', centro: 'el centro de la plaza', este: 'el lado este', norte: 'el lado norte', oeste: 'el lado oeste', cartel: 'el cartel de bienvenida', borde: 'el borde oeste' };
 
 // opts: net (o null), npcs, lotes, getPlayer(), getSceneId(), myName, notify(msg)
-export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId, myName = 'Viajero', notify = () => {} }) {
+export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId, myName = 'Viajero', notify = () => {}, getTienda = () => null }) {
   const solo = !net;
   const myUid = net?.uid ?? 'yo';
   let cfg = { endpoint: '', activa: true, comentarios: true, comentarios_cada: [90, 240] };
@@ -302,6 +302,9 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     return { momento, jugadores, casas, lugares, otros_npc: otros };
   }
 
+  // Tus pedidos en la Carpintería (ver tienda.resumenIA): van solo cuando le hablás vos (charla y saludo), nunca en los
+  // comentarios del chat, que los ven todos.
+  function carpinteria() { try { return getTienda()?.resumenIA?.() ?? null; } catch { return null; } }
   function mundoActual() {
     const here = roster().filter((r) => r.s === getSceneId()).map((r) => r.n).slice(0, 12);
     const owners = (lotes.list ?? []).map((sp) => ({ lote: sp.label, dueno: lotes.record(sp.key)?.n || null })).filter((x) => x.dueno);
@@ -372,7 +375,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       const to = setTimeout(() => ctl.abort(), 15000);
       const r = await fetch(cfg.endpoint, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
-        body: JSON.stringify({ modo: 'saludo', jugador: myName, texto: '', historial: [], mundo: mundoActual() }),
+        body: JSON.stringify({ modo: 'saludo', jugador: myName, texto: '', historial: [], mundo: { ...mundoActual(), carpinteria: carpinteria() } }),
       });
       clearTimeout(to);
       if (!r.ok) return;
@@ -453,7 +456,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     lastAsk = performance.now();
     const body = {
       jugador: myName, texto: String(text).slice(0, 200), historial: history.slice(-6),
-      mundo: mundoActual(),
+      mundo: { ...mundoActual(), carpinteria: carpinteria() },
     };
     let res;
     try {
@@ -467,20 +470,71 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     } catch { return fallo(); }
     if (!res || typeof res.decir !== 'string') return fallo();
     fallos = 0;
-    const say = res.decir.trim().slice(0, 400) || '…';
+    let say = res.decir.trim().slice(0, 400) || '…';
+    let acc = Array.isArray(res.acciones) ? res.acciones : [];
+    // Encargo de muebles hablando ("necesito 7 mesas y 4 sillas"): las cuentas las hace la tienda y la IA las cuenta
+    const enc = acc.find((a) => a?.tipo === 'encargar');
+    acc = acc.filter((a) => a?.tipo !== 'encargar');
+    const tienda = getTienda();
+    if (enc && tienda?.encargoIA) {
+      const r = tienda.encargoIA(enc.muebles, !!enc.confirmado);
+      say = (await contarEncargo(r, text)) || r.texto;
+      history.push({ de: myName, texto: body.texto }, { de: 'Claude', texto: say });
+      while (history.length > 12) history.shift();
+      if (acc.length) act(acc);
+      if (!r.pendiente) return { text: say };
+      // Se puede confirmar con el botón o diciéndole "dale" (la IA vuelve a mandar encargar, confirmado)
+      return {
+        text: say,
+        nodes: { __enc_ok: { dinamico: 'ia_encargar' } },
+        choices: [{ text: r.boton, next: '__enc_ok' }, { text: 'Decile otra cosa', next: 'menu' }, { text: 'Chau', next: 'despedida' }],
+      };
+    }
     history.push({ de: myName, texto: body.texto }, { de: 'Claude', texto: say });
     while (history.length > 12) history.shift();
-    const acc = Array.isArray(res.acciones) ? res.acciones : [];
     const errs = act(acc);
     // Si le pidió moverse, la charla se cierra después de leer la respuesta (si no, se queda quieto mientras charlan)
     return { text: errs.length ? `${say}\n(Uy, ${errs.join(' y ')}.)` : say, cerrar: !errs.length && acc.some((a) => MOVES.includes(a?.tipo)) };
+  }
+  // La IA cuenta, en su personaje, el resultado exacto que calculó la tienda (costo, madera, límite, hora de entrega)
+  async function contarEncargo(r, pedido) {
+    try {
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 15000);
+      const res = await fetch(cfg.endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+        body: JSON.stringify({ modo: 'encargo', jugador: myName, texto: String(pedido).slice(0, 200), historial: history.slice(-4), mundo: { ...mundoActual(), carpinteria: carpinteria() },
+          encargo: { resumen: r.resumen.slice(0, 900), confirmar: !!r.pendiente, hecho: !!r.hecho } }),
+      });
+      clearTimeout(to);
+      if (!res.ok) return null;
+      const j = await res.json();
+      return typeof j?.decir === 'string' && j.decir.trim() ? j.decir.trim().slice(0, 400) : null;
+    } catch { return null; }
   }
   const choiceOk = (c) => (c?.needs === 'ia' ? aiOn() : true);
 
   // ---------- Cada cuadro ----------
   const _v = new THREE.Vector3();
+  // Caminos con obstáculos (ej. adentro de la Carpintería, ver tienda.js > ruta): nav(desde, hasta) -> [{ x, z }] | null
+  let nav = null, navKey = '', navAt = 0, navPts = [];
   function moveTowards(x, z, speed, dt, stopAt) {
     const h = entry.holder;
+    if (nav) {
+      const key = `${Math.round(x * 2)},${Math.round(z * 2)}`, now = performance.now();
+      if (key !== navKey || now - navAt > 3000) { navKey = key; navAt = now; try { navPts = nav(h.position, { x, z }) ?? []; } catch { navPts = []; } }
+      while (navPts.length && Math.hypot(navPts[0].x - h.position.x, navPts[0].z - h.position.z) < 0.2) navPts.shift();
+      if (navPts.length) { // primero los puntos intermedios (sin frenar), después el destino
+        const p = navPts[0], dx = p.x - h.position.x, dz = p.z - h.position.z, d = Math.hypot(dx, dz);
+        const step = Math.min(d, speed * dt);
+        h.position.x += (dx / d) * step; h.position.z += (dz / d) * step;
+        entry.targetYaw = Math.atan2(dx, dz) + entry.yawOffset;
+        const walk = entry.walkName || entry.clips.find((c) => /walk|camina/i.test(c.name))?.name;
+        if (walk && entry.current?.getClip?.().name !== walk) npcs.play(entry, walk);
+        if (entry.obstacle) { entry.obstacle.x = h.position.x; entry.obstacle.z = h.position.z; }
+        return false;
+      }
+    }
     const dx = x - h.position.x, dz = z - h.position.z;
     const d = Math.hypot(dx, dz);
     if (d <= stopAt + 0.01) { if (entry.current !== entry.idle) npcs.play(entry, null); return true; } // (+1 cm: si no, por redondeo nunca llega)
@@ -590,6 +644,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     tiendaReq(d) { if (driving || solo) onTienda?.({ u: myUid, n: myName, ...d }); else send({ req: 'tienda', u: myUid, n: myName, ...d }); },
     tiendaMsg(d) { onTiendaMsg?.(d); send({ tienda: d }); },
     set onTienda(fn) { onTienda = fn; },
+    set nav(fn) { nav = typeof fn === 'function' ? fn : null; navKey = ''; navPts = []; },
     set onTiendaMsg(fn) { onTiendaMsg = fn; },
     get driving() { return driving; },
     get state() { return { driving, mode: driving ? mode.type : remote?.m, talkingWith: driving ? talk.n : remote?.wn, ai: aiOn() }; },

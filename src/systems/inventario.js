@@ -10,6 +10,8 @@
 //   inv.pay({ madera: 5 })                     los descuenta de una sola vez o no toca nada; devuelve true/false
 //   inv.onChange((kind, id, delta, total) => …)  avisa cada cambio; devuelve la función para dejar de escuchar
 //   inv.open() / close() / toggle()            panel de la mochila (tecla I, o el botón 🎒)
+//                                              en la compu (mouse) es un menú al centro estilo Minecraft, con casilleros;
+//                                              en el celular, la lista al costado de siempre
 //   inv.snapshot()                             copia { recursos, muebles } (para el Studio y para depurar)
 //
 // Se guarda en el navegador (localStorage 'coronda.inventario'), igual que los flags y los lotes.
@@ -24,8 +26,10 @@ const DEFAULT_MAX = 999;
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-// opts: stage (donde se dibuja), dev, notify(msg), blocked() (true si algo más usa el teclado: una charla)
-export function createInventario({ stage = null, dev = false, notify = () => {}, blocked = () => false } = {}) {
+// opts: stage (donde se dibuja), dev, notify(msg), blocked() (true si algo más usa el teclado: una charla),
+//       onOpen() / onClose() (el menú del centro frena al personaje, como una charla)
+const FILAS = 9; // casilleros por fila, como el inventario de Minecraft
+export function createInventario({ stage = null, dev = false, notify = () => {}, blocked = () => false, onOpen = () => {}, onClose = () => {} } = {}) {
   const app = stage ?? document.querySelector('.app') ?? document.body;
   let data = { recursos: {}, muebles: {} };
   let defs = { recursos: new Map(), muebles: new Map() }; // id -> { nombre, icono, max }
@@ -51,7 +55,7 @@ export function createInventario({ stage = null, dev = false, notify = () => {},
     loadJSON('data/muebles.json').catch(() => ({ muebles: [] })),
   ]).then(([r, m]) => {
     defs.recursos = new Map(Object.entries(r.recursos ?? {}).map(([id, x]) => [id, { nombre: x.nombre ?? id, icono: x.icono ?? '•', max: Math.max(1, Number(x.max) || DEFAULT_MAX) }]));
-    defs.muebles = new Map((m.muebles ?? []).map((x) => [x.id, { nombre: x.nombre ?? x.id, icono: '🪑', max: DEFAULT_MAX }]));
+    defs.muebles = new Map((m.muebles ?? []).map((x) => [x.id, { nombre: x.nombre ?? x.id, icono: x.icono ?? '🪑', max: DEFAULT_MAX }]));
     load();
     redraw();
   });
@@ -109,20 +113,85 @@ export function createInventario({ stage = null, dev = false, notify = () => {},
       return `<li><span class="inv-ico">${esc(d?.icono ?? '•')}</span><span class="inv-name">${esc(d?.nombre ?? id)}</span><b class="inv-n">${count(kind, id)}</b></li>`;
     }).join('');
   }
+  // Casilleros estilo Minecraft: solo lo que tenés, y el resto de la fila vacía (mínimo `filas` filas)
+  function slots(kind, filas) {
+    const ids = Object.keys(data[kind]).filter((id) => data[kind][id] > 0);
+    const total = Math.max(filas, Math.ceil(ids.length / FILAS)) * FILAS;
+    let html = '';
+    for (let i = 0; i < total; i++) {
+      const id = ids[i];
+      if (!id) { html += '<div class="inv-slot"></div>'; continue; }
+      const d = defs[kind].get(id);
+      const n = count(kind, id);
+      html += `<div class="inv-slot lleno" data-nombre="${esc(d?.nombre ?? id)}" data-n="${n}"><span class="inv-ico">${esc(d?.icono ?? '•')}</span>${n > 1 ? `<b class="inv-n">${n}</b>` : ''}</div>`;
+    }
+    return html;
+  }
+  let central = false; // ¿menú al centro (compu) o lista al costado (celular)?
+  const esCompu = () => typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const tip = document.createElement('div');
+  tip.className = 'inv-tip'; tip.hidden = true;
   function redraw() {
     if (panel.hidden) return;
+    if (central) {
+      panel.innerHTML = `
+        <div class="inv-mc" role="document">
+          <div class="inv-mc-head"><span>Mochila</span><button type="button" class="inv-x" aria-label="Cerrar">✕</button></div>
+          <div class="inv-mc-sec">Recursos</div><div class="inv-grid">${slots('recursos', 1)}</div>
+          <div class="inv-mc-sec">Muebles</div><div class="inv-grid">${slots('muebles', 3)}</div>
+          <div class="inv-mc-pie">I o Esc para cerrar</div>
+        </div>`;
+      panel.append(tip);
+      tip.hidden = true;
+      return;
+    }
     panel.innerHTML = `
       <div class="inv-head"><b>Mochila</b><button type="button" class="inv-x" aria-label="Cerrar">✕</button></div>
       <div class="inv-sec">Recursos</div><ul>${rows('recursos')}</ul>
       <div class="inv-sec">Muebles</div><ul>${rows('muebles')}</ul>`;
   }
   const isOpen = () => !panel.hidden;
-  function open() { if (blocked()) return; panel.hidden = false; redraw(); }
-  function close() { panel.hidden = true; }
+  function open() {
+    if (blocked() || isOpen()) return;
+    central = esCompu();
+    panel.classList.toggle('inv-central', central);
+    panel.hidden = false; redraw();
+    if (central) { onOpen(); btn.blur(); }
+  }
+  function close() {
+    if (!isOpen()) return;
+    panel.hidden = true; tip.hidden = true;
+    if (central) onClose();
+  }
   const toggle = () => (isOpen() ? close() : open());
 
+  // Cartelito con el nombre al pasar el mouse por un casillero (como en Minecraft)
+  panel.addEventListener('mousemove', (e) => {
+    const s = central && e.target.closest?.('.inv-slot.lleno');
+    if (!s) { tip.hidden = true; return; }
+    tip.textContent = `${s.dataset.nombre} ×${s.dataset.n}`;
+    tip.hidden = false;
+    const r = panel.getBoundingClientRect();
+    tip.style.left = `${e.clientX - r.left + 14}px`;
+    tip.style.top = `${e.clientY - r.top - 30}px`;
+  });
+  // El botón y la mochila están dentro de #stage: sin esto, la cámara "agarra" el mouse al apretar
+  // (setPointerCapture) y el clic nunca llega al botón; además arrastrar sobre el menú giraría la cámara.
+  btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+  panel.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    if (central && e.target === panel) close(); // clic afuera de la ventana (en lo oscuro): cierra
+  });
+  panel.addEventListener('wheel', (e) => { if (central) e.stopPropagation(); }, { passive: true }); // la rueda no hace zoom detrás
+  // Con el menú del centro abierto, las teclas del juego (moverse, E, saltar…) no llegan al mundo
+  addEventListener('keydown', (e) => {
+    if (!central || !isOpen() || e.code === 'KeyI' || e.code === 'Escape') return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+  }, true);
+
   btn.addEventListener('click', toggle);
-  panel.addEventListener('click', (e) => { if (e.target.closest('.inv-x')) close(); });
+  panel.addEventListener('click', (e) => { if (e.target.closest?.('.inv-x')) close(); });
   addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return;
     if (e.code === 'Escape' && isOpen()) close();

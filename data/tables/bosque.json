@@ -1,10 +1,11 @@
 {
-  "_ayuda": "Talar árboles (ver src/systems/bosque.js). Cada golpes_por_tanda golpes se recibe madera_por_tanda de madera; después de tandas_por_arbol tandas el árbol se cae y vuelve a crecer a los rebrote_minutos minutos. animacion = clip del personaje al talar. radio = a cuántos metros del tronco aparece 'E Talar'.",
+  "_ayuda": "Talar árboles (ver src/systems/bosque.js). Cada golpes_por_tanda golpes se recibe madera_por_tanda de madera; después de tandas_por_arbol tandas el árbol se cae y vuelve a crecer a los rebrote_minutos minutos. animacion = clip del personaje al talar. radio = a cuántos metros del tronco aparece 'E Talar'. resistencia_por_dia = hachazos que puede dar cada jugador por día del juego (se recupera a las 00:00 del juego; 0 = sin límite).",
   "golpes_por_tanda": 3,
   "madera_por_tanda": 2,
   "tandas_por_arbol": 3,
   "rebrote_minutos": 5,
   "animacion": "talar",
   "radio": 1.6,
-  "recurso": "madera"
-}
+  "recurso": "madera",
+  "resistencia_por_dia": 30
+

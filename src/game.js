@@ -352,13 +352,16 @@ export async function startGame({ dev = false, retro = null } = {}) {
       dev,
       blocked: () => dialogue?.blocked ?? false,
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
+      // En la compu la mochila es un menú al centro: el personaje se queda quieto mientras está abierta
+      onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
+      onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
     });
     // Hora del juego, día y noche y reloj (la misma hora para todos: sale del reloj de la compu)
     tiempo = createTiempo({ scene, stage, dev, getSceneData: () => sceneManager.current, getBaseShade: () => sceneManager.shade });
     window.corondaTiempo = tiempo;
     // Talar árboles (en cualquier escena que tenga arbol_001, arbol_002…)
     bosque = createBosque({
-      stage, net, inventario, getRoot: () => sceneManager.root, getSceneId: () => sceneManager.current?.id ?? null,
+      stage, net, inventario, tiempo, getRoot: () => sceneManager.root, getSceneId: () => sceneManager.current?.id ?? null,
       getPlayer: () => (mode === 'player' ? player : null), blocked: () => !!dialogue?.active || !!casas?.inside,
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
     });
@@ -370,6 +373,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
         net, npcs, lotes, getPlayer: () => (mode === 'player' ? player : null), getSceneId: () => sceneManager.current?.id ?? null,
         myName: choice?.name ?? 'Viajero', notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
         abrirCharla: (e, nodes, start) => dialogue.startCustom(e, nodes, start),
+        getTienda: () => tienda, // la IA sabe tus pedidos de la Carpintería (la tienda se crea después: por eso es una función)
       });
       claudeNpc.precargarSaludo(); // el saludo de la IA se pide ya, mientras carga el juego
       window.corondaClaude = claudeNpc; // para revisar desde la consola: corondaClaude.state
@@ -534,7 +538,12 @@ export async function startGame({ dev = false, retro = null } = {}) {
       createAfk({ onDisconnect: () => net.disconnect() });
       // Chat: Enter para escribir (ver ui/chat.js)
       const { createChat } = await import('./ui/chat.js');
-      const chatUi = createChat({ net, myName: choice.name, blocked: () => !!dialogue?.active });
+      let admin = null;
+      const chatUi = createChat({ net, myName: choice.name, blocked: () => !!dialogue?.active, onCommand: (t) => admin?.comando(t) });
+      // Comandos de admin en el chat: /admin CLAVE, /time set 19, /anuncio… (ver systems/admin.js; los ven todos)
+      const { createAdmin } = await import('./systems/admin.js');
+      admin = createAdmin({ net, chat: chatUi, myName: choice.name, tiempo, inventario, getBosque: () => bosque, stage,
+        notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 3500); } });
       // Claudito también charla por el chat de vez en cuando (la IA lo pide; ver systems/claude-npc.js)
       claudeNpc.onSay = (t) => chatUi.add('Claudito', t);
       const onChat0 = net.onChat;
@@ -542,6 +551,25 @@ export async function startGame({ dev = false, retro = null } = {}) {
       const say0 = net.say;
       net.say = (t) => { const r = say0(t); if (r) claudeNpc.heard(choice.name, r); return r; };
     }
+    // Chat de voz por proximidad (solo en el servidor, ver systems/voz.js) y menú de Esc con sus ajustes (ver ui/menu.js)
+    let menu = null;
+    let voz = null;
+    if (net) {
+      const { createVoz } = await import('./systems/voz.js');
+      voz = createVoz({
+        net, stage, getCamera: () => camera,
+        blocked: () => !!dialogue?.active,
+        onMenu: () => menu?.abrir(),
+        notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 4000); },
+      });
+    }
+    const { createMenu } = await import('./ui/menu.js');
+    menu = createMenu({
+      stage, voz,
+      blocked: () => !!dialogue?.active || (lotes?.blocked ?? false) || (casas?.designing ?? false),
+      onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
+      onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
+    });
     // si el personaje o sus animaciones tienen problemas, se avisa en pantalla (con un NPC elegido en el menú
     // es normal que falten caminar/correr: no se avisa)
     const notice = player.loadError ?? (choice && choice.character.id !== 'personaje' ? null : player.animNotice);

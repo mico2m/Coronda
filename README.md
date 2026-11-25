@@ -596,6 +596,10 @@ Claude atiende la tienda y fabrica muebles a cambio de madera. Código: `src/sys
 - **Modo diseño con la mochila:** en tu casa solo podés poner los muebles que tenés en la mochila (los retirados de la tienda); al colocarlos salen de la mochila y si quitás uno ya puesto vuelve a la mochila. Los pósters siguen siendo gratis.
 - **Consola:** `corondaClaude.state`, `coronda.getTienda().pedidos()` (en `dev.html`).
 
+## HUD estilo WoW
+
+`index.html` usa un HUD inspirado en los MMO de fantasía (`css/wow.css` y `src/ui/wow-hud.js`): marcos oscuros con borde dorado y letras Cinzel. En la compu: marco del jugador con su energía arriba a la izquierda, nombre de la zona + minimapa + reloj arriba a la derecha, barra de acciones abajo al centro, micro-menú (🎒 👥 🎙️ ⚙️) abajo a la derecha y el chat abajo a la izquierda. La mochila es una bolsa con casilleros. En el celular solo cambia el aspecto (los botones quedan donde estaban). `dev.html` mantiene el HUD de siempre; para verlo en el Studio elegí `index.html` en la vista previa.
+
 ## Primera persona
 
 - **Primera persona:** con la cámara ya lo más cerca posible, seguí girando la rueda hacia adelante (o pellizcá en el celular) y la vista pasa a los ojos del personaje; alejá la rueda para volver. Adentro de las casas (cámara fija) no se activa. Altura de los ojos: `camera.eyes` en `data/tables/player.json`.

@@ -559,6 +559,14 @@ export async function startGame({ dev = false, retro = null } = {}) {
       const say0 = net.say;
       net.say = (t) => { const r = say0(t); if (r) claudeNpc.heard(choice.name, r); return r; };
     }
+    // HUD estilo WoW (solo index.html: el de dev.html queda como estaba para inspeccionar). Ver ui/wow-hud.js y css/wow.css
+    if (!dev) {
+      const { createWowHud } = await import('./ui/wow-hud.js');
+      createWowHud({
+        stage, nombre: choice?.name ?? 'Viajero', personaje: choice?.character?.name ?? '',
+        getZona: () => { const c = sceneManager.current; return c?.name ?? c?.data?.name ?? String(c?.id ?? '').replace(/^scene_/, '').replace(/_/g, ' ').replace(/\b\w/g, (x) => x.toUpperCase()); },
+      });
+    }
     // Chat de voz por proximidad (solo en el servidor, ver systems/voz.js) y menú de Esc con sus ajustes (ver ui/menu.js)
     let menu = null;
     let voz = null;

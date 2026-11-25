@@ -27,6 +27,7 @@ export function createPlayerList({ net }) {
   const app = document.querySelector('.app') ?? document.body;
   const el = document.createElement('div');
   el.className = 'players';
+  el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Jugadores');
   el.hidden = true;
   app.append(el);
   const btn = document.createElement('button');
@@ -62,6 +63,7 @@ export function createPlayerList({ net }) {
   function hide() { if (!open) return; open = false; el.hidden = true; clearInterval(timer); }
 
   window.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape' && open) { hide(); return; } // Esc la cierra (el menú de Esc la deja pasar: es un role=dialog)
     if (e.code !== 'Tab' || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return;
     e.preventDefault(); // que Tab no mueva el foco entre botones
     show();

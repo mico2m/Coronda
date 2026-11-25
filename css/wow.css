@@ -1,0 +1,144 @@
+/* ==========================================================================================================
+   HUD estilo WoW (solo index.html, va después de style.css). Inspirado en los MMO de fantasía: marcos oscuros con
+   borde dorado, letras con serifa, texto amarillo para nombres. Sin gráficos de ningún juego: todo es CSS.
+   El acomodo (marco del jugador, micro-menú) lo arma src/ui/wow-hud.js, solo en la compu; en el celular solo cambia
+   el aspecto y los botones quedan donde estaban.
+   ========================================================================================================== */
+.app.wow {
+  --wow-bg: rgba(10, 8, 6, 0.86);
+  --wow-bg-solido: linear-gradient(180deg, #221a10 0%, #0e0b07 100%);
+  --wow-oro: #d4af37;
+  --wow-oro-claro: #f3d78a;
+  --wow-oro-osc: #6e5220;
+  --wow-texto: #f4e7c8;
+  --wow-amarillo: #ffd100;
+  --wow-serif: "Cinzel", "Trajan Pro", Georgia, "Times New Roman", serif;
+  --wow-marco: 0 0 0 1px #000, 0 0 0 3px var(--wow-oro-osc), 0 0 0 4px #000, 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- Botones redondos del HUD (🎒 👥 🎙️ ⚙️ 💬 🎥): oscuros con aro dorado ---------- */
+.app.wow :is(.inv-btn, .players-open, .voz-btn, .menu-btn, .chat-open, .joy-recenter) {
+  background: radial-gradient(circle at 50% 35%, #3a2d1a 0%, #120d08 75%); color: var(--wow-texto);
+  border: 2px solid var(--wow-oro); box-shadow: 0 0 0 1px #000, inset 0 0 6px rgba(0, 0, 0, 0.8), 0 3px 8px rgba(0, 0, 0, 0.5);
+}
+.app.wow :is(.inv-btn, .players-open, .voz-btn, .menu-btn, .chat-open):hover { border-color: var(--wow-oro-claro); box-shadow: 0 0 0 1px #000, 0 0 10px rgba(243, 215, 138, 0.55); }
+.app.wow .voz-btn.al-aire { background: radial-gradient(circle at 50% 35%, #2f7d3e 0%, #0e2a14 80%); border-color: #7dfc9a; }
+
+/* ---------- Minimapa: aro dorado y nombre de la zona arriba ---------- */
+.app.wow .minimap { border: 3px solid var(--wow-oro); box-shadow: 0 0 0 2px #000, 0 0 0 5px var(--wow-oro-osc), 0 0 0 6px #000, 0 6px 18px rgba(0, 0, 0, 0.6); }
+.app.wow .minimap-n { font-family: var(--wow-serif); color: var(--wow-amarillo); text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+.wow-zona { position: absolute; z-index: 4; top: var(--edge-t, 12px); right: var(--edge-r, 12px); width: var(--map, 132px); text-align: center; pointer-events: none;
+  font: 700 13px var(--wow-serif, serif); letter-spacing: 0.04em; color: var(--wow-amarillo, #ffd100); text-shadow: 0 1px 0 #000, 0 0 4px #000, 0 0 2px #000;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wow-zona[hidden] { display: none; }
+.app.wow .minimap { top: calc(var(--edge-t) + 22px); }
+.app.wow .minimap-n { top: 4px; }
+
+/* ---------- Reloj: placa oscura con borde dorado ---------- */
+.app.wow .reloj { background: var(--wow-bg-solido); border: 1px solid var(--wow-oro); border-radius: 4px; box-shadow: 0 0 0 1px #000, 0 3px 8px rgba(0, 0, 0, 0.5); color: var(--wow-texto); }
+.app.wow .reloj-h { font-family: var(--wow-serif); font-weight: 700; color: var(--wow-oro-claro); }
+.app.wow .reloj-m { color: #bfa979; }
+
+/* ---------- Avisos para interactuar (E Hablar, E Entrar, 🪓 Talar): como un tooltip ---------- */
+.app.wow :is(.door-prompt, .talk-prompt) {
+  background: linear-gradient(180deg, rgba(16, 18, 40, 0.95), rgba(6, 7, 20, 0.95)); color: #ffffff; border: 1px solid #9a9a9a; border-radius: 5px;
+  box-shadow: 0 0 0 1px #000, 0 4px 14px rgba(0, 0, 0, 0.55); font-family: var(--font-body);
+}
+.app.wow :is(.door-prompt, .talk-prompt):hover { border-color: var(--wow-oro-claro); }
+.app.wow :is(.door-prompt, .talk-prompt) kbd { color: var(--wow-amarillo); background: rgba(0, 0, 0, 0.5); border: 1px solid var(--wow-oro); font-family: var(--wow-serif); font-weight: 700; }
+@media (pointer: coarse) { .app.wow :is(.door-prompt, .talk-prompt) { border: 1.5px solid var(--wow-oro); border-radius: 999px; } }
+.app.wow .tala-prompt .tala-res { color: var(--wow-amarillo); }
+
+/* ---------- Mensajes de estado: texto amarillo arriba al centro, sin caja ---------- */
+.app.wow .loading { left: 50%; top: calc(var(--edge-t) + 64px); transform: translateX(-50%); max-width: min(80vw, 620px); text-align: center; background: none; border: 0;
+  padding: 0; font: 700 16px var(--font-body); color: var(--wow-amarillo); text-shadow: 0 1px 0 #000, 0 0 3px #000, 0 0 6px rgba(0, 0, 0, 0.8); pointer-events: none; }
+.app.wow .admin-anuncio { background: none; border: 0; box-shadow: none; color: #ff8a1c; font: 700 22px var(--wow-serif); text-shadow: 0 2px 0 #000, 0 0 6px #000; }
+
+/* ---------- Chat: sin globos, texto con sombra sobre una franja oscura, nombres entre corchetes ---------- */
+.app.wow .chat-log { padding: 4px 6px; border-radius: 3px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.12)); }
+.app.wow .chat-log:empty { display: none; }
+.app.wow .chat-log li { background: none; padding: 1px 2px; border-radius: 0; color: #ffffff; text-shadow: 0 1px 0 #000, 0 0 2px #000; }
+.app.wow .chat-log li b { color: #ffffff; }
+.app.wow .chat-log li b::before { content: "["; } .app.wow .chat-log li b::after { content: "]"; }
+.app.wow .chat-log li.chat-mine b { color: var(--wow-amarillo); }
+.app.wow .chat-log li.chat-sys { color: #ffff7a; font-style: normal; }
+.app.wow .chat-input { background: rgba(8, 6, 4, 0.92); color: var(--wow-texto); border: 1px solid var(--wow-oro); border-radius: 3px; }
+
+/* ---------- Barra de energía (fuera del marco: en el celular) ---------- */
+.app.wow .energia { background: var(--wow-bg-solido); border: 1px solid var(--wow-oro); border-radius: 4px; box-shadow: 0 0 0 1px #000, 0 3px 8px rgba(0, 0, 0, 0.5); color: var(--wow-texto); }
+.app.wow .energia-bar { border-radius: 2px; background: #1a1206; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9); }
+.app.wow .energia-bar i { border-radius: 0; background: linear-gradient(180deg, #fff27a 0%, #ffd100 45%, #b38f00 100%); }
+.app.wow .energia.poca .energia-bar i { background: linear-gradient(180deg, #ffb35c 0%, #f97316 50%, #a3460b 100%); }
+
+/* ---------- Barra de acciones (acostarse, saludar…): casilleros abajo al centro ---------- */
+.app.wow .actions { left: 50%; right: auto; bottom: var(--edge-b); transform: translateX(-50%); flex-direction: row; gap: 4px; padding: 6px; border-radius: 4px;
+  background: var(--wow-bg-solido); box-shadow: var(--wow-marco); }
+.app.wow .actions button { position: relative; min-width: 58px; height: 52px; padding: 16px 6px 4px; display: grid; place-items: center; text-align: center; border-radius: 3px;
+  background: radial-gradient(circle at 50% 30%, #3b3020 0%, #15100a 80%); border: 1px solid var(--wow-oro-osc); color: var(--wow-texto); font: 600 11px var(--font-body);
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.9); }
+.app.wow .actions button:hover { border-color: var(--wow-oro-claro); box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.9), 0 0 8px rgba(243, 215, 138, 0.5); }
+.app.wow .actions kbd { position: absolute; top: 2px; right: 3px; padding: 0; border: 0; background: none; color: #e8e8e8; font: 700 10px var(--font-body); text-shadow: 0 1px 0 #000; }
+@media (pointer: coarse) { .app.wow .actions { left: auto; right: var(--edge-r); transform: none; flex-direction: column; } }
+
+/* ---------- Compu: marco del jugador (arriba a la izquierda) ---------- */
+.wow-player { position: absolute; z-index: 4; top: var(--edge-t); left: var(--edge-l); display: flex; align-items: center; pointer-events: none; }
+.wow-retrato { position: relative; z-index: 2; width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 45% 35%, #6b4f2a 0%, #2a1d0f 60%, #0c0805 100%); border: 3px solid var(--wow-oro);
+  box-shadow: 0 0 0 2px #000, 0 0 0 4px var(--wow-oro-osc), 0 4px 12px rgba(0, 0, 0, 0.6); }
+.wow-retrato span { font: 700 30px var(--wow-serif); color: var(--wow-oro-claro); text-shadow: 0 2px 2px #000; }
+.wow-pinfo { margin-left: -14px; padding: 6px 12px 7px 22px; min-width: 190px; display: grid; gap: 3px; border-radius: 0 4px 4px 0;
+  background: var(--wow-bg-solido); box-shadow: 0 0 0 1px #000, 0 0 0 2px var(--wow-oro-osc), 0 4px 12px rgba(0, 0, 0, 0.55); }
+.wow-pnombre { font: 700 14px var(--wow-serif); color: var(--wow-amarillo); text-shadow: 0 1px 0 #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.wow-pclase { margin-top: -3px; font: 500 11px var(--font-body); color: #bfa979; }
+.wow-pbarras:empty { display: none; }
+/* La energía adentro del marco: barra ancha con el número encima */
+.app.wow .energia.en-marco { position: relative; left: auto; bottom: auto; transform: none; padding: 0; gap: 0; background: none; border: 0; box-shadow: none; }
+.app.wow .energia.en-marco .energia-ico { display: none; }
+.app.wow .energia.en-marco .energia-bar { width: 190px; height: 14px; border: 1px solid #000; }
+.app.wow .energia.en-marco .energia-n { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; min-width: 0; font: 700 10px var(--font-body); color: #fff; text-shadow: 0 1px 0 #000, 0 0 2px #000; }
+.app.wow .energia.en-marco.gasta { animation: none; }
+.app.wow .energia.en-marco .energia-n::before { content: "Energía"; font-weight: 600; }
+
+/* ---------- Compu: micro-menú abajo a la derecha ---------- */
+.wow-micro { position: absolute; z-index: 4; right: var(--edge-r); bottom: var(--edge-b); display: flex; gap: 5px; padding: 5px 6px; border-radius: 4px;
+  background: var(--wow-bg-solido); box-shadow: var(--wow-marco); }
+.wow-micro > button { position: static !important; display: grid !important; place-items: center; width: 40px !important; height: 40px !important; padding: 0; margin: 0;
+  border-radius: 4px !important; font-size: 19px; line-height: 1; cursor: pointer; transform: none; }
+
+/* ---------- Compu: acomodo general ---------- */
+@media (hover: hover) and (pointer: fine) {
+  .app.wow .reloj { top: calc(var(--edge-t) + 22px + var(--map) + 10px); left: auto; right: var(--edge-r); width: var(--map); box-sizing: border-box; justify-content: center; padding: 3px 8px; border-radius: 3px; }
+  .app.wow .reloj-m { display: none; }
+  .app.wow .chat { bottom: var(--edge-b); width: min(440px, calc(100% - 380px)); }
+  .app.wow .loading { top: calc(var(--edge-t) + 96px); }
+  /* el menú de la mochila (lista) ya no cuelga del minimapa: la mochila de la compu es la bolsa del centro */
+}
+
+/* ---------- Mochila: bolsa con casilleros oscuros y borde dorado ---------- */
+.app.wow .inv-panel.inv-central { background: rgba(0, 0, 0, 0.5); color: var(--wow-texto); }
+.app.wow .inv-mc { --slot: 42px; padding: 0 10px 10px; border: 0; outline: 0; border-radius: 6px; background: var(--wow-bg-solido); box-shadow: var(--wow-marco); color: var(--wow-texto); }
+.app.wow .inv-mc-head { margin: 0 -10px 8px; padding: 7px 10px; border-bottom: 1px solid var(--wow-oro-osc); background: linear-gradient(180deg, #3a2a14, #1a130a);
+  font: 700 15px var(--wow-serif); color: var(--wow-amarillo); text-shadow: 0 1px 0 #000; border-radius: 6px 6px 0 0; }
+.app.wow .inv-mc .inv-x { color: var(--wow-oro-claro); }
+.app.wow .inv-mc-sec { font: 600 12px var(--wow-serif); color: #bfa979; }
+.app.wow .inv-grid { gap: 3px; }
+.app.wow .inv-slot { background: radial-gradient(circle at 50% 40%, #2a241b 0%, #0d0b08 85%); border: 1px solid #3d321f; border-radius: 3px; box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.95); }
+.app.wow .inv-slot.lleno { border-color: var(--wow-oro-osc); }
+.app.wow .inv-slot.lleno:hover { background: radial-gradient(circle at 50% 40%, #3e3424 0%, #120e09 85%); border-color: var(--wow-oro-claro); box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.9), 0 0 6px rgba(243, 215, 138, 0.6); }
+.app.wow .inv-slot .inv-n { right: 3px; bottom: 1px; font: 700 13px var(--font-body); color: #fff; text-shadow: 0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000; }
+.app.wow .inv-mc-pie { color: #8f7d58; }
+.app.wow .inv-tip { background: linear-gradient(180deg, rgba(16, 18, 40, 0.97), rgba(6, 7, 20, 0.97)); border: 1px solid #9a9a9a; border-radius: 4px; color: #fff; font-family: var(--font-body); }
+/* La lista de la mochila del celular */
+.app.wow .inv-panel:not(.inv-central) { background: var(--wow-bg-solido); border: 1px solid var(--wow-oro); border-radius: 4px; color: var(--wow-texto); }
+.app.wow .inv-panel:not(.inv-central) .inv-head { font-family: var(--wow-serif); color: var(--wow-amarillo); }
+.app.wow .inv-panel:not(.inv-central) li { border-bottom-color: rgba(212, 175, 55, 0.25); }
+
+/* ---------- Celular: el minimapa bajó 22px por el nombre de la zona; los botones de abajo bajan igual ---------- */
+@media (pointer: coarse) {
+  .app.wow :is(.players-open, .inv-btn) { top: calc(var(--edge-t) + 22px + var(--map) + 10px); }
+  .app.wow :is(.voz-btn, .menu-btn) { top: calc(var(--edge-t) + 22px + var(--map) + 62px); }
+  .app.wow .inv-panel:not(.inv-central) { top: calc(var(--edge-t) + 22px + var(--map) + 114px); max-height: calc(100% - var(--map) - 162px); }
+  /* avisos: debajo del reloj, sin pisar el minimapa */
+  .app.wow .loading { left: var(--edge-l); top: calc(var(--edge-t) + 50px); transform: none; text-align: left; font-size: 14px;
+    max-width: calc(100% - var(--map) - var(--edge-l) - var(--edge-r) - 16px); }
+}

@@ -2,4 +2,4 @@
 // Para cambiarlo, editá estos números. Con `retro: null` se ve a resolución y fps completos.
 import { startGame } from './game.js';
 
-startGame({ retro: { width: 1280, height: 720, fps: 20, antialias: true } });
+startGame({ retro: { width: 1280, height: 720, fps: 60, antialias: true } });

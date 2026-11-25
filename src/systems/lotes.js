@@ -318,6 +318,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       await Promise.all(spots.map((s) => render(s.key)));
       spots.forEach((s) => { s.silent = false; });
       console.info(`Lotes de "${sceneId}":`, spots.map((s) => `${s.key}${state.get(s.key)?.o ? ` (${state.get(s.key).n})` : ''}`));
+      return spots.filter((s) => s.house).length; // casas puestas (si hay, hay que rehacer las colisiones)
     },
 
     get blocked() { return panelKey !== null; },

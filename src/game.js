@@ -190,9 +190,15 @@ export async function startGame({ dev = false, retro = null } = {}) {
     async function enterScene(id, spawn, spawnName) {
       await sceneManager.loadScene(id, { spawn, spawnName });
       doors.setup(sceneManager.current, sceneManager.root);
-      await lotes.setup(sceneManager.current, sceneManager.root); // casas de los lotes (antes de las colisiones: pueden chocar)
       // El jugador aparece en el punto de inicio de la escena (sp está a la altura de los ojos)
+      // Colisiones del mapa primero (como siempre); las casas de los lotes se suman después y, si algo falla ahí, el mundo sigue igual
       rebuildCollision();
+      try {
+        if (await lotes.setup(sceneManager.current, sceneManager.root)) rebuildCollision(); // hay casas: pueden tener col_…
+      } catch (err) {
+        console.error('Lotes:', err);
+        ui.setStatus(`Lotes: ${err.message || err}`);
+      }
       spawnDebug?.attach(sceneManager.root, sceneManager.current, doors.list); // después de las colisiones: los postes no chocan
       // NPC: Empties npc_* del .glb + "actors" del JSON (ver src/actors/npc.js). Van después de armar las colisiones.
       const npcInfo = await npcs.setup(sceneManager.root, sceneManager.current, sceneManager.shade);

@@ -106,7 +106,8 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     if (!entry) throw new Error(`La escena "${id}" no está en data/tables/scenes.json`);
 
     ui.setStatus(`Cargando ${id}…`);
-    const data = await loadJSON(entry.file);
+    // Una escena puede venir armada desde el código (entry.data, ej. el interior de una casa, ver casas.js)
+    const data = entry.data ? structuredClone(entry.data) : await loadJSON(entry.file);
     unload();
 
     const group = new THREE.Group();
@@ -153,6 +154,9 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
         missing.push(room.model);
       }
     }
+
+    // Lo que arma el código para esta escena (entry.build, ej. paredes y muebles de una casa)
+    if (entry.build) await entry.build(group, data);
 
     // Objetos reutilizables (Empties con "objeto"): se cargan antes de las colisiones, puertas y NPC
     await placeObjects(group);

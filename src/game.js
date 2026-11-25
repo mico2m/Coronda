@@ -9,6 +9,7 @@ import { createUI } from './ui/ui.js';
 import { createFade } from './systems/fade.js';
 import { createDoors } from './systems/doors.js';
 import { createLotes } from './systems/lotes.js';
+import { createCasas, houseSceneId } from './systems/casas.js';
 import { createFollowers } from './systems/followers.js';
 import { createPlayer } from './actors/player.js';
 import { buildCollision } from './systems/collision.js';
@@ -69,6 +70,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
   let dialogue = null;
   let doors = null;
   let lotes = null; // lotes que los jugadores pueden adquirir (ver systems/lotes.js)
+  let minimap = null; // ver ui/minimap.js
+  let casas = null;   // interiores de las casas de los lotes (ver systems/casas.js)
   let player = null;
   let world = null; // gestor de escenas (para mover el cielo)
   let mode = 'free'; // 'player' (tercera persona) o 'free' (cámara libre)
@@ -128,6 +131,12 @@ export async function startGame({ dev = false, retro = null } = {}) {
     const feetY = mode === 'player' && player ? player.position.y : camera.position.y - 1.7;
     doors?.update(focus, feetY);
     lotes?.update(focus, feetY, dt); // después de las puertas: si hay una puerta cerca, la E es de ella
+    casas?.update(focus);
+    minimap?.update({
+      me: mode === 'player' && player ? { x: player.position.x, z: player.position.z, facing: player.facing } : { x: camera.position.x, z: camera.position.z, facing: controls.getYaw() + Math.PI },
+      others: net?.positions?.() ?? [],
+      lots: lotes?.mapMarks?.() ?? [],
+    });
     renderer.render(scene, camera);
     textbox.render(); // caja de diálogo, encima del mundo
   }
@@ -165,6 +174,10 @@ export async function startGame({ dev = false, retro = null } = {}) {
     player = await createPlayer({ scene, camera, stage, pad: document.getElementById('pad'), config: playerConfig });
     const audio = createAudio(musicTable);
     const sceneManager = createSceneManager({ scene, camera, controls, audio, ui, scenesTable });
+    if (!dev || /[?&]minimapa/.test(location.search)) { // en dev.html el inspector ocupa ese lugar (con ?minimapa aparece igual)
+      const { createMinimap } = await import('./ui/minimap.js');
+      minimap = createMinimap({ renderer, scene });
+    }
     world = sceneManager;
 
     // Arma (o rehace) las colisiones de la escena actual. Se rehace cuando alguien adquiere o libera un lote (aparece o
@@ -200,6 +213,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
         console.error('Lotes:', err);
         ui.setStatus(`Lotes: ${err.message || err}`);
       }
+      casas?.afterScene(sceneManager.current.id);
+      minimap?.capture(sceneManager.root); // el mapa desde arriba, antes de que aparezcan los NPC
       spawnDebug?.attach(sceneManager.root, sceneManager.current, doors.list); // después de las colisiones: los postes no chocan
       // NPC: Empties npc_* del .glb + "actors" del JSON (ver src/actors/npc.js). Van después de armar las colisiones.
       const npcInfo = await npcs.setup(sceneManager.root, sceneManager.current, sceneManager.shade);
@@ -274,8 +289,45 @@ export async function startGame({ dev = false, retro = null } = {}) {
       onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
       onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
       onChange: () => rebuildCollision(),
+      onRedraw: () => minimap?.capture(sceneManager.root),
+      onEnterHouse: (key, info) => goToHouse(key, info),
+      onReleased: (key) => casas?.clear(key),
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
       getShade: () => sceneManager.shade,
+    });
+
+    // Interiores de las casas (ver systems/casas.js): se entra desde el menú del lote, se sale por la puerta
+    casas = createCasas({
+      net, uid: lotes.uid, lotes, stage, camera,
+      getPlayer: () => (mode === 'player' ? player : null),
+      getShade: () => sceneManager.shade,
+      notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
+      blocked: () => (dialogue?.blocked ?? false) || (lotes?.blocked ?? false),
+      onChange: () => { rebuildCollision(); minimap?.capture(sceneManager.root); },
+    });
+    async function travel(go) {
+      player.frozen = true;
+      if (mode === 'free') controls.setEnabled(false);
+      await fade.fadeOut();
+      try { await go(); } catch (err) { console.error(err); ui.setStatus(String(err.message || err)); }
+      await fade.fadeIn();
+      player.frozen = false;
+      if (mode === 'free') controls.setEnabled(true);
+    }
+    function goToHouse(key, back) {
+      const id = houseSceneId(key);
+      scenesTable[id] = casas.sceneEntry(key, back);
+      return travel(() => enterScene(id));
+    }
+    casas.setOnExit(() => {
+      const b = casas.inside?.back;
+      if (!b) return travel(() => enterScene(Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0]));
+      // Aparecés delante del lote, mirando hacia afuera
+      const q = new THREE.Quaternion().fromArray(b.quat);
+      const out = new THREE.Vector3(0, 0, 1).applyQuaternion(q).setY(0).normalize();
+      const dist = Math.abs(b.size[2] || 6) / 2 + 1.5;
+      const pos = [b.pos[0] + out.x * dist, b.pos[1] + 1.7, b.pos[2] + out.z * dist];
+      return travel(() => enterScene(b.scene, { position: pos, yaw: Math.atan2(-out.x, -out.z) }));
     });
 
     if (dev) {
@@ -364,16 +416,15 @@ export async function startGame({ dev = false, retro = null } = {}) {
         scene,
         me: () => (mode === 'player' && player ? {
           s: sceneManager.current?.id, p: [r(player.position.x), r(player.position.y), r(player.position.z)],
-          f: r(player.facing), a: player.clipName, m: ch.model, sc: ch.scale, yo: ch.yawOffset, n: choice.name,
+          f: r(player.facing), a: player.clipName, m: ch.model, sc: ch.scale, yo: ch.yawOffset, n: choice.name, cn: ch.name,
         } : null),
       });
-      const pill = document.createElement('div');
-      pill.className = 'online-pill';
-      pill.title = 'Jugadores en el servidor';
-      const show = (n) => { pill.innerHTML = `<i></i>${n === 1 ? 'Solo vos en el servidor' : `${n} en el servidor`}`; };
-      show(net.count);
-      net.onCount = show;
-      document.querySelector('.app')?.append(pill);
+      // Tab: lista de jugadores con su ping y su última conexión (ver ui/players.js)
+      const { createPlayerList } = await import('./ui/players.js');
+      createPlayerList({ net });
+      // 5 minutos sin tocar nada: "¿Seguís ahí?" y, si no respondés, se te desconecta (ver ui/afk.js)
+      const { createAfk } = await import('./ui/afk.js');
+      createAfk({ onDisconnect: () => net.disconnect() });
       // Chat: Enter para escribir (ver ui/chat.js)
       const { createChat } = await import('./ui/chat.js');
       createChat({ net, myName: choice.name, blocked: () => !!dialogue?.active });

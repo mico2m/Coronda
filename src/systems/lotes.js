@@ -32,10 +32,10 @@ import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { loadJSON, loadGLB } from '../core/assets.js';
 import { makeUnlit, setShade } from './shading.js';
+import { getUid } from '../net/uid.js';
 
 const NAME_RE = /^(?:empty_)?lote_(.+)$/i;
 const KEY_RE = /^[a-z0-9_.-]{1,80}$/;
-const UID_STORE = 'coronda.uid';
 const MINE_STORE = 'coronda.lotes.mios';
 const SOLO_STORE = 'coronda.lotes.solo';
 const HEAL_DELAY = 4000; // ms: se espera a recibir lo guardado en el broker antes de reponer lo propio
@@ -57,14 +57,7 @@ const _p = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
 
-function makeUid() {
-  const r = () => Math.random().toString(36).slice(2, 10);
-  try {
-    let u = localStorage.getItem(UID_STORE);
-    if (!u) { u = (globalThis.crypto?.randomUUID?.().replace(/-/g, '').slice(0, 16)) || (r() + r()); localStorage.setItem(UID_STORE, u); }
-    return u;
-  } catch { return r() + r(); }
-}
+const makeUid = getUid; // ver net/uid.js (el mismo id para lotes, casas y lista de jugadores)
 const readJSON = (k) => { try { return JSON.parse(localStorage.getItem(k)) ?? {}; } catch { return {}; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -82,7 +75,7 @@ const beats = (a, b) => !b || a.v > b.v || (a.v === b.v && (a.o ?? '') < (b.o ??
 //   onChange()   cambió una casa de la escena actual (hay que rehacer las colisiones)
 //   notify(msg)  avisos en pantalla
 //   getShade()   tono/brillo de la escena
-export function createLotes({ stage, net = null, name = 'Viajero', dev = false, blocked = () => false, yieldE = () => false, onOpen, onClose, onChange, notify = () => {}, getShade = () => ({}) }) {
+export function createLotes({ stage, net = null, name = 'Viajero', dev = false, blocked = () => false, yieldE = () => false, onOpen, onClose, onChange, onRedraw, onEnterHouse, onReleased, notify = () => {}, getShade = () => ({}) }) {
   const uid = makeUid();
   const solo = !net;
   const state = new Map();       // clave -> { o, n, m, v }
@@ -107,7 +100,9 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     if (r.o == null) return { o: null, n: '', m: null, v };
     const m = String(r.m ?? '');
     if (!casas.map.has(m)) return null; // un modelo que no existe
-    return { o: String(r.o).slice(0, 40), n: String(r.n ?? 'Viajero').slice(0, 20), m, v };
+    // c: id de esta casa (cambia cada vez que el lote se adquiere de nuevo: su interior arranca vacío, ver casas.js)
+    const c = typeof r.c === 'string' && /^[a-z0-9]{4,24}$/i.test(r.c) ? r.c : null;
+    return { o: String(r.o).slice(0, 40), n: String(r.n ?? 'Viajero').slice(0, 20), m, v, c };
   }
 
   function accept(key, rec) {
@@ -145,7 +140,9 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     if (!casas.map.has(modelId)) return;
     const owned = [...state].filter(([k, r]) => r.o === uid && k !== key).length;
     if (owned >= casas.max) { notify(`Solo podés tener ${casas.max} lote${casas.max > 1 ? 's' : ''}`); return; }
-    const rec = { o: uid, n: name, m: modelId, v: (cur?.v ?? 0) + 1 };
+    // Si ya era tuyo (cambiás el modelo) la casa sigue siendo la misma; si no, es una casa nueva con su interior vacío
+    const c = cur?.o === uid && cur.c ? cur.c : Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    const rec = { o: uid, n: name, m: modelId, v: (cur?.v ?? 0) + 1, c };
     accept(key, rec);
     publish(key, rec);
   }
@@ -155,6 +152,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     const rec = { o: null, n: '', m: null, v: cur.v + 1 };
     accept(key, rec);
     publish(key, rec);
+    onReleased?.(key); // se borra el interior (ver casas.js)
   }
 
   // ---------- Red ----------
@@ -251,6 +249,14 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     }
     // Solo se rehacen las colisiones si la casa nueva o la que se fue tenían (así no se toca nada de lo que ya funciona)
     if (!s.silent && (hadCol || hasCollision(house))) onChange?.(key);
+    if (!s.silent) onRedraw?.(key); // cambió el dibujo del mapa (minimapa)
+  }
+
+  // Dónde está el lote (para volver al salir de la casa): escena, centro, giro y tamaño
+  function spotInfo(key) {
+    const sp = spots.find((x) => x.key === key);
+    if (!sp) return null;
+    return { scene: sceneId, key, pos: sp.pos.toArray(), quat: sp.quat.toArray(), size: sp.size.toArray(), label: sp.label };
   }
 
   // ---------- Panel para elegir la casa ----------
@@ -259,18 +265,29 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   panel.hidden = true;
   stage.parentElement.appendChild(panel);
 
-  function openPanel(key) {
+  function openPanel(key, view = 'main') {
     const s = spots.find((x) => x.key === key);
     const cur = state.get(key);
-    if (!s || (cur?.o && cur.o !== uid)) return;
+    if (!s) return;
     panelKey = key;
     const own = cur?.o === uid;
+    const other = cur?.o && !own;
     const items = [...casas.map.values()];
-    panel.innerHTML = `<div class="lote-box">
-      <h3>${esc(s.label)}${own ? ' · tu casa' : ''}</h3>
-      <div class="lote-list">${items.map((c, i) => `<button type="button" data-id="${esc(c.id)}"${own && cur.m === c.id ? ' class="on"' : ''}><kbd>${i + 1}</kbd> ${esc(c.nombre)}${own && cur.m === c.id ? ' ✓' : ''}</button>`).join('') || '<p>No hay casas en data/casas.json</p>'}</div>
-      <div class="lote-foot">${own ? '<button type="button" data-act="release">Liberar lote</button>' : ''}<button type="button" data-act="close">Cancelar <kbd>Esc</kbd></button></div>
-    </div>`;
+    let body;
+    if (view === 'destroy') { // confirmación antes de destruir: se borra todo
+      body = `<h3>¿Destruir tu casa?</h3>
+        <p class="lote-warn">Se borra la casa y <b>todo lo que tiene adentro</b> (los muebles y el diseño). El lote queda libre para cualquiera. No se puede deshacer.</p>
+        <div class="lote-foot"><button type="button" data-act="destroy" class="danger">Sí, destruir</button><button type="button" data-act="back">Cancelar <kbd>Esc</kbd></button></div>`;
+    } else if (other) { // casa de otro jugador: se puede visitar
+      body = `<h3>${esc(s.label)} · casa de ${esc(cur.n || 'otro jugador')}</h3>
+        <div class="lote-foot"><button type="button" data-act="enter">Visitar la casa <kbd>E</kbd></button><button type="button" data-act="close">Cancelar <kbd>Esc</kbd></button></div>`;
+    } else {
+      body = `<h3>${esc(s.label)}${own ? ' · tu casa' : ''}</h3>
+        ${own ? '<button type="button" data-act="enter" class="lote-enter">Entrar a la casa <kbd>E</kbd></button>' : ''}
+        <div class="lote-list">${own ? '<small>Cambiar el modelo:</small>' : ''}${items.map((c, i) => `<button type="button" data-id="${esc(c.id)}"${own && cur.m === c.id ? ' class="on"' : ''}><kbd>${i + 1}</kbd> ${esc(c.nombre)}${own && cur.m === c.id ? ' ✓' : ''}</button>`).join('') || '<p>No hay casas en data/casas.json</p>'}</div>
+        <div class="lote-foot">${own ? '<button type="button" data-act="ask-destroy" class="danger">Destruir casa</button>' : ''}<button type="button" data-act="close">Cancelar <kbd>Esc</kbd></button></div>`;
+    }
+    panel.innerHTML = `<div class="lote-box" data-view="${view}">${body}</div>`;
     panel.hidden = false;
     near = null; prompt.hidden = true; sig = '';
     onOpen?.();
@@ -286,7 +303,10 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     if (!b) { if (e.target === panel) closePanel(); return; }
     const key = panelKey;
     if (b.dataset.act === 'close') closePanel();
-    else if (b.dataset.act === 'release') { closePanel(); release(key); }
+    else if (b.dataset.act === 'ask-destroy') openPanel(key, 'destroy');
+    else if (b.dataset.act === 'back') openPanel(key);
+    else if (b.dataset.act === 'destroy') { closePanel(); release(key); notify('Destruiste tu casa: el lote quedó libre'); }
+    else if (b.dataset.act === 'enter') { closePanel(); onEnterHouse?.(key, spotInfo(key)); }
     else if (b.dataset.id) { closePanel(); if (state.get(key)?.m !== b.dataset.id) claim(key, b.dataset.id); }
   });
 
@@ -301,8 +321,11 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   window.addEventListener('keydown', (e) => {
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (panelKey !== null) {
-      if (e.code === 'Escape') closePanel();
-      else if (/^Digit[1-9]$/.test(e.code)) {
+      const view = panel.querySelector('.lote-box')?.dataset.view;
+      const r = state.get(panelKey);
+      if (e.code === 'Escape') { if (view === 'destroy') openPanel(panelKey); else closePanel(); }
+      else if (e.code === 'KeyE' && !e.repeat && view === 'main' && r?.o) { const key = panelKey; closePanel(); onEnterHouse?.(key, spotInfo(key)); }
+      else if (/^Digit[1-9]$/.test(e.code) && view === 'main' && (!r?.o || r.o === uid)) {
         const c = [...casas.map.values()][Number(e.code.slice(5)) - 1];
         const key = panelKey;
         if (c) { closePanel(); if (state.get(key)?.m !== c.id) claim(key, c.id); }
@@ -360,6 +383,18 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     },
 
     get blocked() { return panelKey !== null; },
+    record: (key) => state.get(key) ?? null,   // { o, n, m, v, c } del lote
+    spotInfo,
+    // Para el minimapa: los lotes libres (amarillo) y los tuyos (celeste)
+    mapMarks() {
+      const out = [];
+      for (const sp of spots) {
+        const r = state.get(sp.key);
+        if (!r?.o) out.push({ x: sp.pos.x, z: sp.pos.z, color: '#ffd23f' });
+        else if (r.o === uid) out.push({ x: sp.pos.x, z: sp.pos.z, color: '#2dd4bf' });
+      }
+      return out;
+    },
     get list() { return spots; },
     get uid() { return uid; },
     claim, release,
@@ -397,7 +432,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
         const r = state.get(best.key);
         if (!r?.o) { near = best; html = `<kbd>E</kbd> Adquirir ${esc(best.label.toLowerCase())}`; }
         else if (r.o === uid) { near = best; html = `<kbd>E</kbd> Tu casa`; }
-        else html = `${esc(best.label)} · casa de ${esc(r.n || 'otro jugador')}`;
+        else { near = best; html = `<kbd>E</kbd> Casa de ${esc(r.n || 'otro jugador')}`; }
       }
       if (yieldE() && near) { near = null; html = ''; } // la E es de la puerta
       if (html !== sig) {

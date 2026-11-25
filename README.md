@@ -449,5 +449,26 @@ Jugando solo, se guarda en `localStorage`.
 no garantizan guardar para siempre ni impiden que alguien escriba. Para algo serio (lotes que cuestan monedas, que no se puedan robar) hace falta un
 servidor propio que valide, y `lotes.js` ya está separado para eso: solo cambian `publish()` y la entrada de `receive()`.
 
+**Entrar y destruir:** en tu lote, **E** abre el menú: *Entrar a la casa*, cambiar el modelo o *Destruir casa* (pide confirmación: se borra la casa y todo lo que tiene adentro). En el lote de otro, **E** > *Visitar la casa*.
+
 **Modo dev (`dev.html`):** cada lote muestra su zona (verde libre · celeste tuyo · rojo de otro). Para borrar el estado de prueba: `localStorage.removeItem('coronda.lotes.solo')` (solo)
 o `coronda.lotes.mios` (online).
+
+
+## Interiores de las casas (diseño)
+
+Cada casa de un lote tiene **su propia escena** (`casa_<lote>`). Se crea vacía cuando alguien adquiere el lote y se borra entera cuando el dueño la destruye; si el lote se vuelve a adquirir, el interior arranca de cero (cada casa tiene un id propio). Código: `src/systems/casas.js`.
+
+- **Entrar:** desde el menú del lote (**E**). Todos pueden visitar; solo el dueño diseña. Para salir, la puerta del frente (**E Salir de la casa**): aparecés delante del lote.
+- **El cascarón:** si la casa tiene `"interior": "assets/models/interiores/….glb"` en `data/casas.json`, se usa ese modelo (con piso sólido, un Empty `spawn` donde aparecés y un Empty `salida` en la puerta). Si no, se arma una habitación simple de `"tamano": [ancho, largo, alto]` metros (por defecto 10 × 10 × 3,2).
+- **Muebles:** `data/muebles.json` → `{ "muebles": [{ "id", "nombre", "archivo", "caja": [ancho, alto, largo] }] }`. Los `.glb` van en `assets/models/muebles/` (origen en la base del mueble, al centro). Si el archivo no existe se ve una caja de prueba del tamaño de `caja`. Los `col_…` del mueble chocan.
+- **Modo diseño** (el dueño, adentro): **B** o el botón 🛠. Elegí un mueble y aparece delante tuyo; caminá para llevarlo, **Q**/**R** giran 15°, **clic** o **Enter** lo apoya, **Supr** lo borra, **Esc** cancela. Clic sobre un mueble puesto para moverlo. Se acomodan en una grilla de 25 cm. Máximo 150 por casa.
+- **Se comparte** igual que los lotes: en vivo y guardado en el broker MQTT (`casa~<lote>`). Jugando solo, en el navegador.
+
+## Servidor: jugadores, nombres, minimapa e inactividad
+
+- **Tab** (mantener apretado): lista de jugadores con su personaje, dónde están, su **ping** y su **última conexión** (los que ya se fueron también aparecen). En celular, el botón 👥.
+- **Nombres únicos:** cada nombre es de un solo jugador. El registro (`nombre~<nombre>` en el broker) se va llenando solo: cuando entrás al servidor tu nombre queda reservado para tu id. Si el nombre ya es de otro, el menú no te deja entrar con él. Nombre vacío = uno automático ("Viajero 4821"). Los lotes son de tu id y se guardan con tu nombre, así que nadie puede quedarse con tu lote poniéndose tu nombre. (Sin cuentas: si borrás los datos del sitio perdés tu id y, con él, tus lotes y tu nombre.)
+- **Minimapa:** arriba a la derecha, el mapa visto desde arriba en baja resolución (norte arriba). Vos sos la flecha amarilla, los otros jugadores los puntos celestes, los lotes libres cuadraditos amarillos y los tuyos celestes. **M** lo muestra u oculta. En `dev.html` aparece con `?minimapa`. Código: `src/ui/minimap.js`.
+- **Inactividad:** 5 minutos sin tocar nada → "¿Seguís ahí?". Si no respondés en 1 minuto, te desconecta del servidor (botón para volver a conectar). Código: `src/ui/afk.js`.
+- **Probar con dos jugadores en una PC:** `index.html?mp=local` en dos pestañas (cada pestaña es un jugador distinto).

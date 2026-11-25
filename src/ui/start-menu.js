@@ -164,8 +164,9 @@ export function showStartMenu({ characters, connect }) {
         </div>
         <div class="sm-actions">
           <label class="sm-field">Tu nombre
-            <input class="sm-input" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Viajero">
+            <input class="sm-input" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Vacío = uno automático">
           </label>
+          <p class="sm-err" aria-live="assertive"></p>
           <button type="button" class="sm-btn sm-primary" data-go="solo">Entrar al mundo</button>
           <button type="button" class="sm-btn" data-go="online">
             <span>Jugar en el servidor</span>
@@ -235,20 +236,38 @@ export function showStartMenu({ characters, connect }) {
 
   return new Promise((resolve) => {
     const keyNav = (e) => {
-      if (e.target === nameIn) { if (e.key === 'Enter') go('solo'); return; }
+      if (e.target === nameIn) { if (e.key === 'Enter') go('solo'); else $('.sm-err').textContent = ''; return; }
       if (e.target?.tagName === 'BUTTON' && e.key === 'Enter') return; // el botón ya hace lo suyo
       if (e.key === 'ArrowLeft') select(index - 1);
       else if (e.key === 'ArrowRight') select(index + 1);
       else if (e.key === 'Enter') go('solo');
     };
     addEventListener('keydown', keyNav);
+    let busy = false;
+    const errEl = $('.sm-err');
     async function go(mode) {
-      const name = nameIn.value.trim().slice(0, 20) || 'Viajero';
-      const character = characters[index];
-      try { localStorage.setItem(STORE, JSON.stringify({ model: character.model, name: nameIn.value.trim() })); } catch { /* nada */ }
-      removeEventListener('keydown', keyNav);
+      if (busy) return;
       const online = mode === 'online';
+      let name = nameIn.value.trim().replace(/\s+/g, ' ').slice(0, 20);
+      const character = characters[index];
       const n = online ? await netReady : null;
+      // En el servidor cada nombre es de un solo jugador (ver checkName en net/multiplayer.js)
+      if (online && n) {
+        busy = true;
+        errEl.textContent = 'Comprobando el nombre…';
+        const t0 = performance.now();
+        while (!n.namesReady() && performance.now() - t0 < 6000) await new Promise((r) => setTimeout(r, 150));
+        busy = false;
+        if (!name) { name = n.freeName(); nameIn.value = name; }
+        const st = n.checkName(name);
+        if (st === 'invalido') { errEl.textContent = 'El nombre tiene que tener al menos una letra o número.'; nameIn.focus(); return; }
+        if (st === 'ocupado') { errEl.textContent = `"${name}" ya es de otro jugador. Elegí otro nombre.`; nameIn.focus(); nameIn.select(); return; }
+        n.claimName(name);
+        errEl.textContent = '';
+      }
+      name = name || 'Viajero';
+      try { localStorage.setItem(STORE, JSON.stringify({ model: character.model, name })); } catch { /* nada */ }
+      removeEventListener('keydown', keyNav);
       if (!online) netReady.then((x) => x?.leave());
       preview.dispose();
       el.classList.add('sm-out');

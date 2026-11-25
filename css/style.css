@@ -196,8 +196,8 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .sm-primary { justify-content: center; background: #f4f8fa; color: #12212b; border-color: #f4f8fa; }
 .sm-primary:hover { background: #ffffff !important; }
 .sm-count { display: inline-flex; align-items: center; gap: 7px; font: 500 13px var(--font-body); color: rgba(244, 248, 250, 0.8); }
-.sm-dot, .online-pill i { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; display: inline-block; }
-.sm-dot.on, .online-pill i { background: #4ade80; box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.25); }
+.sm-dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; display: inline-block; }
+.sm-dot.on { background: #4ade80; box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.25); }
 .sm-note { margin: 0; font-size: 12px; line-height: 1.45; color: rgba(244, 248, 250, 0.65); }
 .start-menu button:focus-visible, .sm-input:focus-visible { outline: 2px solid #ffd43b; outline-offset: 2px; }
 @media (max-width: 640px) {
@@ -206,11 +206,7 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
   .sm-title { font-size: 30px; margin-bottom: 10px; }
   .sm-card { padding: 18px; }
 }
-.online-pill {
-  position: absolute; top: 12px; right: 12px; z-index: 3; display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 12px; border-radius: 999px; background: rgba(12, 22, 30, 0.55); color: #f4f8fa;
-  font: 500 12px var(--font-body); backdrop-filter: blur(6px); pointer-events: none;
-}
+
 .sm-net { margin: 0; font-size: 11px; color: rgba(244, 248, 250, 0.55); min-height: 1em; }
 
 /* ---------- Chat del servidor (src/ui/chat.js) ---------- */
@@ -251,3 +247,59 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .boot-text { font: 500 15px var(--font-body); }
 .boot-tip { font-size: 12px; color: rgba(244, 248, 250, 0.6); }
 @media (prefers-reduced-motion: reduce) { .boot-bar i { animation: none; } }
+
+/* ---------- Lista de jugadores (Tab, src/ui/players.js) ---------- */
+.players { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(5, 10, 14, 0.35); }
+.players[hidden] { display: none; }
+.players-card {
+  width: min(720px, calc(100% - 24px)); max-height: 80%; overflow: auto; border-radius: 14px; padding: 14px 16px;
+  background: rgba(12, 22, 30, 0.88); color: #f4f8fa; font: 500 13px var(--font-body); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+.players-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.players-head b { font: 600 18px var(--font-display); }
+.players-head span { color: rgba(244, 248, 250, 0.65); }
+.players table { width: 100%; border-collapse: collapse; }
+.players th { text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: rgba(244, 248, 250, 0.55); padding: 6px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+.players td { padding: 7px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); white-space: nowrap; }
+.players tr.off td { color: rgba(244, 248, 250, 0.5); }
+.players tr.me td:first-child { color: #ffd43b; }
+.players .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: #64748b; }
+.players tr.on .dot { background: #4ade80; }
+.players td.ping { font-variant-numeric: tabular-nums; }
+.players td.ping.ok { color: #4ade80; } .players td.ping.mid { color: #facc15; } .players td.ping.bad { color: #f87171; }
+.players-foot { margin-top: 10px; font-size: 11px; color: rgba(244, 248, 250, 0.5); }
+.players-foot kbd { border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 4px; padding: 0 5px; }
+.players-open { display: none; position: absolute; right: 12px; top: 150px; z-index: 4; width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(10, 16, 20, 0.55); font-size: 18px; }
+@media (pointer: coarse) { .players-open { display: block; } .players-foot { display: none; } }
+
+/* ---------- ¿Seguís ahí? (src/ui/afk.js) ---------- */
+.afk { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; background: rgba(5, 10, 14, 0.55); }
+.afk[hidden] { display: none; }
+.afk-card { width: min(360px, calc(100% - 32px)); border-radius: 14px; padding: 20px; display: grid; gap: 10px; text-align: center; background: rgba(12, 22, 30, 0.92); color: #f4f8fa; font: 500 14px var(--font-body); }
+.afk-title { font: 600 22px var(--font-display); }
+.afk-text { margin: 0; color: rgba(244, 248, 250, 0.8); line-height: 1.45; }
+.afk-btn { justify-self: center; border: 0; border-radius: 10px; padding: 10px 18px; font: 600 15px var(--font-body); background: #f4f8fa; color: #12212b; cursor: pointer; }
+
+/* ---------- Minimapa (src/ui/minimap.js) ---------- */
+.minimap {
+  position: absolute; top: 12px; right: 12px; z-index: 3; width: 132px; height: 132px; border-radius: 50%; overflow: hidden;
+  border: 3px solid rgba(244, 248, 250, 0.85); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); background: #0d1418; pointer-events: none;
+}
+.minimap[hidden] { display: none; }
+.minimap canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.minimap-n { position: absolute; top: 3px; left: 50%; transform: translateX(-50%); font: 700 10px var(--font-body); color: #f4f8fa; text-shadow: 0 1px 2px #000; }
+
+/* ---------- Casas: confirmación y modo diseño (src/systems/lotes.js, src/systems/casas.js) ---------- */
+.lote-warn { margin: 0; line-height: 1.45; font-size: 13px; }
+.lote-box button.danger { border-color: #ef4444; color: #fecaca; }
+.lote-box .lote-enter { font-weight: 600; }
+.lote-list small { opacity: .7; }
+.casa-ui { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 4; font: 500 13px var(--font-body); color: #f4f8fa; }
+.casa-ui[hidden] { display: none; }
+.casa-bar { display: flex; gap: 12px; align-items: center; padding: 6px 8px 6px 14px; border-radius: 999px; background: rgba(12, 22, 30, 0.7); }
+.casa-panel { width: min(520px, calc(100vw - 32px)); display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; background: rgba(12, 22, 30, 0.85); }
+.casa-head { display: flex; justify-content: space-between; align-items: center; }
+.casa-cat { display: flex; flex-wrap: wrap; gap: 6px; }
+.casa-help, .casa-count { margin: 0; font-size: 12px; color: rgba(244, 248, 250, 0.75); }
+.casa-ui kbd { font: 600 11px var(--font-body); border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 4px; padding: 0 5px; }
+.sm-err { margin: -4px 0 0; min-height: 1em; font-size: 12px; color: #fecaca; }

@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { loadGLB } from '../core/assets.js';
 import { makeUnlit, setShade } from '../systems/shading.js';
+import { getUid } from './uid.js';
 
 const APP_ID = 'coronda-mirkuwu-3d';
 const SEND_EVERY = 0.1;      // s entre envíos de posición (10 por segundo)
@@ -24,6 +25,8 @@ const HEARTBEAT = 2;         // s: aunque no te muevas, se avisa que seguís ah�
 const TIMEOUT = 75;          // s sin noticias de alguien conectado -> deja de contarse (la pestaña quedó congelada)
 const NAME_HEIGHT = 2.05;    // m: altura de la etiqueta con el nombre
 const CHAT_MAX = 120;        // letras por mensaje
+const PING_EVERY = 3;        // s entre mediciones de ping a cada jugador
+const SEEN_EVERY = 60;       // s entre avisos de "sigo conectado" guardados en el broker (para la última conexión)
 const BUBBLE_SECS = 6;       // s que se ve el globo de chat arriba de alguien
 
 // Sala de prueba entre pestañas (misma PC): imita la API de Trystero que usamos
@@ -162,7 +165,7 @@ export async function connectServer(roomId = 'coronda') {
   const room = await openRoom(roomId);
   const state = room.makeAction('estado');   // { s: escena, p: [x,y,z], f: giro, a: clip, m: modelo, n: nombre, … }
   const chat = room.makeAction('chat');      // { n: nombre, t: texto, s: escena }
-  const lotesAct = room.makeAction('lotes'); // lotes: { k, r } un cambio · { all: [{k, r}] } todo el estado · { ask: 1 } pedir el estado
+  const pingAct = room.makeAction('ping');   // { q: hora } pregunta · { r: hora } respuesta (para medir el ping)
   const peers = new Map();                    // peerId -> { last, data, avatar }
   let me = null, scene3d = null, shade = null, playing = false;
   let beatT = 0, lastSent = '';
@@ -177,8 +180,12 @@ export async function connectServer(roomId = 'coronda') {
     get count() { let n = playing ? 1 : 0; for (const p of peers.values()) if (p.data?.playing) n++; return n; },
     start(opts) {
       scene3d = opts.scene; me = opts.me; playing = true; sendNow(); emitCount();
+      saveSeen();
+      setInterval(saveSeen, SEEN_EVERY * 1000);
+      addEventListener('pagehide', saveSeen);
       // Envío con un reloj propio (no con los cuadros): sigue andando aunque la pestaña quede en segundo plano
       setInterval(() => {
+        if (!playing) return;
         beatT += SEND_EVERY;
         const s = myState();
         const j = JSON.stringify(s);
@@ -197,19 +204,146 @@ export async function connectServer(roomId = 'coronda') {
       return t;
     },
     leave() { try { room.leave(); } catch { /* nada */ } },
+    // Salir del servidor en pleno juego (ej. por inactividad): los demás dejan de verte y vos a ellos
+    disconnect() {
+      if (!playing) return;
+      try { state.send({ playing: false }); } catch { /* nada */ }
+      saveSeen();
+      playing = false;
+      for (const p of peers.values()) removeAvatar(p);
+      peers.clear();
+      emitCount();
+      setTimeout(() => net.leave(), 300);
+    },
   };
-  // Lotes (ver systems/lotes.js). Lo que llega antes de que el juego los arme (en el menú) se guarda y se entrega después.
-  const lotesInbox = [], lotesSaved = new Map();
-  net.lotes = {
-    send(data, target) { lotesAct.send(data, target ? { target } : undefined); },
-    persist(key, data) { room.persist?.(key, data); },   // se guarda en el broker MQTT (sigue ahí aunque nadie esté conectado)
-    onMessage: null,   // (data, peerId)
-    onPersisted: null, // (clave, dato)
-    onPeer: null,      // (peerId) alguien nuevo entró
-    take() { const a = lotesInbox.splice(0), b = [...lotesSaved]; lotesSaved.clear(); return { messages: a, saved: b }; },
+  // Canales de datos de los sistemas del juego (lotes, casas…). Cada uno manda mensajes en vivo y puede guardar datos
+  // en el broker MQTT (retained: siguen ahí aunque nadie esté conectado). Lo que llega antes de que el juego arme el
+  // sistema (mientras estás en el menú) se guarda y se entrega con take().
+  //   prefix: los datos guardados de ese canal van con esa marca en la clave (los lotes, sin marca, por compatibilidad)
+  const channels = [];
+  function channel(name, prefix) {
+    const act = room.makeAction(name);
+    const inbox = [], saved = new Map();
+    const ch = {
+      prefix,
+      send(data, target) { act.send(data, target ? { target } : undefined); },
+      persist(key, data) { room.persist?.(prefix + key, data); },
+      onMessage: null,   // (data, peerId)
+      onPersisted: null, // (clave, dato)
+      onPeer: null,      // (peerId) alguien nuevo entró
+      take() { const a = inbox.splice(0), b = [...saved]; saved.clear(); return { messages: a, saved: b }; },
+      _saved(key, data) { if (ch.onPersisted) ch.onPersisted(key, data); else if (saved.size < 500) saved.set(key, data); },
+    };
+    act.onMessage = (data, { peerId }) => { if (ch.onMessage) ch.onMessage(data, peerId); else if (inbox.length < 200) inbox.push({ data, peerId }); };
+    channels.push(ch);
+    return ch;
+  }
+  net.lotes = channel('lotes', '');      // ver systems/lotes.js
+  net.casas = channel('casas', 'casa~'); // ver systems/casas.js (interiores)
+  const SEEN = 'visto~';                 // última conexión de cada jugador (ver players())
+  const NAME = 'nombre~';                // registro de nombres: cada nombre es de un solo jugador (ver checkName)
+  room.onPersisted = (key, data) => {
+    if (key.startsWith(SEEN)) { seenFromBroker(key.slice(SEEN.length), data); return; }
+    if (key.startsWith(NAME)) { nameFromBroker(key.slice(NAME.length), data); return; }
+    const ch = channels.find((c) => c.prefix && key.startsWith(c.prefix)) ?? net.lotes;
+    ch._saved(ch.prefix ? key.slice(ch.prefix.length) : key, data);
   };
-  lotesAct.onMessage = (data, { peerId }) => { if (net.lotes.onMessage) net.lotes.onMessage(data, peerId); else if (lotesInbox.length < 200) lotesInbox.push({ data, peerId }); };
-  room.onPersisted = (key, data) => { if (net.lotes.onPersisted) net.lotes.onPersisted(key, data); else lotesSaved.set(key, data); };
+
+  // ---------- Lista de jugadores (Tab): ping y última conexión ----------
+  const uid = getUid();
+
+  // ---------- Nombres únicos ----------
+  // Base de datos de nombres guardada en el broker (retained, nombre~<nombre normalizado> = { u: id del jugador, n, t }).
+  // Se va llenando sola: cada jugador que entra al servidor reserva su nombre. Un nombre reservado por otro id no se
+  // puede usar, así nadie puede hacerse pasar por otro (ni quedarse con su lote: los lotes son del id, con ese nombre).
+  const names = new Map(); // normalizado -> { u, n, t }
+  let namesSince = 0;      // cuándo empezó a llegar el registro
+  function nameFromBroker(k, d) {
+    if (!d || typeof d !== 'object' || !d.u) return;
+    const cur = names.get(k);
+    const t = Number(d.t) || 0;
+    if (!cur || t < cur.t) names.set(k, { u: String(d.u).slice(0, 40), n: String(d.n ?? '').slice(0, 20), t }); // gana el primero que lo reservó
+  }
+  net.normName = (name) => String(name ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+  // 'libre' · 'tuyo' · 'ocupado' (lo tiene otro jugador, en el registro o conectado ahora con ese nombre)
+  net.checkName = (name) => {
+    const k = net.normName(name);
+    if (!k) return 'invalido';
+    const r = names.get(k);
+    if (r && r.u !== uid) return 'ocupado';
+    for (const p of peers.values()) if (p.data?.u && p.data.u !== uid && net.normName(p.data.n) === k) return 'ocupado';
+    return r ? 'tuyo' : 'libre';
+  };
+  net.claimName = (name) => {
+    const k = net.normName(name);
+    if (!k || net.checkName(name) === 'ocupado') return false;
+    const rec = names.get(k) ?? { u: uid, n: String(name).slice(0, 20), t: Date.now() };
+    names.set(k, rec);
+    room.persist?.(NAME + k, rec);
+    return true;
+  };
+  // ¿Ya llegó el registro? (unos segundos después de conectarse a un broker MQTT)
+  net.namesReady = () => {
+    const st = room.status?.();
+    if (!st) return true; // prueba local entre pestañas
+    if (!namesSince && st.open > 0) namesSince = performance.now();
+    return namesSince > 0 && performance.now() - namesSince > 2500;
+  };
+  // Un nombre libre de la forma "Viajero 1234"
+  net.freeName = (base = 'Viajero') => {
+    for (let i = 0; i < 50; i++) { const n = `${base} ${Math.floor(1000 + Math.random() * 9000)}`; if (net.checkName(n) === 'libre') return n; }
+    return `${base} ${uid.slice(0, 4)}`;
+  };
+  const seen = new Map(); // uid -> { n, c, s, t } (t = Date.now() de su última señal)
+  function seenFromBroker(u, d) {
+    if (!/^[a-z0-9]{4,40}$/i.test(u) || !d || typeof d !== 'object') return;
+    const t = Number(d.t);
+    if (!Number.isFinite(t)) return;
+    const cur = seen.get(u);
+    if (!cur || t > cur.t) seen.set(u, { n: String(d.n ?? 'Jugador').slice(0, 20), c: String(d.c ?? '').slice(0, 30), s: String(d.s ?? '').slice(0, 60), t });
+  }
+  function saveSeen() {
+    const s = me?.();
+    if (!s || !playing) return;
+    const rec = { n: s.n, c: s.cn ?? '', s: s.s ?? '', t: Date.now() };
+    seen.set(uid, rec);
+    room.persist?.(SEEN + uid, rec);
+  }
+  pingAct.onMessage = (data, { peerId }) => {
+    if (data?.q !== undefined) { pingAct.send({ r: data.q }, { target: peerId }); return; }
+    const p = peers.get(peerId);
+    if (p && data?.r !== undefined && data.r === p.pingAsk) { p.ping = Math.round(performance.now() - data.r); p.pingAsk = null; }
+  };
+  setInterval(() => {
+    for (const [id, p] of peers) {
+      if (!p.data?.playing) continue;
+      p.pingAsk = performance.now();
+      pingAct.send({ q: p.pingAsk }, { target: id });
+    }
+  }, PING_EVERY * 1000);
+  // Todos los jugadores: los conectados (con su ping) y los que estuvieron antes (con su última conexión), los más recientes primero
+  // Posiciones de los otros jugadores que están en tu misma escena (para el minimapa)
+  net.positions = () => {
+    const mine = me?.()?.s;
+    const out = [];
+    for (const p of peers.values()) if (p.data?.playing && p.data.s === mine && p.data.p) out.push({ x: p.data.p[0], z: p.data.p[2] });
+    return out;
+  };
+  net.players = () => {
+    const list = [];
+    const online = new Set();
+    const mine = me?.();
+    if (playing && mine) { list.push({ me: true, online: true, n: mine.n, c: mine.cn ?? '', s: mine.s, ping: 0, t: Date.now() }); online.add(uid); }
+    for (const p of peers.values()) {
+      const d = p.data;
+      if (!d?.playing) continue;
+      if (d.u) online.add(d.u);
+      list.push({ online: true, n: d.n ?? 'Jugador', c: d.cn ?? '', s: d.s, ping: p.ping ?? null, t: Date.now() });
+    }
+    const off = [...seen].filter(([u]) => !online.has(u)).map(([, r]) => ({ online: false, ...r, ping: null }));
+    off.sort((a, b) => b.t - a.t);
+    return [...list, ...off.slice(0, 40)];
+  };
   const emitCount = () => net.onCount?.(net.count);
   // Para revisar desde la consola (F12): corondaNet.debug()
   net.debug = () => ({ yo: room.selfId, jugando: playing, red: net.network, otros: [...peers].map(([id, p]) => ({ id, jugando: !!p.data?.playing, escena: p.data?.s, nombre: p.data?.n, hace: Math.round((performance.now() - p.last) / 100) / 10 })) });
@@ -218,7 +352,7 @@ export async function connectServer(roomId = 'coronda') {
   room.onPeerJoin = (id) => {
     peers.set(id, { last: performance.now(), data: null, avatar: null });
     if (playing) sendNow(id); // que el nuevo te vea enseguida
-    net.lotes.onPeer?.(id);
+    channels.forEach((c) => c.onPeer?.(id));
   };
   room.onPeerLeave = (id) => { drop(id); emitCount(); };
   state.onMessage = (data, { peerId }) => {
@@ -301,7 +435,7 @@ export async function connectServer(roomId = 'coronda') {
 
   function myState() {
     const s = me?.();
-    return s ? { playing: true, ...s } : { playing: false };
+    return s ? { playing: true, u: uid, ...s } : { playing: false };
   }
   function sendNow(target) {
     const s = myState();

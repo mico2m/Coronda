@@ -80,7 +80,9 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
   const prompt = document.createElement('button');
   prompt.type = 'button';
   prompt.className = 'door-prompt tala-prompt';
+  prompt.setAttribute('aria-label', 'Talar');
   prompt.hidden = true;
+  let promptHtml = ''; // se reescribe solo si cambia: rehacerlo en cada cuadro hace perder toques en el celular
   stage.appendChild(prompt);
   const pop = document.createElement('div');
   pop.className = 'tala-pop';
@@ -106,8 +108,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     const t = near;
     const player = getPlayer?.();
     if (!t || busy || !player || isDown(t)) return;
-    busy = true;
-    prompt.hidden = true;
+    busy = true; // el botón sigue a la vista, atenuado, mientras da el hachazo
     const face = { x: t.pos.x, z: t.pos.z };
     let ok = false;
     try { ok = await player.interact(cfg.animacion, { face, wait: 0.55 }); } catch { ok = false; }
@@ -139,8 +140,13 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
       if (d < bd) { bd = d; best = t; }
     }
     near = best && bd <= cfg.radio + 0.4 && !blocked() ? best : null;
-    const show2 = !!near && !busy && !!getPlayer?.();
-    if (show2) prompt.innerHTML = `<kbd>E</kbd> Talar <small>${near.tandas}/${cfg.tandas_por_arbol}</small>`;
+    const show2 = !!near && !!getPlayer?.();
+    if (show2) {
+      // 🪓 = botón: en la PC "🪓 E Talar 1/3"; en el celular un botón redondo con el hacha y el progreso (ver css .tala-prompt)
+      const html = `<span class="tala-ico" aria-hidden="true">🪓</span><kbd>E</kbd><span class="tala-txt">Talar</span><small>${near.tandas}/${cfg.tandas_por_arbol}</small>`;
+      if (html !== promptHtml) { prompt.innerHTML = html; promptHtml = html; }
+    }
+    prompt.classList.toggle('busy', busy);
     prompt.hidden = !show2;
   }
 

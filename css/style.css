@@ -471,6 +471,8 @@ body:has(.talking) .reloj { opacity: 0.4; }
 
 /* ---------- Talar (src/systems/bosque.js) ---------- */
 .tala-prompt small { margin-left: 6px; opacity: 0.75; font-size: 0.8em; }
+.tala-prompt .tala-ico { font-size: 1.15em; line-height: 1; }
+.tala-prompt.busy { opacity: 0.55; pointer-events: none; } /* dando el hachazo */
 .tala-pop { position: absolute; left: 50%; top: 38%; z-index: 6; transform: translate(-50%, 0); pointer-events: none;
   padding: 6px 14px; border-radius: 999px; background: rgba(12, 20, 26, 0.88); color: #ffe7a8; font: 700 18px var(--font-body); letter-spacing: 0.04em; }
 .tala-pop[hidden] { display: none; }
@@ -536,4 +538,21 @@ body:has(.talking) .reloj { opacity: 0.4; }
 @media (pointer: coarse) and (max-height: 500px) {
   .door-prompt, .talk-prompt { bottom: calc(var(--edge-b) + 84px); }
   .door-prompt.lote-prompt { bottom: calc(var(--edge-b) + 136px); }
+}
+
+/* ---------- Talar en el celular: botón redondo 🪓 (src/systems/bosque.js) ----------
+   Aparece al acercarte a un árbol, en el mismo lugar que los demás avisos. Se toca para dar cada hachazo; la etiqueta
+   de abajo es el progreso del árbol (tandas). */
+@media (pointer: coarse) {
+  .door-prompt.tala-prompt:not([hidden]) {
+    display: grid; place-items: center; width: 72px; height: 72px; max-width: none; padding: 0; border-radius: 50%;
+    border-width: 2px; overflow: visible; font-size: 0; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); transition: transform 0.08s;
+  }
+  .tala-prompt .tala-ico { font-size: 36px; }
+  .tala-prompt .tala-txt { display: none; }
+  .tala-prompt small {
+    position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); margin: 0; padding: 1px 7px; border-radius: 999px;
+    font: 700 11px var(--font-body); background: var(--accent); color: var(--accent-fg); opacity: 1;
+  }
+  .door-prompt.tala-prompt:active { transform: translateX(-50%) scale(0.9); }
 }

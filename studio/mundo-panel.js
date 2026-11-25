@@ -7,7 +7,8 @@ const FILES = { tiempo: 'data/tables/tiempo.json', bosque: 'data/tables/bosque.j
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // opts: root (elemento), game() -> iframe.contentWindow.coronda, api(path) -> url, quiet (Map), toast(msg, err)
-export function createMundoPanel({ root, game, api, quiet, toast = () => {} }) {
+//       hasFile(path) -> ¿existe ese archivo en el proyecto? (para avisar de los .glb que faltan)
+export function createMundoPanel({ root, game, api, quiet, toast = () => {}, hasFile = null }) {
   const data = {}; // lo leído de cada archivo
   const timers = {};
   root.innerHTML = `
@@ -88,10 +89,18 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {} }) {
     live('tiempo'); save('tiempo');
   });
 
+  // Al lado de cada mueble: su .glb y el objeto (id) que usa el juego
+  const mueble = (id) => (data.muebles?.muebles ?? []).find((m) => m.id === id);
+  function glbTag(m, id = m?.id) {
+    if (!m && !id) return '';
+    const file = m?.archivo ?? `assets/models/muebles/${id}.glb`;
+    const falta = hasFile?.(file) === false; // null: todavía no llegó la lista de archivos
+    return `<span class="mp-glb" title="${esc(file)}"><code>${esc(file.split('/').pop())}</code> · objeto <code>${esc(id)}</code>${falta ? ' · <span class="no">no existe: se ve una caja</span>' : ''}</span>`;
+  }
   // Precios y tiempos de cada mueble
   function drawMuebles() {
     const list = data.muebles?.muebles ?? [];
-    $('#mpMuebles').innerHTML = `<table class="mp-t"><tr><th>Mueble</th><th>Madera</th><th>Min</th></tr>${list.map((m, i) => `<tr><td>${esc(m.nombre ?? m.id)}</td>
+    $('#mpMuebles').innerHTML = `<table class="mp-t"><tr><th>Mueble</th><th>Madera</th><th>Min</th></tr>${list.map((m, i) => `<tr><td>${esc(m.nombre ?? m.id)}${glbTag(m)}</td>
       <td><input type="number" min="0" max="999" step="1" data-i="${i}" data-c="madera" value="${esc(m.costo?.madera ?? 0)}"></td>
       <td><input type="number" min="0.1" max="600" step="0.5" data-i="${i}" data-c="tiempo_min" value="${esc(m.tiempo_min ?? 1)}"></td></tr>`).join('')}</table>`;
   }
@@ -112,7 +121,9 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {} }) {
 
   // ---------- En vivo (cada segundo) ----------
   const hhmm = (g, ms) => { try { return g.getTiempo().texto(g.getTiempo().hora(ms)); } catch { return ''; } };
+  let conArchivos = false; // redibuja la tabla una vez que llega la lista de archivos (para el aviso de .glb que faltan)
   function tick() {
+    if (!conArchivos && hasFile?.('index.html') != null && data.muebles && !root.querySelector('#mpMuebles :focus')) { conArchivos = true; drawMuebles(); }
     if (root.closest('[hidden]')) return;
     const g = game();
     if (!g?.getTiempo?.()) { $('#mpLive').innerHTML = '<span class="k">Esperando la vista previa (dev.html o index.html)…</span>'; return; }
@@ -127,13 +138,14 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {} }) {
       <span class="k">Claude</span><span>${esc(tienda?.claudeHace ?? '—')} · ${esc(cl?.mode ?? '—')}${cl?.talkingWith ? ` · hablando con ${esc(cl.talkingWith)}` : ''}${cl?.driving === false ? ' · (lo maneja otro jugador)' : ''}</span>
       <span class="k">Taller</span><span>${listos} listos sin retirar · ${fab} fabricándose · ${peds.length - listos - fab} en fila · ${slots - peds.length} slots libres de ${slots}</span>`;
     $('#mpPedidos').innerHTML = peds.length ? `<table class="mp-t"><tr><th>#</th><th>Jugador</th><th>Mueble</th><th>Estado</th><th></th></tr>${peds.map((p) => `<tr>
-      <td>${p.slot}</td><td>${esc(p.jugador)}</td><td>${esc(p.nombre)}</td>
+      <td>${p.slot}</td><td>${esc(p.jugador)}</td><td>${esc(p.nombre)}${glbTag(mueble(p.mueble), p.mueble)}</td>
       <td>${p.listo ? `listo ✓${p.aviso ? ' · nota 📬' : ''}` : p.fabricando ? `<span class="mp-bar"><i style="width:${Math.round(p.progreso * 100)}%"></i></span> ${Math.round(p.progreso * 100)}% · ${esc(hhmm(g, p.termina))}` : `en fila · ${esc(hhmm(g, p.termina))}`}</td>
       <td><button type="button" data-del="${esc(p.id)}" title="Sacar el pedido">✕</button></td></tr>`).join('')}</table>` : '<span class="k">Sin pedidos</span>';
     try {
       const inv = g.getInventario?.()?.snapshot?.() ?? {};
       const fmt = (o) => Object.entries(o ?? {}).filter(([, n]) => n > 0).map(([k, n]) => `${esc(k)} ×${n}`).join(' · ') || '—';
-      $('#mpInv').innerHTML = `<div><span class="k">Recursos</span> ${fmt(inv.recursos)}</div><div><span class="k">Muebles</span> ${fmt(inv.muebles)}</div>`;
+      const muebles = Object.entries(inv.muebles ?? {}).filter(([, n]) => n > 0).map(([k, n]) => `<div>${esc(mueble(k)?.nombre ?? k)} ×${n}${glbTag(mueble(k), k)}</div>`).join('') || '—';
+      $('#mpInv').innerHTML = `<div><span class="k">Recursos</span> ${fmt(inv.recursos)}</div><div><span class="k">Muebles</span> ${muebles}</div>`;
     } catch { /* nada */ }
   }
   setInterval(tick, 1000);

@@ -4,7 +4,7 @@
 //   .getInventario()                       inventario del jugador (recursos y muebles; .snapshot(), .add(), .remove())
 //   .getTienda()                           la tienda: .point('pos_mostrador'), .slots()
 //   .forgetJSON(url)                       olvida un JSON cacheado
-//   .routePoints()                         Empties de la escena: [{ name, x, y, z }] (para elegir los puntos de un recorrido)
+//   .routePoints()                         Empties de la escena: [{ name, x, y, z, file }] (file: el .glb de donde sale)
 //   .showRoute(json | null)                dibuja un recorrido (data/routes/*.json) dentro de la vista previa
 import * as THREE from 'three';
 import { forgetJSON } from '../core/assets.js';
@@ -24,7 +24,7 @@ export function createStudioBridge(game) {
       room.traverse((o) => {
         if (o === room || !o.name || o.isMesh || o.isLight || o.isCamera || o.getObjectByProperty('isMesh', true)) return;
         const p = o.getWorldPosition(new THREE.Vector3());
-        out.push({ name: o.name, x: p.x, y: p.y, z: p.z });
+        out.push({ name: o.name, x: p.x, y: p.y, z: p.z, file: o.userData?.sourceFile ?? null });
       });
     }
     return out.sort((a, b) => (/^ruta/i.test(b.name) - /^ruta/i.test(a.name)) || a.name.localeCompare(b.name));

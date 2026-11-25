@@ -166,7 +166,7 @@ export function createRouteEditor(root, { onChange = () => {}, onUndo = () => {}
   }
   function fillLists() {
     dlPts.replaceChildren();
-    for (const p of points()) { const o = el('option', '', dlPts); o.value = p.name; o.label = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`; }
+    for (const p of points()) { const o = el('option', '', dlPts); o.value = p.name; o.label = `${p.file ? String(p.file).split('/').pop() + ' · ' : ''}${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`; }
     dlFlags.replaceChildren();
     for (const f of flags()) el('option', '', dlFlags).value = f;
     dlClips.replaceChildren();
@@ -229,7 +229,7 @@ export function createRouteEditor(root, { onChange = () => {}, onUndo = () => {}
     pIn.append(new Option('— elegí un Empty —', ''));
     const names = points().map((p) => p.name);
     if (s.point && !names.includes(s.point.trim())) pIn.append(new Option(`${s.point} (no está en el .glb)`, s.point));
-    for (const nm of names) pIn.append(new Option(nm, nm));
+    for (const nm of names) { const f = points().find((p) => p.name === nm)?.file; pIn.append(new Option(f ? `${nm} · ${String(f).split('/').pop()}` : nm, nm)); }
     pIn.value = s.point.trim();
     pIn.classList.toggle('bad', !!s.point && !names.includes(s.point.trim()) && names.length > 0);
     pIn.addEventListener('change', () => { s.point = pIn.value; changed(); render(); });
@@ -295,12 +295,14 @@ export function createRouteEditor(root, { onChange = () => {}, onUndo = () => {}
     speedIn.value = doc.speed; walkIn.value = doc.walk;
     el('p', 'rl-intro', col, 'La ruta es la lista de Empties por los que pasa el NPC, de arriba hacia abajo.');
     const pal = el('div', 'rl-pal', col);
-    el('div', 'rl-lab', pal, 'Empties detectados en el .glb — tocá uno para agregarlo a la ruta:');
+    const glbs = [...new Set(points().map((p) => p.file).filter(Boolean).map((f) => String(f).split('/').pop()))];
+    el('div', 'rl-lab', pal, `Empties detectados en ${glbs.length ? glbs.join(', ') : 'el .glb'} — tocá uno para agregarlo a la ruta:`);
     const pts = points().map((p) => p.name).sort((a, b) => (/^ruta/i.test(b) - /^ruta/i.test(a)) || a.localeCompare(b));
     if (!pts.length) el('p', 'rl-hint', pal, 'No encuentro Empties: esperá a que cargue la vista previa (o abrí la escena donde están).');
     for (const nm of pts) {
       const used = doc.stops.filter((x) => x.point.trim() === nm).length;
-      const b = el('button', 'rl-chip', pal, used ? `${nm} ×${used}` : nm); b.type = 'button'; b.title = 'Agregar como nueva parada';
+      const f = points().find((p) => p.name === nm)?.file;
+      const b = el('button', 'rl-chip', pal, used ? `${nm} ×${used}` : nm); b.type = 'button'; b.title = `Agregar como nueva parada${f ? ` · objeto ${nm} en ${String(f).split('/').pop()}` : ''}`;
       b.addEventListener('click', () => { const st = blank(uniq(doc.stops, cleanId(nm) || 'parada')); st.point = nm; doc.stops.push(st); changed(); render(); requestAnimationFrame(() => { wrap.scrollTop = wrap.scrollHeight; }); });
     }
     doc.stops.forEach((s, i) => {

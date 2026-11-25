@@ -51,6 +51,7 @@ details > div { padding-left: 12px; }
 .mp-grid .ok { color: #98c379; } .mp-grid .no { color: #e06c75; }
 .mp-t { width: 100%; border-collapse: collapse; font-size: 12px; } .mp-t th { text-align: left; color: var(--mu); font-weight: 500; } .mp-t td, .mp-t th { padding: 2px 4px; border-bottom: 1px solid #2c2e33; }
 .mp-t input { width: 56px; } .mp-t button { padding: 0 6px; }
+.mp-glb { display: block; font-size: 11px; color: var(--mu); } .mp-glb code { color: var(--ac); } .mp-glb .no { color: #f59e0b; }
 .mp-bar { display: inline-block; width: 50px; height: 6px; border-radius: 3px; background: #33363c; vertical-align: middle; overflow: hidden; } .mp-bar i { display: block; height: 100%; background: #e5c07b; }
 #gitPane { overflow: auto; } #gitHead { padding: 8px 10px; border-bottom: 1px solid var(--bd); display: grid; gap: 3px; }
 #gitHead .k { color: var(--mu); } #gitHead a { color: var(--ac); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -481,7 +482,7 @@ let mundo = null;
 async function mundoPanel() {
   if (mundo) { mundo.refresh(); return; }
   const { createMundoPanel } = await import('/studio/mundo-panel.js');
-  mundo = createMundoPanel({ root: $('#mundoPane'), game, api, quiet, toast });
+  mundo = createMundoPanel({ root: $('#mundoPane'), game, api, quiet, toast, hasFile: (p) => (files.length ? files.some((f) => f.p === p) : null) });
 }
 $('#gitForm').onsubmit = (e) => { e.preventDefault(); gitDo('/__git/enviar', { mensaje: $('#gitMsg').value }, 'Enviando a GitHub'); };
 $('#gitMsg').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('#gitForm').requestSubmit(); } });
@@ -513,6 +514,7 @@ function drawNpc() {
   const src = { npc: 'fijado en este NPC (npc_anim): pisa la tabla', modelo: 'definido para el modelo', auto: 'detectado solo' }[n.idleSource] ?? '';
   const glb = n.path ? String(n.path).split('/').pop() : null; // el archivo del modelo, al lado del nombre
   const lm = line(info, 'Modelo', tag('code', glb ?? n.modelKey)); if (n.path) { lm.title = n.path; lm.appendChild(tag('span', ' · ' + String(n.path).replace(/[^/]+$/, ''), 'm')); }
+  if (n.objeto) line(info, 'Objeto', tag('code', n.objeto), tag('span', n.objetoGlb ? ` · en ${String(n.objetoGlb).split('/').pop()}` : ' · del JSON de la escena', 'm'));
   line(info, 'Idle', tag('b', n.idleName ?? '(ninguno)'), tag('span', n.idleName ? ' · ' + src : '', 'm'));
   const d = line(info, 'Diálogo');
   if (n.talk?.dialogue) {

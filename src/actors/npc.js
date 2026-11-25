@@ -78,7 +78,7 @@ export function createNpcs() {
         const p = o.getWorldPosition(new THREE.Vector3());
         const f = new THREE.Vector3(0, 0, -1).applyQuaternion(o.getWorldQuaternion(new THREE.Quaternion()));
         defs.push({
-          name: o.name,
+          name: o.name, glb: o.userData?.sourceFile ?? null, // el Empty y el .glb de la escena donde está (para el Studio)
           id: m[1].replace(/\d{3}$/, ''), // npc_vecino.001 -> (three lo guarda como npc_vecino001) -> vecino
           model: u.npc_modelo, animation: u.npc_anim, scale: u.npc_escala, radius: u.npc_radio, yawOffset: u.npc_giro,
           speaker: u.npc_nombre, text: u.npc_texto, repeatText: u.npc_texto_repetir, setFlag: u.npc_pone, dialogue: u.npc_dialogo,
@@ -194,7 +194,7 @@ export function createNpcs() {
         } : null;
         const yawOffset = num(d.yawOffset, 0) * DEG;
         const entry = { id: d.id, holder, mixer, talk, yawOffset, baseYaw: holder.rotation.y, targetYaw: holder.rotation.y,
-          clips: g.animations, idle, idleName: idleInfo.clip?.name ?? null, idleHow: idleInfo.how, idleSource, modelKey, path, talkOwn: !!String(d.talkAnim ?? '').trim(), current: idle,
+          clips: g.animations, idle, idleName: idleInfo.clip?.name ?? null, idleHow: idleInfo.how, idleSource, modelKey, path, talkOwn: !!String(d.talkAnim ?? '').trim(), current: idle, objeto: d.name ?? null, objetoGlb: d.glb ?? null,
           walkName: tableWalk || null, routeName: String(d.route ?? '').trim() || null, route: null, obstacle: null };
         // Un clip "…_vuelve" se reproduce una vez y el NPC vuelve solo a su idle
         mixer?.addEventListener('finished', (e) => { if (e.action === entry.current && entry.current !== entry.idle) api.play(entry, null); });

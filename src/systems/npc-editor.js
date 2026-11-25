@@ -94,6 +94,7 @@ export function createNpcEditor({ npcs, camera, controls, host = document.queryS
     const n = selected;
     const idleSrc = { npc: 'definido en este NPC (npc_anim / JSON): pisa la tabla', modelo: 'definido para el modelo', auto: 'detectado solo' }[n.idleSource] ?? '';
     const l1 = el('div', 'ne-line', info); el('span', 'ne-k', l1, 'Modelo'); el('code', '', l1, n.path ? String(n.path).split('/').pop() : n.modelKey); if (n.path) l1.title = n.path; // el archivo .glb, al lado
+    if (n.objeto) { const l2 = el('div', 'ne-line', info); el('span', 'ne-k', l2, 'Objeto'); el('code', '', l2, n.objeto); el('span', '', l2, n.objetoGlb ? ` · en ${String(n.objetoGlb).split('/').pop()}` : ' · del JSON'); }
     const l2 = el('div', 'ne-line', info); el('span', 'ne-k', l2, 'Idle'); el('b', '', l2, n.idleName ?? '(ninguno)'); el('span', 'ne-muted', l2, n.idleName ? ` · ${idleSrc}` : '');
     const l3 = el('div', 'ne-line', info); el('span', 'ne-k', l3, 'Hablar'); el('b', '', l3, n.talk ? (n.talk.talkAnim ?? '(sigue en idle)') : '(sin diálogo)');
 

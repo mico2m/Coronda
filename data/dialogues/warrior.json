@@ -1,0 +1,21 @@
+{
+  "speaker": "Warrior",
+  "start": "inicio",
+  "nodes": {
+    "inicio": {
+      "text": "¿Vos tambien caiste aca?"
+    }
+  },
+  "editor": {
+    "nodes": {
+      "inicio": {
+        "x": 390,
+        "y": 40
+      }
+    },
+    "start": {
+      "x": 20,
+      "y": 40
+    }
+  }
+}

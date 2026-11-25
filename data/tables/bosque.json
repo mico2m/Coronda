@@ -7,8 +7,8 @@
   "animacion": "talar",
   "radio": 1.6,
   "recurso": "madera",
-  "resistencia_por_dia": 30,
+  "resistencia_por_dia": 60,
   "energia_correr_por_seg": 1,
-  "recupera_quieto_por_seg": 2,
-  "recupera_caminando_por_seg": 0.5
+  "recupera_quieto_por_seg": 0.5,
+  "recupera_caminando_por_seg": 0.2
 }

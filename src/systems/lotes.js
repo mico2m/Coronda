@@ -26,9 +26,9 @@
 //   jugadores lo adquieren a la vez (misma versión) gana el de id menor, igual para todos, y el otro se entera.
 //   Sin conexión ("jugar solo") el estado se guarda en el navegador (localStorage).
 //
-// OJO: no hay cuentas ni servidor que valide. El "dueño" es un id al azar guardado en el navegador del jugador
-// (borrar los datos del sitio = perder sus lotes) y un cliente tramposo podría escribir en el broker público.
-// Para algo serio hace falta un servidor propio que decida (ver README, "Lotes").
+// Con el servidor propio (index.html) el que decide es el SERVIDOR: adquirir, destruir y ceder se le piden con
+// net.rpc('lote.…') y él valida (que esté libre, el máximo por jugador, que sea tuyo) y avisa a todos.
+// El dueño es el id de tu CUENTA (no el nombre): nadie puede quedarse con tu lote poniéndose tu nombre.
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { loadJSON, loadGLB } from '../core/assets.js';
@@ -58,7 +58,7 @@ const _p = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
 
-const makeUid = getUid; // ver net/uid.js (el mismo id para lotes, casas y lista de jugadores)
+const makeUid = getUid; // ver net/uid.js (sin servidor: id del navegador)
 const readJSON = (k) => { try { return JSON.parse(localStorage.getItem(k)) ?? {}; } catch { return {}; } };
 const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin almacenamiento */ } };
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -77,10 +77,10 @@ const beats = (a, b) => !b || a.v > b.v || (a.v === b.v && (a.o ?? '') < (b.o ??
 //   notify(msg)  avisos en pantalla
 //   getShade()   tono/brillo de la escena
 export function createLotes({ stage, net = null, name = 'Viajero', dev = false, blocked = () => false, yieldE = () => false, onOpen, onClose, onChange, onRedraw, onEnterHouse, onReleased, notify = () => {}, getShade = () => ({}) }) {
-  const uid = makeUid();
+  const uid = net ? net.uid : makeUid(); // con servidor: el id de tu cuenta
   const solo = !net;
   const state = new Map();       // clave -> { o, n, m, v }
-  const mine = new Map(Object.entries(solo ? {} : readJSON(MINE_STORE)));
+  const mine = new Map(); // (con servidor, lo tuyo lo sabe el servidor)
   let casas = { max: 1, map: new Map() };
   let spots = [];                // lotes de la escena actual
   let root = null, sceneId = null, unlit = true;
@@ -111,10 +111,6 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     if (cur && !beats(rec, cur)) return false;
     state.set(key, rec);
     if (solo) writeJSON(SOLO_STORE, Object.fromEntries(state));
-    else {
-      if (rec.o === uid) mine.set(key, rec); else mine.delete(key);
-      writeJSON(MINE_STORE, Object.fromEntries(mine));
-    }
     if (rec.o === uid && cur?.o && cur.o !== uid) notify(`${cur.n || 'Alguien'} te cedió un lote: ¡ya es tuyo!`);
     if (cur?.o === uid && rec.o !== uid) notify(rec.o ? `${rec.n || 'Alguien'} adquirió el lote antes que vos` : 'Tu lote quedó libre');
     if (panelKey === key && rec.o && rec.o !== uid) closePanel();
@@ -124,6 +120,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
 
   async function receive(key, r) {
     await ready;
+    if (!r && net) { if (state.delete(key)) render(key); return; }
     const rec = clean(key, r);
     if (rec) accept(key, rec);
   }
@@ -137,6 +134,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   const stateList = () => [...state].map(([k, r]) => ({ k, r }));
 
   function claim(key, modelId) {
+    if (net) { net.rpc('lote.adquirir', { k: key, m: modelId }).then(() => notify('¡El lote es tuyo!')).catch((e) => notify(e.message)); return; }
     const cur = state.get(key);
     if (cur?.o && cur.o !== uid) { notify('Ese lote ya tiene dueño'); return; }
     if (!casas.map.has(modelId)) return;
@@ -151,6 +149,10 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   function release(key) {
     const cur = state.get(key);
     if (cur?.o !== uid) return;
+    if (net) {
+      net.rpc('lote.liberar', { k: key }).then((r) => notify(r?.perdido ? `Destruiste tu casa. ${r.perdido} cosas de los cofres no entraron en tu mochila.` : 'Destruiste tu casa: el lote quedó libre (lo de los cofres volvió a tu mochila)')).catch((e) => notify(e.message));
+      return;
+    }
     const rec = { o: null, n: '', m: null, v: cur.v + 1 };
     accept(key, rec);
     publish(key, rec);
@@ -158,9 +160,10 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   }
 
   // Ceder el lote a otro jugador (por su nombre): pasa a ser suyo, con una casa NUEVA (el interior se borra)
-  function cede(key, targetName) {
+  async function cede(key, targetName) {
     const cur = state.get(key);
     if (cur?.o !== uid || solo) return 'no';
+    try { return (await net.rpc('lote.ceder', { k: key, nombre: targetName })).r; } catch { return 'no'; }
     const who = net.findPlayer(targetName);
     if (!who) return 'nadie';
     if (who.u === uid) return 'vos';
@@ -189,17 +192,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     L.onPeer = (id) => { if (state.size) L.send({ all: stateList() }, id); };
     messages.forEach(({ data, peerId }) => handle(data, peerId));
     saved.forEach(([k, r]) => receive(k, r));
-    L.send({ ask: 1 }); // que los que ya están jugando me pasen el estado
-    // Un rato después: lo que es mío y el broker olvidó (los brokers públicos no garantizan guardar para siempre) se repone
-    setTimeout(async () => {
-      await ready;
-      for (const [k, r] of [...mine]) {
-        const cur = state.get(k);
-        if (!cur) { const rec = clean(k, r); if (rec) { accept(k, rec); publish(k, rec); } }
-        else if (cur.o !== uid) mine.delete(k);
-      }
-      writeJSON(MINE_STORE, Object.fromEntries(mine));
-    }, HEAL_DELAY);
+
   }
 
   // ---------- Flecha indicadora ----------
@@ -270,7 +263,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     const rec = state.get(key);
     const want = rec?.o ? rec.m : null;
     if (s.helper) s.helper.material.color.setHex(rec?.o ? (rec.o === uid ? 0x2dd4bf : 0xef4444) : 0x84cc16);
-    if (s.model === want) return;
+    if (s.model === want) { cartelDueño(s.house, rec?.n); return; } // misma casa, quizá otro dueño (la cedieron)
     s.model = want;
     const token = ++s.token;
     let house = null;
@@ -283,10 +276,55 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       root.add(house);
       house.updateMatrixWorld(true);
       s.house = house;
+      cartelDueño(house, state.get(key)?.n);
     }
     // Solo se rehacen las colisiones si la casa nueva o la que se fue tenían (así no se toca nada de lo que ya funciona)
     if (!s.silent && (hadCol || hasCollision(house))) onChange?.(key);
     if (!s.silent) onRedraw?.(key); // cambió el dibujo del mapa (minimapa)
+  }
+
+  // Cartel con el nombre del dueño: en el Empty "cartel_dueno" del modelo de la casa (ver blender/agregar_cartel_casa.py).
+  // El nombre NO está en el .glb: se escribe acá, con el dueño que dice el servidor, y cambia si la casa cambia de dueño.
+  // Sin ese Empty se pone sobre la puerta, al frente de la casa.
+  function cartelDueño(house, nombre) {
+    if (!house) return;
+    let punto = null;
+    house.traverse((o) => { if (!punto && /^cartel_dueno$/i.test(o.name)) punto = o; });
+    let cartel = house.getObjectByName('cartel-dueño-texto');
+    const texto = nombre ? `Casa de ${nombre}` : '';
+    if (cartel?.userData.texto === texto) return;
+    if (cartel) { cartel.removeFromParent(); cartel.material.map.dispose(); cartel.material.dispose(); cartel = null; }
+    if (!texto) return;
+    const c = document.createElement('canvas');
+    const ctx = c.getContext('2d');
+    const size = 44;
+    ctx.font = `700 ${size}px Cinzel, Georgia, serif`;
+    c.width = Math.min(1024, Math.ceil(ctx.measureText(texto).width) + 48); c.height = 84;
+    ctx.font = `700 ${size}px Cinzel, Georgia, serif`;
+    ctx.fillStyle = '#f3e3c3'; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.strokeStyle = '#6f421f'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, c.width - 6, c.height - 6);
+    ctx.fillStyle = '#3b2412'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(texto, c.width / 2, c.height / 2 + 2);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const alto = 0.4, ancho = Math.min(1.9, (alto * c.width) / c.height);
+    // un plano (no un sprite): queda pegado al cartel de madera, como algo pintado; se ve de los dos lados
+    cartel = new THREE.Mesh(new THREE.PlaneGeometry(ancho, alto), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, transparent: false }));
+    cartel.name = 'cartel-dueño-texto';
+    cartel.userData.texto = texto;
+    if (punto) {
+      // el Empty mira hacia adelante (-Y de Blender = +Z del juego): el texto se apoya en esa cara
+      punto.add(cartel);
+      cartel.position.set(0, 0, 0.03);
+    } else {
+      // medidas de la casa en sus propias coordenadas (sin el lugar ni el giro del lote)
+      const p0 = house.position.clone(), q0 = house.quaternion.clone();
+      house.position.set(0, 0, 0); house.quaternion.identity(); house.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(house);
+      house.position.copy(p0); house.quaternion.copy(q0); house.updateMatrixWorld(true);
+      cartel.position.set(0, Math.max(1.2, box.max.y - 0.6), box.max.z + 0.05);
+      house.add(cartel);
+    }
   }
 
   // Dónde está el lote (para volver al salir de la casa): escena, centro, giro y tamaño
@@ -344,10 +382,10 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     else panel.querySelector('.lote-msg').textContent = '';
     e.stopPropagation(); // las letras no mueven al personaje
   });
-  function doCede(key) {
+  async function doCede(key) {
     const name = panel.querySelector('.lote-input')?.value.trim() ?? '';
     const msg = panel.querySelector('.lote-msg');
-    const r = cede(key, name);
+    const r = await cede(key, name);
     const texts = { nadie: `No hay ningún jugador llamado "${name}".`, vos: 'Ese sos vos.', lleno: `Ese jugador ya tiene ${casas.max} lote${casas.max > 1 ? 's' : ''}.`, no: 'No se puede ceder este lote.' };
     if (r !== 'ok') { if (msg) msg.textContent = texts[r] ?? ''; return; }
     closePanel();
@@ -368,7 +406,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     else if (b.dataset.act === 'ask-cede') openPanel(key, 'cede');
     else if (b.dataset.act === 'cede') doCede(key);
     else if (b.dataset.act === 'back') openPanel(key);
-    else if (b.dataset.act === 'destroy') { closePanel(); release(key); notify('Destruiste tu casa: el lote quedó libre'); }
+    else if (b.dataset.act === 'destroy') { closePanel(); release(key); if (!net) notify('Destruiste tu casa: el lote quedó libre'); }
     else if (b.dataset.act === 'enter') { closePanel(); onEnterHouse?.(key, spotInfo(key)); }
     else if (b.dataset.id) { closePanel(); if (!state.get(key)?.o) claim(key, b.dataset.id); }
   });
@@ -473,7 +511,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       await ready;
       const t0 = performance.now();
       while (!state.get(key) && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 150));
-      if (!state.get(key) && mine.has(key)) { const rec = clean(key, mine.get(key)); if (rec) { accept(key, rec); publish(key, rec); } }
+      if (!net && !state.get(key) && mine.has(key)) { const rec = clean(key, mine.get(key)); if (rec) { accept(key, rec); publish(key, rec); } }
       return state.get(key)?.o === uid;
     },
     claim, release,

@@ -72,6 +72,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
   }
   new ResizeObserver(resize).observe(stage);
   resize();
+  // Clic derecho: sin el menú del navegador dentro del juego (el resto de la página no cambia). Los campos de texto
+  // (chat, formularios) lo conservan, para poder pegar o corregir.
+  stage.addEventListener('contextmenu', (e) => { if (!(e.target instanceof HTMLElement && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) e.preventDefault(); });
 
   let inspector = null;
   let collisionDebug = null;
@@ -92,6 +95,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
   let minimap = null; // ver ui/minimap.js
   let casas = null;   // interiores de las casas de los lotes (ver systems/casas.js)
   let claudeNpc = null; // Claude, el NPC de la plaza: uno solo para todo el servidor (ver systems/claude-npc.js)
+  let social = null;    // perfil, firmas e intercambios entre jugadores (ver ui/social.js)
   let player = null;
   let world = null; // gestor de escenas (para mover el cielo)
   let mode = 'free'; // 'player' (tercera persona) o 'free' (cámara libre)
@@ -203,7 +207,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       const { connectServer } = await import('./net/multiplayer.js');
       boot.text('Buscando personajes…');
       const characters = await findCharacters(playerConfig);
-      const menu = showStartMenu({ characters, connect: () => connectServer(params.get('sala') || 'coronda') });
+      const menu = showStartMenu({ characters, connect: () => connectServer() });
       boot.hide(); // el menú ya está a la vista
       choice = await menu;
       boot.show(choice.online ? 'Entrando al servidor…' : 'Entrando al mundo…');
@@ -216,6 +220,21 @@ export async function startGame({ dev = false, retro = null } = {}) {
         playerConfig.animation = { ...playerConfig.animation, clips: { idle: ch.idle || '', walk: '', run: '' } };
       }
       net = choice.online ? choice.net : null;
+    }
+    // Aviso de conexión (se cortó y está reconectando, te sacaron, el servidor se apagó)
+    if (net) {
+      const banda = document.createElement('div');
+      banda.className = 'conexion-banda'; banda.hidden = true; banda.setAttribute('role', 'status');
+      document.querySelector('.app')?.append(banda);
+      net.onEstado = (e, txt) => {
+        if (e === 'conectado') { banda.hidden = true; return; }
+        banda.hidden = false;
+        banda.classList.toggle('fatal', e === 'expulsado');
+        banda.innerHTML = e === 'expulsado'
+          ? `${txt || 'Te desconectaste del servidor.'} <button type="button">Volver a entrar</button>`
+          : `⟳ ${txt || 'Reconectando con el servidor…'}`;
+        banda.querySelector('button')?.addEventListener('click', () => location.reload());
+      };
     }
     player = await createPlayer({ scene, camera, stage, pad: document.getElementById('pad'), touch, config: playerConfig });
     // Primera persona (acercar la cámara al máximo con la rueda): cruceta en el centro de la pantalla
@@ -362,6 +381,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     inventario = createInventario({
       stage,
       dev,
+      net, // con servidor, la mochila la manda el servidor
       blocked: () => dialogue?.blocked ?? false,
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
       // En la compu la mochila es un menú al centro: el personaje se queda quieto mientras está abierta
@@ -369,13 +389,13 @@ export async function startGame({ dev = false, retro = null } = {}) {
       onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
     });
     // Hora del juego, día y noche y reloj (la misma hora para todos: sale del reloj de la compu)
-    tiempo = createTiempo({ scene, stage, dev, getSceneData: () => sceneManager.current, getBaseShade: () => sceneManager.shade });
+    tiempo = createTiempo({ scene, stage, dev, net, getSceneData: () => sceneManager.current, getBaseShade: () => sceneManager.shade });
     window.corondaTiempo = tiempo;
     // Talar árboles (en cualquier escena que tenga arbol_001, arbol_002…)
     // Niveles y aptitudes: XP por talar y retirar muebles, puntos para mejorar la energía (ver systems/niveles.js; tecla N)
     const { createNiveles } = await import('./systems/niveles.js');
     niveles = createNiveles({
-      stage, blocked: () => !!dialogue?.active,
+      stage, net, blocked: () => !!dialogue?.active,
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
       onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
       onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
@@ -423,6 +443,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 4500); },
       onEntrega: () => niveles?.ganar('mueble'),
     });
+    window.corondaTienda = tienda; // para revisar desde la consola: corondaTienda.pedidos()
+    // Para revisar desde la consola (y para las pruebas automáticas). Solo mueve TU pantalla: lo que vale lo decide el servidor.
+
     async function travel(go, text) {
       player.frozen = true;
       if (mode === 'free') controls.setEnabled(false);
@@ -441,6 +464,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
         await enterScene(entry.id);
       }, text);
     }
+    window.corondaDebug = { player: () => player, escena: () => sceneManager.current?.id ?? null, inventario: () => inventario, social: () => social, lotes: () => lotes, casas: () => casas, entrarCasa: (k) => goToHouse(k, lotes.spotInfo(k)) };
     casas.setOnExit(() => {
       const b = casas.inside?.back;
       if (!b) return travel(() => enterScene(Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0]), 'Saliendo…');
@@ -551,7 +575,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       const ch = choice.character;
       net.setShade(sceneManager.shade);
       net.start({
-        scene,
+        scene, personaje: ch.name,
         me: () => (mode === 'player' && player ? {
           s: sceneManager.current?.id, p: [r(player.position.x), r(player.position.y), r(player.position.z)],
           f: r(player.facing), a: player.clipName, m: ch.model, sc: ch.scale, yo: ch.yawOffset, n: choice.name, cn: ch.name,
@@ -559,7 +583,33 @@ export async function startGame({ dev = false, retro = null } = {}) {
       });
       // Tab: lista de jugadores con su ping y su última conexión (ver ui/players.js)
       const { createPlayerList } = await import('./ui/players.js');
-      createPlayerList({ net });
+      const { createSocial } = await import('./ui/social.js');
+      social = createSocial({
+        net, stage, camera, inventario,
+        notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 3500); },
+        blocked: () => !!dialogue?.active || (casas?.designing ?? false),
+        onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
+        onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
+      });
+      createPlayerList({ net, onPerfil: (u) => social.verPerfil(u) });
+      // 👤 Mi perfil (foto, estadísticas y firmas)
+      const perfilBtn = document.createElement('button');
+      perfilBtn.type = 'button'; perfilBtn.className = 'perfil-btn'; perfilBtn.textContent = '👤';
+      perfilBtn.title = 'Mi perfil'; perfilBtn.setAttribute('aria-label', 'Mi perfil');
+      perfilBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+      perfilBtn.addEventListener('click', () => (social.abierta ? social.cerrar() : social.miPerfil()));
+      document.querySelector('.app')?.append(perfilBtn);
+      // Cofres: la ventana para guardar y sacar cosas (ver ui/cofre.js)
+      const { createCofre } = await import('./ui/cofre.js');
+      const cofre = createCofre({
+        net, stage, inventario,
+        notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 3000); },
+        onOpen: () => { player.frozen = true; },
+        onClose: () => setTimeout(() => { player.frozen = false; }, 0),
+      });
+      casas.setOnCofre((k, i) => cofre.abrir(k, i));
+      // Avisos del servidor (pedidos que vuelven al taller, firmas, regalos del admin…)
+      net.onAviso = (txt) => { ui.setStatus(txt); setTimeout(() => ui.clearStatus(), 5000); };
       // 5 minutos sin tocar nada: "¿Seguís ahí?" y, si no respondés, se te desconecta (ver ui/afk.js)
       const { createAfk } = await import('./ui/afk.js');
       createAfk({ onDisconnect: () => net.disconnect() });
@@ -569,8 +619,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
       const chatUi = createChat({ net, myName: choice.name, blocked: () => !!dialogue?.active, onCommand: (t) => admin?.comando(t) });
       // Comandos de admin en el chat: /admin CLAVE, /time set 19, /anuncio… (ver systems/admin.js; los ven todos)
       const { createAdmin } = await import('./systems/admin.js');
-      admin = createAdmin({ net, chat: chatUi, myName: choice.name, tiempo, inventario, getBosque: () => bosque, stage,
-        notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 3500); } });
+      admin = createAdmin({ net, chat: chatUi, stage, notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 3500); } });
+      // "Martín se ha unido al mundo" / "Martín ha abandonado el mundo" (los manda el servidor, una sola vez cada uno)
+      net.onSystem = (txt) => chatUi.add('', txt, false, true);
       // Claudito también charla por el chat de vez en cuando (la IA lo pide; ver systems/claude-npc.js)
       claudeNpc.onSay = (t) => chatUi.add('Claudito', t);
       const onChat0 = net.onChat;
@@ -581,10 +632,12 @@ export async function startGame({ dev = false, retro = null } = {}) {
     // HUD estilo WoW (solo index.html: el de dev.html queda como estaba para inspeccionar). Ver ui/wow-hud.js y css/wow.css
     if (!dev) {
       const { createWowHud } = await import('./ui/wow-hud.js');
-      createWowHud({
+      const hud = createWowHud({
         stage, nombre: choice?.name ?? 'Viajero', personaje: choice?.character?.name ?? '', nivel: niveles?.estado?.nivel ?? 1,
         getZona: () => { const c = sceneManager.current; return c?.name ?? c?.data?.name ?? String(c?.id ?? '').replace(/^scene_/, '').replace(/_/g, ' ').replace(/\b\w/g, (x) => x.toUpperCase()); },
       });
+      // tu foto de perfil en el retrato (cambia apenas la subís)
+      net?.onYo((yo) => hud.setFoto(yo.foto ? net.foto(yo.u, yo.foto) : ''));
     }
     // Chat de voz por proximidad (solo en el servidor, ver systems/voz.js) y menú de Esc con sus ajustes (ver ui/menu.js)
     let menu = null;
@@ -598,6 +651,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
         notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 4000); },
       });
     }
+    // Atajos 1 a 5 para los apartados del menú (ver ui/atajos.js). No andan escribiendo ni en una charla.
+    const { createAtajos } = await import('./ui/atajos.js');
+    createAtajos({ ocupado: () => !!dialogue?.active || (lotes?.blocked ?? false) || (casas?.designing ?? false) });
     const { createMenu } = await import('./ui/menu.js');
     menu = createMenu({
       stage, voz, extras: [{ texto: '⭐ Nivel y aptitudes (N)', accion: () => niveles?.abrir() }],

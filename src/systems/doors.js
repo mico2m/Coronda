@@ -248,11 +248,14 @@ export function createDoors({ stage, onEnter, dev = false, blocked = () => false
       for (const cfg of data.doors ?? []) {
         const name = cfg.empty ?? cfg.object ?? cfg.name;
         const id = doorIdFromName(name) ?? name;
-        if (!byId.has(id) && !cfg.position) {
+        // Un objeto del .glb nombrado en el JSON vale aunque no tenga las Custom Properties (ej. se exportó sin ellas)
+        const node = !byId.has(id) && name ? root.getObjectByName(name) : null;
+        if (!byId.has(id) && !node && !cfg.position) {
           console.warn(`Puerta "${name}": no está en el .glb ni tiene "position" en el JSON.`);
           continue;
         }
         const door = get(id);
+        if (node && !door.nodes.length) { door.nodes.push(node); door.shapes.push(shapeOf(node).box); }
         if (!door.shapes.length && cfg.position) {
           const p = new THREE.Vector3(...cfg.position);
           door.shapes.push(new THREE.Box3(p.clone(), p.clone()));

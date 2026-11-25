@@ -1,6 +1,9 @@
 // Hora del juego y ciclo de día y noche.
 //
-// La hora sale del reloj de la compu (Date.now()), así TODOS los jugadores ven la misma hora sin mandarse nada.
+// En el servidor (index.html) la hora la manda el SERVIDOR: su configuración (con el /time del admin) llega por
+// net.onHora y el reloj es el del servidor (net.ahora(), sincronizado; no el de la compu de cada uno). Así todos ven
+// exactamente la misma hora aunque el reloj de alguna compu esté corrido, y al reconectar se recupera sola.
+// Sin servidor (dev.html) usa data/tables/tiempo.json y el reloj de la compu.
 // Configuración: data/tables/tiempo.json (también desde el Studio):
 //   dia_minutos     cuántos minutos reales dura un día entero del juego (24 = 1 minuto real por hora)
 //   desfase_horas   corre el reloj (ej. 6 = el juego va 6 horas adelantado)
@@ -38,9 +41,12 @@ export const TIEMPO_DEFAULT = {
 
 const _a = new THREE.Color(), _b = new THREE.Color(), _c = new THREE.Color();
 
-export function createTiempo({ scene, getSceneData = () => null, getBaseShade = () => ({ tint: '#ffffff', brightness: 1 }), stage = null, dev = false } = {}) {
+export function createTiempo({ scene, net = null, getSceneData = () => null, getBaseShade = () => ({ tint: '#ffffff', brightness: 1 }), stage = null, dev = false } = {}) {
   let cfg = structuredClone(TIEMPO_DEFAULT);
-  const ready = loadJSON('data/tables/tiempo.json').then((c) => setConfig(c)).catch(() => {});
+  const reloj = net ? () => net.ahora() : () => Date.now();
+  // con servidor, la configuración es la del servidor (no la del archivo local)
+  const ready = net ? Promise.resolve() : loadJSON('data/tables/tiempo.json').then((c) => setConfig(c)).catch(() => {});
+  if (net) { if (net.hora) queueMicrotask(() => setConfig(net.hora)); const prev = net.onHora; net.onHora = (c) => { prev?.(c); setConfig(c); }; }
   const listeners = new Set();
 
   function setConfig(c) {
@@ -58,14 +64,14 @@ export function createTiempo({ scene, getSceneData = () => null, getBaseShade = 
 
   // ---------- Hora ----------
   const dayMs = () => cfg.dia_minutos * 60000;
-  function horasTotales(t = Date.now()) { return (t / dayMs()) * 24 + cfg.desfase_horas; }
+  function horasTotales(t = reloj()) { return (t / dayMs()) * 24 + cfg.desfase_horas; }
   function hora(t) { const h = horasTotales(t) % 24; return h < 0 ? h + 24 : h; }
   function dia(t) { return Math.floor(horasTotales(t) / 24); }
   function texto(h = hora()) { const m = Math.floor((h % 1) * 60); return `${String(Math.floor(h)).padStart(2, '0')}:${String(m).padStart(2, '0')}`; }
   function enRango(h, desde, hasta) { return desde <= hasta ? h >= desde && h < hasta : h >= desde || h < hasta; }
   function abierta(h = hora()) { return enRango(h, cfg.tienda.abre, cfg.tienda.cierra); }
   // ms reales que faltan para que sea la hora h (siempre hacia adelante)
-  function hastaHora(h, t = Date.now()) { let d = (h - hora(t)) % 24; if (d <= 0) d += 24; return (d / 24) * dayMs(); }
+  function hastaHora(h, t = reloj()) { let d = (h - hora(t)) % 24; if (d <= 0) d += 24; return (d / 24) * dayMs(); }
   // Momento del día: los dos que rodean a la hora y cuánto se mezclan
   function tramo(h = hora()) {
     const ms = cfg.momentos;
@@ -136,8 +142,8 @@ export function createTiempo({ scene, getSceneData = () => null, getBaseShade = 
   }
 
   return {
-    ready, update, apply: () => apply(true), setConfig, onConfig: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
-    hora, dia, texto, momento, abierta, hastaHora, enRango,
+    ready, update, apply: () => apply(true), setConfig: (c) => { if (!net) setConfig(c); }, // (Studio) con servidor, la hora la cambia el servidor onConfig: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
+    hora, dia, texto, momento, abierta, hastaHora, enRango, ahora: reloj,
     get config() { return structuredClone(cfg); },
     set enabled(v) { enabled = !!v; if (enabled) apply(true); },
   };

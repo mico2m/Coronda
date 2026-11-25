@@ -7,7 +7,9 @@
 //   xp_base, xp_exponente                         XP para pasar del nivel n al n+1 = xp_base × n^xp_exponente
 //   nivel_max, puntos_por_nivel
 //   aptitudes: { id: { nombre, icono, descripcion, por_punto, max_puntos } }
-// Se guarda en el navegador (localStorage 'coronda.niveles'), como la mochila: { xp, gastados: { energia: 2 } }.
+// En el servidor (index.html) la XP y los puntos los decide el SERVIDOR (llegan con net.onYo): talar o retirar muebles
+// suman XP allá, y "mejorar" se le pide al servidor. ganar() solo muestra el "+XP" en pantalla.
+// Sin servidor (dev.html) se guarda en el navegador (localStorage 'coronda.niveles'): { xp, gastados: { energia: 2 } }.
 //
 // API: niveles.ganar('hachazo' | 'arbol' | 'mueble' | número, cantidad) · niveles.bonus('energia') (lo que suma esa aptitud)
 //      niveles.estado (nivel, xp, para el siguiente, puntos libres…) · niveles.abrir() / cerrar() / alternar() (tecla N)
@@ -22,11 +24,11 @@ export const NIVELES_DEFAULT = {
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // opts: stage, notify(msg), blocked() (charla abierta: la N no hace nada), onOpen() / onClose() (frenar al personaje)
-export function createNiveles({ stage, notify = () => {}, blocked = () => false, onOpen = () => {}, onClose = () => {} } = {}) {
+export function createNiveles({ stage, net = null, notify = () => {}, blocked = () => false, onOpen = () => {}, onClose = () => {} } = {}) {
   let cfg = structuredClone(NIVELES_DEFAULT);
   let data = { xp: 0, gastados: {} };
-  try { const d = JSON.parse(localStorage.getItem(STORE)); if (d && typeof d === 'object') data = { xp: Math.max(0, Number(d.xp) || 0), gastados: { ...(d.gastados ?? {}) } }; } catch { /* nada */ }
-  const guardar = () => { try { localStorage.setItem(STORE, JSON.stringify(data)); } catch { /* modo privado */ } };
+  if (!net) { try { const d = JSON.parse(localStorage.getItem(STORE)); if (d && typeof d === 'object') data = { xp: Math.max(0, Number(d.xp) || 0), gastados: { ...(d.gastados ?? {}) } }; } catch { /* nada */ } }
+  const guardar = () => { if (net) return; try { localStorage.setItem(STORE, JSON.stringify(data)); } catch { /* modo privado */ } };
   const listeners = new Set();
   const avisar = () => { listeners.forEach((f) => { try { f(estado()); } catch (e) { console.error(e); } }); dibujar(); };
 
@@ -59,9 +61,21 @@ export function createNiveles({ stage, notify = () => {}, blocked = () => false,
   const bonus = (id) => (Number(data.gastados[id]) || 0) * (cfg.aptitudes[id]?.por_punto || 0);
 
   // ---------- Ganar XP ----------
+  // Del servidor: XP y puntos de verdad
+  let primera = true;
+  const desdeServidor = (yo) => {
+    const n = yo.niveles ?? { xp: 0, gastados: {} };
+    const antes = nivelDe(data.xp).nivel;
+    data = { xp: Math.max(0, Number(n.xp) || 0), gastados: { ...(n.gastados ?? {}) } };
+    const ahora = nivelDe(data.xp).nivel;
+    if (!primera && ahora > antes) subio(ahora);
+    primera = false;
+    avisar();
+  };
   function ganar(que, cant = 1) {
     const xp = typeof que === 'number' ? que : (cfg[`xp_por_${que}`] || 0) * cant;
     if (!(xp > 0)) return 0;
+    if (net) { flotar(`+${xp} XP`); return xp; } // la suma la hace el servidor
     const antes = nivelDe(data.xp).nivel;
     data.xp = Math.round((data.xp + xp) * 100) / 100;
     guardar();
@@ -72,6 +86,10 @@ export function createNiveles({ stage, notify = () => {}, blocked = () => false,
     return xp;
   }
   function mejorar(id) {
+    if (net) {
+      net.rpc('niveles.mejorar', { id }).then(() => notify(`${cfg.aptitudes[id]?.nombre ?? id} mejorada`)).catch((e) => notify(e.message));
+      return false;
+    }
     const a = cfg.aptitudes[id];
     const e = estado();
     if (!a || e.puntos <= 0 || (Number(data.gastados[id]) || 0) >= a.max_puntos) return false;
@@ -79,7 +97,7 @@ export function createNiveles({ stage, notify = () => {}, blocked = () => false,
     guardar(); avisar();
     return true;
   }
-  function reiniciar() { data = { xp: 0, gastados: {} }; guardar(); avisar(); }
+  function reiniciar() { if (net) return; data = { xp: 0, gastados: {} }; guardar(); avisar(); }
 
   // ---------- Interfaz: barra de XP, cartel de nivel, ventana de aptitudes ----------
   const host = stage ?? document.body;
@@ -168,6 +186,7 @@ export function createNiveles({ stage, notify = () => {}, blocked = () => false,
   }, true);
 
   dibujar();
+  if (net) net.onYo(desdeServidor); // después de armar la barra (si ya llegó, se aplica enseguida)
   return {
     ganar, mejorar, bonus, reiniciar, setConfig, abrir, cerrar, alternar, boton,
     get abierto() { return abierto(); },

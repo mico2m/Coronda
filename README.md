@@ -36,6 +36,26 @@ Coronda/
     └── ui/                 interfaz
 ```
 
+## Servidor propio (multijugador)
+
+Desde esta versión el mundo vive en **un servidor que corre en tu PC** (`servidor/`, ver `servidor/README.md`): doble clic en
+`Servidor.bat` y entrás en `http://localhost:8080`. Tus amigos entran por la dirección del túnel de Cloudflare.
+Con el servidor apagado, `index.html` muestra *"El servidor está apagado"*. `dev.html` (solo en tu PC) sigue andando solo, para modelar.
+
+- **Cuentas:** nombre + contraseña. Cada jugador tiene su id; el nombre no se repite (tampoco con tildes o mayúsculas) y no se puede estar dos veces a la vez.
+- **El servidor decide todo lo que vale algo:** mochila, nivel y XP, energía para talar, lotes, casas y muebles, cofres, pedidos, árboles, intercambios.
+  El navegador solo guarda el token de la sesión y preferencias de pantalla: editar F12 → Aplicación no cambia nada.
+- **Misma hora y mismos pedidos para todos:** salen del reloj del servidor (cada navegador lo sincroniza con su reloj interno, así cambiar la hora de la PC no afecta).
+- **Chat:** avisa *"X se ha unido al mundo"* / *"X ha abandonado el mundo"* (un corte de menos de 20 s cuenta como reconexión y no avisa).
+- **Atajos:** 1 Mochila · 2 Nivel y aptitudes · 3 Jugadores · 4 Mi perfil · 5 Menú (no andan escribiendo ni en una charla). Las acciones del personaje pasaron a Mayús + número.
+- **Social:** clic sobre otro jugador → Ver perfil · Dejar una firma · Intercambiar. Foto de perfil en 👤 Mi perfil (se recorta y comprime sola).
+- **Cofre:** Claude lo fabrica; ponelo en tu casa y acercate: *E Abrir el cofre*.
+- **Casas:** el cartel del frente (Empty `cartel_dueno`) muestra el nombre del dueño actual.
+- **Admins:** nombres en `servidor/config.json > admins`. Comandos: `/time set 19`, `/time reset`, `/anuncio`, `/madera Nombre 20`, `/resistencia Nombre`, `/expulsar Nombre`.
+- **Consola (F12):** `corondaNet.debug()`, `corondaTienda.pedidos()`, `corondaClaude.state`.
+
+Las secciones de abajo que hablan de MQTT, brokers o `localStorage` describen cómo era antes; con el servidor esos datos están en `servidor/datos/`.
+
 ## Qué tomamos de Ocarina of Time
 
 | En Ocarina of Time | Acá |

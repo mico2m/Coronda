@@ -23,7 +23,7 @@ function place(id) {
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
 }
 
-export function createPlayerList({ net }) {
+export function createPlayerList({ net, onPerfil = null }) {
   const app = document.querySelector('.app') ?? document.body;
   const el = document.createElement('div');
   el.className = 'players';
@@ -47,7 +47,7 @@ export function createPlayerList({ net }) {
         <table>
           <thead><tr><th>Nombre</th><th>Personaje</th><th>Dónde</th><th>Ping</th><th>Última conexión</th></tr></thead>
           <tbody>${list.map((p) => `
-            <tr class="${p.online ? 'on' : 'off'}${p.me ? ' me' : ''}">
+            <tr class="${p.online ? 'on' : 'off'}${p.me ? ' me' : ''}" data-u="${esc(p.u ?? '')}" title="Clic: ver perfil">
               <td><i class="dot"></i>${esc(p.n)}${p.me ? ' <small>(vos)</small>' : ''}</td>
               <td>${esc(p.c)}</td>
               <td>${esc(p.online ? place(p.s) : '')}</td>
@@ -56,7 +56,7 @@ export function createPlayerList({ net }) {
             </tr>`).join('')}
           </tbody>
         </table>
-        <div class="players-foot">Soltá <kbd>Tab</kbd> para cerrar</div>
+        <div class="players-foot">Soltá <kbd>Tab</kbd> para cerrar · tocá un nombre para ver su perfil</div>
       </div>`;
   }
   function show() { if (open) return; open = true; render(); el.hidden = false; timer = setInterval(render, 1000); }
@@ -71,6 +71,6 @@ export function createPlayerList({ net }) {
   window.addEventListener('keyup', (e) => { if (e.code === 'Tab') hide(); });
   window.addEventListener('blur', hide);
   btn.addEventListener('click', () => (open ? hide() : show()));
-  el.addEventListener('click', hide);
+  el.addEventListener('click', (e) => { const u = e.target.closest('tr[data-u]')?.dataset.u; hide(); if (u && onPerfil) onPerfil(u); });
   return { show, hide };
 }

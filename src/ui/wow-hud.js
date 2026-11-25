@@ -1,7 +1,8 @@
 // HUD estilo WoW (solo index.html; el aspecto está en css/wow.css). En la compu acomoda el HUD como un MMO:
 //   arriba a la izquierda  marco del jugador: retrato, nombre y la barra de energía (hachazos que quedan hoy)
 //   arriba a la derecha    nombre de la zona, minimapa con aro dorado y el reloj debajo
-//   arriba al centro       micro-menú: 🎒 mochila · 👥 jugadores · 🎙️ voz · ⚙️ menú
+//   arriba al centro       micro-menú: 🎒 mochila · ⭐ nivel · 👥 jugadores · 👤 perfil · 🎙️ voz · ⚙️ menú (atajos 1 a 5, ui/atajos.js)
+//   El retrato muestra tu foto de perfil si tenés (setFoto).
 //   abajo a la izquierda   chat
 // En el celular no mueve nada (el HUD táctil ya está acomodado para el pulgar): solo cambia el aspecto.
 // Los elementos los crean otros sistemas, algunos más tarde (chat, 👥, 🎙️ solo en el servidor): un MutationObserver
@@ -22,7 +23,7 @@ export function createWowHud({ stage, nombre = 'Viajero', personaje = '', getZon
   let zonaTxt = '';
   setInterval(() => { const z = getZona() || ''; if (z !== zonaTxt) { zonaTxt = z; zona.textContent = z; zona.hidden = !z; } }, 500);
 
-  if (!compu) return { compu };
+  if (!compu) return { compu, setFoto() {} };
 
   // Marco del jugador
   const marco = document.createElement('div');
@@ -40,7 +41,7 @@ export function createWowHud({ stage, nombre = 'Viajero', personaje = '', getZon
   stage.append(micro);
   // Está dentro de #stage: sin esto la cámara se queda con el clic (setPointerCapture) y los botones no responden
   for (const el of [marco, micro]) el.addEventListener('pointerdown', (e) => e.stopPropagation());
-  const ORDEN = ['inv-btn', 'apt-btn', 'players-open', 'voz-btn', 'menu-btn'];
+  const ORDEN = ['inv-btn', 'apt-btn', 'players-open', 'perfil-btn', 'voz-btn', 'menu-btn'];
 
   function acomodar() {
     const en = document.querySelector('.energia');
@@ -56,5 +57,10 @@ export function createWowHud({ stage, nombre = 'Viajero', personaje = '', getZon
   acomodar();
   new MutationObserver(acomodar).observe(app, { childList: true, subtree: true });
 
-  return { compu, marco, micro };
+  const retrato = marco.querySelector('.wow-retrato');
+  function setFoto(url) {
+    retrato.style.backgroundImage = url ? `url("${String(url).replace(/"/g, '')}")` : '';
+    retrato.classList.toggle('con-foto', !!url);
+  }
+  return { compu, marco, micro, setFoto };
 }

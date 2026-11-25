@@ -346,7 +346,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       try {
         const ctl = new AbortController();
         const to = setTimeout(() => ctl.abort(), 15000);
-        const r = await fetch(cfg.endpoint, {
+        const r = await iaFetch({
           method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
           body: JSON.stringify({
             modo: 'informe', jugador: m.whoName, texto: '', historial: [], mundo: mundoActual(),
@@ -373,7 +373,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       if (!aiOn()) return;
       const ctl = new AbortController();
       const to = setTimeout(() => ctl.abort(), 15000);
-      const r = await fetch(cfg.endpoint, {
+      const r = await iaFetch({
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
         body: JSON.stringify({ modo: 'saludo', jugador: myName, texto: '', historial: [], mundo: { ...mundoActual(), carpinteria: carpinteria() } }),
       });
@@ -421,7 +421,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     try {
       const ctl = new AbortController();
       const to = setTimeout(() => ctl.abort(), 15000);
-      const r = await fetch(cfg.endpoint, {
+      const r = await iaFetch({
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
         body: JSON.stringify({ modo: 'comentario', jugador: myName, texto: '', historial: [], chat_reciente: chatLog.slice(-6), mundo: mundoActual() }),
       });
@@ -443,6 +443,12 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   function resting() { try { return Number(localStorage.getItem(REST_KEY) || 0) > Date.now(); } catch { return false; } }
   function rest() { try { localStorage.setItem(REST_KEY, String(Date.now() + REST_SECS * 1000)); } catch { /* nada */ } }
   const aiOn = () => !!cfg.endpoint && cfg.activa !== false && !resting();
+  // Con servidor, la IA se pide a través de él (POST /ia): así anda desde cualquier dirección del juego (localhost, el
+  // túnel) sin tocar la configuración del worker. Sin servidor (dev.html), directo al worker de data/tables/ia.json.
+  function iaFetch(init) {
+    if (!net?.base) return fetch(cfg.endpoint, init);
+    return fetch(`${net.base}/ia`, { ...init, headers: { ...(init.headers ?? {}), Authorization: `Bearer ${net.token}` } });
+  }
   let fallos = 0;
   // Un fallo suelto no apaga la IA: recién al segundo seguido descansa unos minutos
   function fallo() { if (++fallos >= 2) rest(); return overload(); }
@@ -462,7 +468,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     try {
       const ctl = new AbortController();
       const to = setTimeout(() => ctl.abort(), 15000);
-      const r = await fetch(cfg.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
+      const r = await iaFetch({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
       clearTimeout(to);
       if (r.status === 429) return { text: 'Pará, pará, que me mareás. Dame un cachito y seguimos.', choices: [{ text: 'Dale', next: 'menu' }, { text: 'Chau', next: 'despedida' }] };
       if (!r.ok) return fallo();
@@ -477,7 +483,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     acc = acc.filter((a) => a?.tipo !== 'encargar');
     const tienda = getTienda();
     if (enc && tienda?.encargoIA) {
-      const r = tienda.encargoIA(enc.muebles, !!enc.confirmado);
+      const r = await tienda.encargoIA(enc.muebles, !!enc.confirmado);
       say = (await contarEncargo(r, text)) || r.texto;
       history.push({ de: myName, texto: body.texto }, { de: 'Claude', texto: say });
       while (history.length > 12) history.shift();
@@ -501,7 +507,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     try {
       const ctl = new AbortController();
       const to = setTimeout(() => ctl.abort(), 15000);
-      const res = await fetch(cfg.endpoint, {
+      const res = await iaFetch({
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
         body: JSON.stringify({ modo: 'encargo', jugador: myName, texto: String(pedido).slice(0, 200), historial: history.slice(-4), mundo: { ...mundoActual(), carpinteria: carpinteria() },
           encargo: { resumen: r.resumen.slice(0, 900), confirmar: !!r.pendiente, hecho: !!r.hecho } }),

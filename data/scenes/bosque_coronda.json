@@ -34,10 +34,15 @@
   "actors": [],
   "doors": [
     {
-      "empty": "cartel_volver",
+      "empty": "volver_plaza",
+      "position": [
+        3.2,
+        1,
+        -44.5
+      ],
       "target": "coronda_plaza",
       "mode": "E",
-      "radius": 2.2,
+      "radius": 1.6,
       "label": "Volver a la plaza",
       "spawn": {
         "position": [

@@ -8,6 +8,6 @@
   "nivel_max": 30,
   "puntos_por_nivel": 1,
   "aptitudes": {
-    "energia": { "nombre": "Energía", "icono": "⚡", "descripcion": "Más energía por día para talar y correr.", "por_punto": 5, "max_puntos": 10 }
+    "energia": { "nombre": "Energía", "icono": "⚡", "descripcion": "Más energía máxima para talar y correr.", "por_punto": 5, "max_puntos": 10 }
   }
 }

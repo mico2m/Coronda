@@ -183,6 +183,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
   // Primera persona: con la cámara ya lo más cerca posible, una vuelta más de la rueda (o pellizcar) entra a la vista desde
   // los ojos; alejar la rueda vuelve a la tercera persona. El personaje se oculta (los demás lo siguen viendo).
   let fp = false, fpPull = 0;
+  let movimiento = 'quieto'; // 'quieto' | 'caminando' | 'corriendo' (la energía se recupera quieto o caminando, ver bosque.js)
   let runGate = null; // (dt) => ¿puede correr? (lo pone game.js: correr gasta energía, ver systems/bosque.js)
   const onFpChange = new Set();
   function setFirstPerson(on) {
@@ -380,6 +381,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
     get facing() { return facing; },
     // Primera persona (ver setFirstPerson): player.firstPerson = true/false · player.onFirstPerson((on) => …)
     get firstPerson() { return fp; },
+    get movimiento() { return movimiento; },
     setRunGate(fn) { runGate = typeof fn === 'function' ? fn : null; },
     set firstPerson(on) { setFirstPerson(on); },
     onFirstPerson(fn) { onFpChange.add(fn); return () => onFpChange.delete(fn); },
@@ -474,6 +476,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
       if (!active) return;
       mixer?.update(dt);
       let moving = false;
+      movimiento = 'quieto';
 
       // Movimiento relativo a la cámara: teclado, o el joystick del celular si no hay teclas apretadas
       let fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
@@ -495,6 +498,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
         if (analog && !running) speed *= THREE.MathUtils.clamp(analog / 0.85, 0.35, 1);
         moving = true;
         playClip(running ? 'run' : 'walk');
+        movimiento = running ? 'corriendo' : 'caminando';
         // La animación acompaña la velocidad para que los pies no resbalen
         const animSpeed = running ? cfg.animation.runAnimSpeed : cfg.animation.walkAnimSpeed;
         currentClip?.setEffectiveTimeScale(animSpeed > 0 ? speed / animSpeed : running ? 1 : speed / cfg.walkSpeed);

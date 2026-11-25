@@ -9,15 +9,16 @@
 //   rebrote_minutos    minutos reales hasta que vuelve a crecer         (5)
 //   animacion          clip del personaje al talar ("talar"; si tu personaje no lo tiene, el árbol igual se sacude)
 //   radio              a cuántos metros del tronco aparece "E Talar"
-//   resistencia_por_dia hachazos que podés dar por día del juego (30). Se recupera al empezar el día siguiente (00:00,
-//                      data/tables/tiempo.json). Se ve en el botón 🪓 (⚡) y se guarda en el navegador. 0 = sin límite.
-//   energia_correr_por_seg  cuánta de esa misma energía gasta correr, por segundo (0.25; 0 = correr no gasta).
-//                      Sin energía no se puede correr (solo caminar) ni talar hasta el día siguiente.
+//   resistencia_por_dia energía máxima (30; el nombre quedó de cuando se recargaba por día). Cada hachazo gasta 1.
+//                      Se ve en la barra ⚡ y se guarda en el navegador. 0 = sin límite.
+//   energia_correr_por_seg      cuánta energía gasta correr, por segundo (1; 0 = correr no gasta). Sin energía solo se camina.
+//   recupera_quieto_por_seg     cuánta se recupera por segundo con el personaje quieto (2)
+//   recupera_caminando_por_seg  y caminando (más lento: 0.5). Corriendo o talando no se recupera.
 // Los árboles caídos son los mismos para todo el servidor (se guardan como los lotes: bosque~<escena>.<árbol>).
 import * as THREE from 'three';
 import { loadJSON } from '../core/assets.js';
 
-export const BOSQUE_DEFAULT = { golpes_por_tanda: 3, madera_por_tanda: 2, tandas_por_arbol: 3, rebrote_minutos: 5, animacion: 'talar', radio: 1.6, recurso: 'madera', resistencia_por_dia: 30, energia_correr_por_seg: 0.25 };
+export const BOSQUE_DEFAULT = { golpes_por_tanda: 3, madera_por_tanda: 2, tandas_por_arbol: 3, rebrote_minutos: 5, animacion: 'talar', radio: 1.6, recurso: 'madera', resistencia_por_dia: 30, energia_correr_por_seg: 1, recupera_quieto_por_seg: 2, recupera_caminando_por_seg: 0.5 };
 const RES_KEY = 'coronda.bosque.resistencia'; // { dia, usados }
 const TREE_RE = /^arbol_\d+$/i;
 const STUMP_RE = /_tocon/i;
@@ -36,6 +37,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     cfg.radio = Math.max(0.5, Number(cfg.radio) || BOSQUE_DEFAULT.radio);
     cfg.resistencia_por_dia = Math.max(0, Math.round(Number(cfg.resistencia_por_dia ?? BOSQUE_DEFAULT.resistencia_por_dia) || 0));
     cfg.energia_correr_por_seg = Math.max(0, Number(cfg.energia_correr_por_seg ?? BOSQUE_DEFAULT.energia_correr_por_seg) || 0);
+    for (const k of ['recupera_quieto_por_seg', 'recupera_caminando_por_seg']) cfg[k] = Math.max(0, Number(cfg[k] ?? BOSQUE_DEFAULT[k]) || 0);
   }
 
   // ---------- Resistencia: hachazos por día del juego ----------
@@ -45,7 +47,6 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
   const maxE = () => cfg.resistencia_por_dia + Math.max(0, Number(extraEnergia()) || 0); // la del día + la aptitud Energía
   function quedan() {
     if (!cfg.resistencia_por_dia) return Infinity;
-    if (res.dia !== hoy()) res = { dia: hoy(), usados: 0 }; // día nuevo: resistencia llena
     return Math.max(0, maxE() - res.usados);
   }
   function gastar() {
@@ -58,7 +59,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
   function correr(dt) {
     if (!cfg.resistencia_por_dia || !(cfg.energia_correr_por_seg > 0)) return true;
     if (quedan() <= 0) {
-      if (!avisado) { avisado = true; notify(`Estás agotado: no podés correr. Recuperás la energía ${recupera()}.`); }
+      if (!avisado) { avisado = true; notify(`Estás agotado: no podés correr. ${recupera()}`); }
       return false;
     }
     avisado = false;
@@ -67,12 +68,16 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     if (guardarT > 1) { guardarT = 0; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }
     return true;
   }
-  // Cuándo se recupera: "a las 00:00 (en 7 minutos)" según el reloj del juego
-  function recupera() {
-    if (!tiempo) return 'mañana';
-    const ms = tiempo.hastaHora(0);
-    const min = Math.max(1, Math.round(ms / 60000));
-    return `a las 00:00 del juego (en ${min} minuto${min > 1 ? 's' : ''})`;
+  // Cómo se recupera: quieto rápido, caminando más lento (ver recuperar)
+  const recupera = () => 'Quedate quieto un momento (o caminá) para recuperar energía.';
+  // Recupera energía según lo que hace el personaje: 'quieto' | 'caminando' | 'corriendo' (dt en segundos)
+  function recuperar(mov, dt) {
+    if (!cfg.resistencia_por_dia || !res.usados || busy) return;
+    const v = mov === 'quieto' ? cfg.recupera_quieto_por_seg : mov === 'caminando' ? cfg.recupera_caminando_por_seg : 0;
+    if (!(v > 0)) return;
+    res.usados = Math.max(0, res.usados - v * dt);
+    guardarT += dt;
+    if (guardarT > 1 || !res.usados) { guardarT = 0; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }
   }
 
   // ---------- Árboles de la escena ----------
@@ -153,7 +158,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     const t = near;
     const player = getPlayer?.();
     if (!t || busy || !player || isDown(t)) return;
-    if (quedan() <= 0) { toast('😮‍💨 Sin fuerzas'); notify(`Estás agotado: no podés talar más hoy. Recuperás la resistencia ${recupera()}.`); return; }
+    if (quedan() <= 0) { toast('😮‍💨 Sin fuerzas'); notify(`Estás agotado: no podés talar. ${recupera()}`); return; }
     gastar();
     onXp('hachazo');
     busy = true; // el botón sigue a la vista, atenuado, mientras da el hachazo
@@ -171,13 +176,14 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
       if (t.tandas >= cfg.tandas_por_arbol) { fell(t); toast(`¡Cayó el árbol! +${cfg.madera_por_tanda} 🪵`); onXp('arbol'); }
     } else toast(`${'●'.repeat(t.hits)}${'○'.repeat(cfg.golpes_por_tanda - t.hits)}`);
     const q = Math.ceil(quedan() - 1e-6);
-    if (q === 0) setTimeout(() => notify(`Te quedaste sin fuerzas por hoy. Recuperás la resistencia ${recupera()}.`), 900);
-    else if (q === 5) setTimeout(() => notify('Te quedan 5 hachazos por hoy ⚡'), 900);
+    if (q === 0) setTimeout(() => notify(`Te quedaste sin fuerzas. ${recupera()}`), 900);
+    else if (q === 5) setTimeout(() => notify('Te queda poca energía ⚡ (descansá para recuperarla)'), 900);
     busy = false;
   }
 
   function update(focus, dt) {
     scan(dt);
+    recuperar(getPlayer?.()?.movimiento ?? 'quieto', dt); // con la cámara libre (dev) cuenta como quieto
     let best = null, bd = Infinity;
     for (const t of trees) {
       if (t.parts.length && t.parts[0].visible === isDown(t)) show(t); // se cayó o volvió a crecer

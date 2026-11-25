@@ -388,7 +388,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     });
     // Correr gasta la misma energía que talar (bosque.json > energia_correr_por_seg; sin energía, solo camina)
     player.setRunGate((dt) => bosque.correr(dt));
-    // Barra de energía (hachazos que te quedan hoy) abajo en el HUD (ver ui/energia.js)
+    // Barra de energía (para talar y correr; se recupera quieto o caminando) en el HUD (ver ui/energia.js)
     const { createEnergia } = await import('./ui/energia.js');
     createEnergia({ stage, getBosque: () => bosque });
 

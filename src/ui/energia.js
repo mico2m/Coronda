@@ -1,5 +1,5 @@
-// Barra de energía en el HUD: la energía que te queda hoy para talar y correr (resistencia del bosque,
-// ver systems/bosque.js). Se llena de nuevo al empezar el día del juego. Si "Hachazos por día" es 0 (sin límite), no se ve.
+// Barra de energía en el HUD: la energía para talar y correr (resistencia del bosque, ver systems/bosque.js).
+// Se recupera quieto (rápido) o caminando (más lento). Si la energía máxima es 0 (sin límite), no se ve.
 export function createEnergia({ stage, getBosque }) {
   const el = document.createElement('div');
   el.className = 'energia'; el.hidden = true;
@@ -19,7 +19,7 @@ export function createEnergia({ stage, getBosque }) {
     el.classList.toggle('vacia', r.quedan === 0);
     el.setAttribute('aria-valuenow', String(r.quedan)); el.setAttribute('aria-valuemax', String(r.max)); el.setAttribute('aria-valuemin', '0');
     if (antes != null && r.quedan < antes) { el.classList.remove('gasta'); void el.offsetWidth; el.classList.add('gasta'); } // un golpecito al gastar
-    if (antes != null && r.quedan > antes) { el.classList.remove('llena'); void el.offsetWidth; el.classList.add('llena'); }   // se recargó
+    if (antes != null && r.quedan > antes && r.quedan >= r.max) { el.classList.remove('llena'); void el.offsetWidth; el.classList.add('llena'); } // se llenó
     antes = r.quedan;
   }
   setInterval(dibujar, 250);

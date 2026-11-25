@@ -1,5 +1,5 @@
 // Niveles y aptitudes. Ganás experiencia (XP) haciendo cosas en el mundo (talar, retirar muebles); al juntar la XP
-// necesaria subís de nivel y recibís puntos para mejorar aptitudes. Por ahora hay una: Energía (más energía por día
+// necesaria subís de nivel y recibís puntos para mejorar aptitudes. Por ahora hay una: Energía (más energía máxima
 // para talar y correr, ver systems/bosque.js).
 //
 // Configuración: data/tables/niveles.json (también desde el Studio, panel Mundo):
@@ -17,7 +17,7 @@ import { loadJSON } from '../core/assets.js';
 const STORE = 'coronda.niveles';
 export const NIVELES_DEFAULT = {
   xp_por_hachazo: 2, xp_por_arbol: 10, xp_por_mueble: 15, xp_base: 50, xp_exponente: 1.5, nivel_max: 30, puntos_por_nivel: 1,
-  aptitudes: { energia: { nombre: 'Energía', icono: '⚡', descripcion: 'Más energía por día para talar y correr.', por_punto: 5, max_puntos: 10 } },
+  aptitudes: { energia: { nombre: 'Energía', icono: '⚡', descripcion: 'Más energía máxima para talar y correr.', por_punto: 5, max_puntos: 10 } },
 };
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 

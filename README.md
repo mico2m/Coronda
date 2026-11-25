@@ -599,7 +599,7 @@ Claude atiende la tienda y fabrica muebles a cambio de madera. Código: `src/sys
 ## Niveles y aptitudes
 
 - Ganás **XP** talando (por hachazo y al voltear un árbol) y retirando muebles de la Carpintería. Al juntar la XP necesaria subís de nivel y recibís **puntos de aptitud**.
-- **N** (o ⭐ en la barra de ítems, o ⚙️ → *Nivel y aptitudes*; en el celular también tocando la barra de XP) abre la ventana de aptitudes. Por ahora hay una: **Energía** (+5 de energía máxima por punto, hasta 10 puntos).
+- **N** (o ⭐ en la barra de ítems, o ⚙️ → *Nivel y aptitudes*; en el celular también tocando la barra de XP) abre la ventana de aptitudes. Por ahora hay una: **Energía** (+5 de energía máxima por punto, hasta 10 puntos). La energía se gasta talando (1 por hachazo) y corriendo, y se recupera quieto (rápido) o caminando (más lento): `data/tables/bosque.json` o Studio → Mundo → *Talar árboles y energía*.
 - Se configura en `data/tables/niveles.json` o en el Studio (panel Mundo → *Niveles y aptitudes*, con botones para sumar XP y reiniciar el nivel de la vista previa). XP para pasar del nivel n al n+1 = `xp_base × n^xp_exponente`.
 - Se guarda en el navegador (`coronda.niveles`), como la mochila. Código: `src/systems/niveles.js`.
 

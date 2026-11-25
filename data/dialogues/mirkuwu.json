@@ -1,0 +1,29 @@
+{
+  "speaker": "Mirkuwue",
+  "start": "inicio",
+  "nodes": {
+    "inicio": {
+      "text": [
+        "Que onda artikuwu",
+        "¿que te parece la nueva update?",
+        "yo aca trabajando",
+        "...",
+        "{celular}para",
+        "me llama la guaranga",
+        "mentira jajaja\n{idle}\nbueno sigo caminando pa"
+      ]
+    }
+  },
+  "editor": {
+    "nodes": {
+      "inicio": {
+        "x": 390,
+        "y": 40
+      }
+    },
+    "start": {
+      "x": 20,
+      "y": 40
+    }
+  }
+}

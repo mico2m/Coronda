@@ -1,0 +1,16 @@
+{
+  "speed": 1.4,
+  "start": "a",
+  "nodes": {
+    "a": {
+      "point": "ruta_mirkuwu_1",
+      "wait": 2,
+      "next": "parada"
+    },
+    "parada": {
+      "point": "ruta_mirkuwu_2",
+      "wait": 2,
+      "next": "a"
+    }
+  }
+}

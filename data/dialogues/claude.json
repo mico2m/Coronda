@@ -14,9 +14,8 @@
   "nodes": {
     "presentacion": {
       "text": [
-        "¡Hola! Vos no me conocés todavía. Soy Claude, una inteligencia artificial que se mudó a Coronda.",
-        "Ayudé a armar este pueblo y ahora me gusta recorrerlo, charlar y dar consejos.",
-        "Escribime lo que quieras: charlamos, te doy una mano, y si me lo pedís te sigo o voy hasta tu casa."
+        "¡Holaa! Soy Claudito, un NPC más de acá, de Coronda.",
+        "Escribime lo que quieras, que acá estoy."
       ],
       "set": {
         "conoce_claude": true
@@ -90,7 +89,7 @@
     "menu": {
       "ask": true,
       "continuo": true,
-      "text": "Te escucho, escribime lo que quieras. Si querés, pedime que te siga o que vaya a tu casa.",
+      "text": "Dale, te escucho. ¿Qué me contás?",
       "bye": "despedida"
     },
     "charla_001": {

@@ -373,23 +373,33 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .casa-ui .casa-drop, .casa-ui .casa-done { background: #5eead4; color: #062a25; border-color: #5eead4; }
 .casa-ui .casa-drop:hover, .casa-ui .casa-done:hover { background: #99f6e4; }
 
-/* ---------- Música de las casas (src/ui/house-music.js): arriba a la izquierda ---------- */
+/* ---------- Música de las casas (src/ui/house-music.js): arriba a la izquierda, solo "Sonando: …" ---------- */
 .casa-music {
-  position: absolute; top: 12px; left: 12px; z-index: 4; width: 216px; display: grid; gap: 6px; padding: 8px;
+  position: absolute; top: 12px; left: 12px; z-index: 4; width: max-content; max-width: min(300px, calc(100% - 170px)); display: grid; gap: 6px; padding: 6px;
   border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font: 500 13px var(--font-body);
 }
 .casa-music[hidden], .casa-music [hidden] { display: none !important; }
-.cm-video { width: 200px; height: 113px; border-radius: 8px; overflow: hidden; background: #000; }
-.cm-video iframe, .cm-player { width: 200px; height: 113px; display: block; border: 0; }
+/* El reproductor de YouTube existe (para que suene) pero no se ve */
+.cm-player-wrap { position: fixed; left: -10000px; top: 0; width: 200px; height: 200px; opacity: 0; pointer-events: none; }
+.cm-now { display: flex; align-items: center; gap: 8px; min-width: 0; padding-left: 6px; }
+.cm-note { font-size: 16px; color: var(--accent); }
+.cm-note.on { animation: cm-bob 1s ease-in-out infinite alternate; }
+@keyframes cm-bob { from { transform: translateY(1px); } to { transform: translateY(-2px); } }
+.cm-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cm-title small { color: var(--muted); font-size: 12px; }
+.cm-more { flex: none; width: 30px; height: 28px; padding: 0; border-radius: 8px; font-size: 18px; line-height: 1; cursor: pointer; }
+.cm-menu { display: grid; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); min-width: 210px; }
 .cm-row { display: flex; gap: 6px; align-items: center; }
 .cm-row button { width: 32px; height: 32px; padding: 0; border-radius: 8px; font-size: 15px; line-height: 1; cursor: pointer; flex: none; }
 .cm-row .cm-play { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .cm-vol { flex: 1; min-width: 0; accent-color: var(--accent); }
-.cm-msg { margin: 0; font-size: 12px; color: var(--muted); }
-.cm-set { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.cm-msg { margin: 0; padding: 0 6px; font-size: 12px; color: var(--muted); }
+.cm-set { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; min-width: 230px; }
 .cm-url { grid-column: 1 / -1; font: 500 13px var(--font-body); padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.92); color: #12212b; }
-.cm-set button, .cm-edit { padding: 7px 10px; border-radius: 8px; cursor: pointer; font: 600 13px var(--font-body); }
-.cm-set button[type="submit"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.cm-set button, .cm-edit, .cm-clear, .cm-start { padding: 7px 10px; border-radius: 8px; cursor: pointer; font: 600 13px var(--font-body); text-align: left; }
+.cm-set button[type="submit"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); text-align: center; }
+.cm-cancel { text-align: center !important; }
+.cm-listen { padding: 7px 10px; border-radius: 8px; cursor: pointer; font: 600 13px var(--font-body); background: var(--accent) !important; color: var(--accent-fg) !important; border-color: var(--accent) !important; }
 
 /* ---------- ¿Dónde querés aparecer? (src/ui/spawn-choice.js): sobre la pantalla de carga ---------- */
 .spawn-choice { position: fixed; inset: 0; z-index: 65; display: grid; place-items: center; padding: 16px; background: rgba(5, 10, 14, 0.65); font-family: var(--font-body); color: #f6f9fa; }

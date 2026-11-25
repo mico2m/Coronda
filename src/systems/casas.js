@@ -24,7 +24,7 @@
 //     la imagen se vuelve a pedir cada 5 minutos (si cambia en internet, cambia en la casa).
 //
 // Música: el dueño pega un enlace de YouTube (🎵 arriba a la izquierda) y suena para todos los que entren.
-//   Pausa, silencio y volumen son de cada uno (src/ui/house-music.js).
+//   Pausarla, cambiarla o quitarla: solo el dueño, para todos. Volumen y silencio: cada uno el suyo (src/ui/house-music.js).
 //
 // Cómo se comparte (igual que los lotes): cada cambio se manda en vivo y se guarda en el broker MQTT (retained)
 // bajo casa~<lote>. Registro: { c: id de la casa, o: dueño, v: versión, items: [{ i, m, p: [x, z], y: grados }], mu: { v: video, l: lista } }.
@@ -404,8 +404,11 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     notify,
     onSet(mu) {
       if (!inside || !isOwner()) return;
+      const before = current(inside.key).mu;
       save(inside.key, current(inside.key).items, mu);
-      notify(mu ? 'Música puesta: la escuchan todos los que entren' : 'Música quitada');
+      if (!mu) notify('Música quitada');
+      else if (before?.v !== mu.v || before?.l !== mu.l) notify('Música puesta: la escuchan todos los que entren');
+      else notify(mu.p ? 'Música en pausa para todos' : 'Música sonando para todos');
     },
   });
   function syncMusic() { if (inside) music.show(current(inside.key).mu, isOwner()); }

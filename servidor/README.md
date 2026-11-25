@@ -6,6 +6,13 @@ valores en F12 → Aplicación no sirve para nada (el navegador solo guarda el t
 
 ## Arrancar y apagar
 
+**Lo más fácil:** doble clic en **`Iniciar servidor y enlace.bat`**. Prende el servidor, abre el túnel de Cloudflare, espera
+a que el enlace ande, te lo abre en el navegador y lo copia (Ctrl+V para pasárselo a tus amigos; también queda en
+`servidor/enlace-actual.txt`). Quedan dos ventanas abiertas: *Servidor de Coronda* y *Túnel de Coronda*; para apagar, cerralas.
+**`Abrir Studio.bat`** abre el Studio y, si el servidor no está prendido, lo prende también (para la vista previa de `index.html`).
+
+A mano:
+
 - **Arrancar:** doble clic en `Servidor.bat` (en la carpeta de Coronda). Necesita [Node.js](https://nodejs.org) LTS (el mismo del Studio).
   O en una terminal: `node servidor/coronda-server.mjs`.
 - **Jugar vos:** abrí `http://localhost:8080`.

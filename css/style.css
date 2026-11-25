@@ -480,3 +480,41 @@ body:has(.talking) .reloj { opacity: 0.4; }
 .casa-cat button[disabled] { opacity: 0.45; cursor: not-allowed; }
 .casa-cat button small { opacity: 0.8; font-weight: 600; }
 .casa-hint { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+
+/* ---------- Ubicación del HUD (va al final: pisa las posiciones de arriba) ----------
+   Respeta las zonas seguras del celular (notch, barra de inicio del iPhone, bordes redondeados): --edge-* es el margen
+   de cada lado, nunca menos de 12px. Columna derecha: minimapa y, debajo, 👥 y 🎒 lado a lado y centrados.
+   Abajo a la izquierda: joystick y 🎥 (ver ui/touch-controls.js); el chat va arriba del joystick, o al lado en horizontal. */
+:root {
+  --edge-t: max(12px, env(safe-area-inset-top, 0px));
+  --edge-r: max(12px, env(safe-area-inset-right, 0px));
+  --edge-b: max(12px, env(safe-area-inset-bottom, 0px));
+  --edge-l: max(12px, env(safe-area-inset-left, 0px));
+  --map: 132px; /* tamaño del minimapa */
+}
+.reloj { top: var(--edge-t); left: var(--edge-l); }
+.minimap { top: var(--edge-t); right: var(--edge-r); width: var(--map); height: var(--map); box-sizing: border-box; }
+.casa-music { top: calc(var(--edge-t) + 42px); left: var(--edge-l); }
+.casa-ui { top: var(--edge-t); }
+.update-notice { top: max(14px, env(safe-area-inset-top, 0px)); }
+.actions { right: var(--edge-r); bottom: var(--edge-b); }
+.chat { left: var(--edge-l); bottom: var(--edge-b); }
+.inv-btn { top: calc(var(--edge-t) + var(--map) + 10px); right: calc(var(--edge-r) + (var(--map) - 44px) / 2); }
+.inv-panel { top: calc(var(--edge-t) + var(--map) + 62px); right: var(--edge-r); max-height: calc(100% - var(--map) - 90px); }
+@media (pointer: coarse) {
+  /* 👥 a la izquierda y 🎒 a la derecha, los dos debajo del minimapa */
+  .players-open, .inv-btn { top: calc(var(--edge-t) + var(--map) + 10px); width: 44px; height: 44px; padding: 0; font-size: 20px; line-height: 1;
+    display: grid; place-items: center; border-radius: 50%; }
+  .players-open { right: calc(var(--edge-r) + var(--map) / 2 + 6px); }
+  .inv-btn { right: calc(var(--edge-r) + var(--map) / 2 - 50px); }
+  .app:not(:has(.players-open)) .inv-btn { right: calc(var(--edge-r) + (var(--map) - 44px) / 2); } /* sin 👥 (jugando solo): 🎒 centrada */
+  .pad { left: env(safe-area-inset-left, 0px); bottom: env(safe-area-inset-bottom, 0px); }
+  .chat { bottom: calc(var(--edge-b) + 160px); } /* arriba del joystick */
+  .chat-open { width: 44px; height: 44px; font-size: 20px; }
+}
+/* Celular en horizontal (poca altura): minimapa más chico y el chat al lado del 🎥, no arriba del joystick */
+@media (pointer: coarse) and (max-height: 500px) {
+  :root { --map: 108px; }
+  .chat { bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); left: calc(var(--edge-l) + 228px); width: min(360px, calc(100% - var(--edge-l) - var(--edge-r) - 240px)); }
+  .reloj { padding: 4px 10px; }
+}

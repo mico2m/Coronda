@@ -183,6 +183,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
   // Primera persona: con la cámara ya lo más cerca posible, una vuelta más de la rueda (o pellizcar) entra a la vista desde
   // los ojos; alejar la rueda vuelve a la tercera persona. El personaje se oculta (los demás lo siguen viendo).
   let fp = false, fpPull = 0;
+  let runGate = null; // (dt) => ¿puede correr? (lo pone game.js: correr gasta energía, ver systems/bosque.js)
   const onFpChange = new Set();
   function setFirstPerson(on) {
     on = !!on && !preset?.locked;
@@ -379,6 +380,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
     get facing() { return facing; },
     // Primera persona (ver setFirstPerson): player.firstPerson = true/false · player.onFirstPerson((on) => …)
     get firstPerson() { return fp; },
+    setRunGate(fn) { runGate = typeof fn === 'function' ? fn : null; },
     set firstPerson(on) { setFirstPerson(on); },
     onFirstPerson(fn) { onFpChange.add(fn); return () => onFpChange.delete(fn); },
     get actions() { return actions; },
@@ -486,7 +488,8 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
         let dz = -cy * fwd - sy * side;
         const len = Math.hypot(dx, dz);
         dx /= len; dz /= len;
-        const running = analog ? stick.run : !!keys.ShiftLeft;
+        let running = analog ? stick.run : !!keys.ShiftLeft;
+        if (running && runGate && !runGate(dt)) running = false; // sin energía: camina (ver setRunGate)
         let speed = running ? cfg.runSpeed : cfg.walkSpeed;
         // Joystick inclinado de a poco: camina más despacio (como en Ocarina), nunca menos de un tercio
         if (analog && !running) speed *= THREE.MathUtils.clamp(analog / 0.85, 0.35, 1);

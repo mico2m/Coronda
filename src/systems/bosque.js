@@ -11,11 +11,13 @@
 //   radio              a cuántos metros del tronco aparece "E Talar"
 //   resistencia_por_dia hachazos que podés dar por día del juego (30). Se recupera al empezar el día siguiente (00:00,
 //                      data/tables/tiempo.json). Se ve en el botón 🪓 (⚡) y se guarda en el navegador. 0 = sin límite.
+//   energia_correr_por_seg  cuánta de esa misma energía gasta correr, por segundo (0.25; 0 = correr no gasta).
+//                      Sin energía no se puede correr (solo caminar) ni talar hasta el día siguiente.
 // Los árboles caídos son los mismos para todo el servidor (se guardan como los lotes: bosque~<escena>.<árbol>).
 import * as THREE from 'three';
 import { loadJSON } from '../core/assets.js';
 
-export const BOSQUE_DEFAULT = { golpes_por_tanda: 3, madera_por_tanda: 2, tandas_por_arbol: 3, rebrote_minutos: 5, animacion: 'talar', radio: 1.6, recurso: 'madera', resistencia_por_dia: 30 };
+export const BOSQUE_DEFAULT = { golpes_por_tanda: 3, madera_por_tanda: 2, tandas_por_arbol: 3, rebrote_minutos: 5, animacion: 'talar', radio: 1.6, recurso: 'madera', resistencia_por_dia: 30, energia_correr_por_seg: 0.25 };
 const RES_KEY = 'coronda.bosque.resistencia'; // { dia, usados }
 const TREE_RE = /^arbol_\d+$/i;
 const STUMP_RE = /_tocon/i;
@@ -32,6 +34,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     cfg.rebrote_minutos = Math.max(0.1, Number(cfg.rebrote_minutos) || BOSQUE_DEFAULT.rebrote_minutos);
     cfg.radio = Math.max(0.5, Number(cfg.radio) || BOSQUE_DEFAULT.radio);
     cfg.resistencia_por_dia = Math.max(0, Math.round(Number(cfg.resistencia_por_dia ?? BOSQUE_DEFAULT.resistencia_por_dia) || 0));
+    cfg.energia_correr_por_seg = Math.max(0, Number(cfg.energia_correr_por_seg ?? BOSQUE_DEFAULT.energia_correr_por_seg) || 0);
   }
 
   // ---------- Resistencia: hachazos por día del juego ----------
@@ -47,6 +50,20 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     if (!cfg.resistencia_por_dia) return;
     quedan(); res.usados++;
     try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ }
+  }
+  // Correr gasta energía de a poco (dt en segundos). Devuelve false si no queda: el personaje camina.
+  let guardarT = 0, avisado = false;
+  function correr(dt) {
+    if (!cfg.resistencia_por_dia || !(cfg.energia_correr_por_seg > 0)) return true;
+    if (quedan() <= 0) {
+      if (!avisado) { avisado = true; notify(`Estás agotado: no podés correr. Recuperás la energía ${recupera()}.`); }
+      return false;
+    }
+    avisado = false;
+    res.usados = Math.min(cfg.resistencia_por_dia, res.usados + cfg.energia_correr_por_seg * dt);
+    guardarT += dt;
+    if (guardarT > 1) { guardarT = 0; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }
+    return true;
   }
   // Cuándo se recupera: "a las 00:00 (en 7 minutos)" según el reloj del juego
   function recupera() {
@@ -190,7 +207,9 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     get config() { return { ...cfg }; },
     get near() { return !!near; },
     recargar() { res = { dia: hoy(), usados: 0 }; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }, // (admin)
-    get resistencia() { const q = quedan(); return { quedan: Number.isFinite(q) ? q : null, max: cfg.resistencia_por_dia, dia: res.dia }; },
+    correr,
+    // quedan: entero (redondeado hacia arriba) para mostrar · exacto: con decimales (correr gasta de a poco)
+    get resistencia() { const q = quedan(); return { quedan: Number.isFinite(q) ? Math.ceil(q - 1e-6) : null, exacto: Number.isFinite(q) ? q : null, max: cfg.resistencia_por_dia, dia: res.dia }; },
     get trees() { return trees.map((t) => ({ id: t.id, caido: isDown(t), hasta: fallen.get(t.key) ?? 0 })); },
   };
 }

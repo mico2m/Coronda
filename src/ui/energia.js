@@ -1,4 +1,4 @@
-// Barra de energía en el HUD (abajo, al centro): los hachazos que te quedan hoy para talar (resistencia del bosque,
+// Barra de energía en el HUD: la energía que te queda hoy para talar y correr (resistencia del bosque,
 // ver systems/bosque.js). Se llena de nuevo al empezar el día del juego. Si "Hachazos por día" es 0 (sin límite), no se ve.
 export function createEnergia({ stage, getBosque }) {
   const el = document.createElement('div');
@@ -12,7 +12,7 @@ export function createEnergia({ stage, getBosque }) {
     const r = getBosque?.()?.resistencia;
     if (!r || r.quedan == null || !r.max) { el.hidden = true; return; }
     el.hidden = false;
-    const k = Math.max(0, Math.min(1, r.quedan / r.max));
+    const k = Math.max(0, Math.min(1, (r.exacto ?? r.quedan) / r.max));
     bar.style.width = `${k * 100}%`;
     num.textContent = `${r.quedan}/${r.max}`;
     el.classList.toggle('poca', k <= 0.3 && k > 0);

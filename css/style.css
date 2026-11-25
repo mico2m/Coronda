@@ -473,6 +473,10 @@ body:has(.talking) .reloj { opacity: 0.4; }
 .tala-prompt small { margin-left: 6px; opacity: 0.75; font-size: 0.8em; }
 .tala-prompt .tala-ico { font-size: 1.15em; line-height: 1; }
 .tala-prompt.busy { opacity: 0.55; pointer-events: none; } /* dando el hachazo */
+.tala-prompt .tala-res { margin-left: 6px; font: 700 0.8em var(--font-body); color: #fde047; }
+.tala-prompt .tala-res.poca { color: #fb923c; }
+.tala-prompt .tala-res.vacia { color: #f87171; }
+.tala-prompt.agotado { opacity: 0.6; filter: grayscale(0.6); } /* sin resistencia: se toca y avisa cuándo se recupera */
 .tala-pop { position: absolute; left: 50%; top: 38%; z-index: 6; transform: translate(-50%, 0); pointer-events: none;
   padding: 6px 14px; border-radius: 999px; background: rgba(12, 20, 26, 0.88); color: #ffe7a8; font: 700 18px var(--font-body); letter-spacing: 0.04em; }
 .tala-pop[hidden] { display: none; }
@@ -555,4 +559,6 @@ body:has(.talking) .reloj { opacity: 0.4; }
     font: 700 11px var(--font-body); background: var(--accent); color: var(--accent-fg); opacity: 1;
   }
   .door-prompt.tala-prompt:active { transform: translateX(-50%) scale(0.9); }
+  .tala-prompt .tala-res { position: absolute; top: -8px; right: -10px; margin: 0; padding: 1px 6px; border-radius: 999px;
+    font: 700 11px var(--font-body); background: #1f2937; border: 1.5px solid currentColor; }
 }

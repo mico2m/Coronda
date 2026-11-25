@@ -12,6 +12,7 @@ Medidas (metros, Y arriba, origen = centro del piso del edificio). El frente (pu
 Empties que usa el juego (todos con la flecha de frente hacia donde mira el NPC / jugador):
   pos_mostrador   donde se para Claude detrás del mostrador (mira al cliente)
   pos_cliente     donde se para el jugador frente al mostrador;  cola_1 … cola_5  la fila de espera
+  zona_entrega    caja (Empty cubo escalado) frente al mostrador: para retirar pedidos hay que estar parado adentro
   pos_taller      donde Claude trabaja el mueble;  banco_obra  sobre el banco: ahí se ve el mueble en construcción
   pos_entrada     justo adentro de la puerta;  pos_afuera  justo afuera
   slot_01 … slot_50   grilla de 5 x 10 de la sala de fabricación (un pedido por slot, 1 m de separación)
@@ -95,8 +96,9 @@ class Builder:
         if extras: node['extras'] = extras
         self.nodes.append(node)
 
-    def empty(self, name, pos, yaw_deg=0.0, extras=None):
+    def empty(self, name, pos, yaw_deg=0.0, extras=None, scale=None):
         node = {'name': name, 'translation': [round(v, 4) for v in pos]}
+        if scale: node['scale'] = [round(v, 4) for v in scale]
         if yaw_deg:
             h = math.radians(yaw_deg) / 2
             node['rotation'] = [0, round(math.sin(h), 6), 0, round(math.cos(h), 6)]
@@ -241,6 +243,8 @@ def build():
     # ---- Empties ----
     b.empty('pos_mostrador', (-1.0, 0.08, 4.4), 0)
     b.empty('pos_cliente', (-1.0, 0.08, 6.7), 180)
+    # Zona de entrega: Empty "cubo" (Display As = Cube, Size = 1, escalado). Retirar pedidos solo se puede parado adentro.
+    b.empty('zona_entrega', (-1.5, 1.5, 7.3), 0, scale=(3.0, 1.5, 1.2))
     for i in range(5):
         b.empty(f'cola_{i + 1}', (-1.0, 0.08, 6.7 + (i + 1) * 1.0), 180)
     b.empty('pos_taller', (2.5, 0.08, -5.5), 90)

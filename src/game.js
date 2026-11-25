@@ -358,7 +358,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     window.corondaTiempo = tiempo;
     // Talar árboles (en cualquier escena que tenga arbol_001, arbol_002…)
     bosque = createBosque({
-      stage, net, inventario, getRoot: () => sceneManager.root, getSceneId: () => sceneManager.current?.id ?? null,
+      stage, net, inventario, tiempo, getRoot: () => sceneManager.root, getSceneId: () => sceneManager.current?.id ?? null,
       getPlayer: () => (mode === 'player' ? player : null), blocked: () => !!dialogue?.active || !!casas?.inside,
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
     });

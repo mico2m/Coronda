@@ -311,7 +311,7 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
    Avisos, menús de lotes y casas, acciones, chat, lista de jugadores y botones táctiles se ven sobre la escena 3D
    (que puede ser clara u oscura), así que no siguen el tema claro/oscuro del navegador: fondo oscuro, texto claro,
    botones con borde y fondo visibles. Contraste del texto: más de 7:1. */
-.door-prompt, .talk-prompt, .loading, .lote-panel, .casa-ui, .actions, .chat, .players, .afk, .pad, .chat-open, .players-open {
+.door-prompt, .talk-prompt, .loading, .lote-panel, .casa-ui, .casa-music, .actions, .chat, .players, .afk, .pad, .chat-open, .players-open {
   --panel: rgba(12, 20, 26, 0.9);
   --fg: #f6f9fa;
   --muted: #c9d4d8;
@@ -322,10 +322,10 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 }
 .door-prompt, .talk-prompt, .loading { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); }
 .door-prompt:hover, .talk-prompt:hover { border-color: var(--accent); }
-:is(.lote-panel, .casa-ui, .actions, .chat, .players, .afk, .pad) button {
+:is(.lote-panel, .casa-ui, .casa-music, .actions, .chat, .players, .afk, .pad) button {
   color: var(--fg); background: rgba(255, 255, 255, 0.12); border: 1px solid var(--line); font-weight: 600;
 }
-:is(.lote-panel, .casa-ui, .actions, .chat, .pad) button:hover { background: rgba(255, 255, 255, 0.22); border-color: var(--accent); }
+:is(.lote-panel, .casa-ui, .casa-music, .actions, .chat, .pad) button:hover { background: rgba(255, 255, 255, 0.22); border-color: var(--accent); }
 .actions button, .pad button { background: var(--panel); }
 :is(.door-prompt, .talk-prompt, .lote-panel, .casa-ui, .actions, .players) kbd {
   color: var(--fg); background: rgba(255, 255, 255, 0.14); border: 1px solid var(--line); border-radius: 4px;
@@ -372,3 +372,21 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .casa-carry { display: flex; flex-wrap: wrap; gap: 6px; }
 .casa-ui .casa-drop, .casa-ui .casa-done { background: #5eead4; color: #062a25; border-color: #5eead4; }
 .casa-ui .casa-drop:hover, .casa-ui .casa-done:hover { background: #99f6e4; }
+
+/* ---------- Música de las casas (src/ui/house-music.js): arriba a la izquierda ---------- */
+.casa-music {
+  position: absolute; top: 12px; left: 12px; z-index: 4; width: 216px; display: grid; gap: 6px; padding: 8px;
+  border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font: 500 13px var(--font-body);
+}
+.casa-music[hidden], .casa-music [hidden] { display: none !important; }
+.cm-video { width: 200px; height: 113px; border-radius: 8px; overflow: hidden; background: #000; }
+.cm-video iframe, .cm-player { width: 200px; height: 113px; display: block; border: 0; }
+.cm-row { display: flex; gap: 6px; align-items: center; }
+.cm-row button { width: 32px; height: 32px; padding: 0; border-radius: 8px; font-size: 15px; line-height: 1; cursor: pointer; flex: none; }
+.cm-row .cm-play { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.cm-vol { flex: 1; min-width: 0; accent-color: var(--accent); }
+.cm-msg { margin: 0; font-size: 12px; color: var(--muted); }
+.cm-set { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.cm-url { grid-column: 1 / -1; font: 500 13px var(--font-body); padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.92); color: #12212b; }
+.cm-set button, .cm-edit { padding: 7px 10px; border-radius: 8px; cursor: pointer; font: 600 13px var(--font-body); }
+.cm-set button[type="submit"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }

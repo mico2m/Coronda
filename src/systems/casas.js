@@ -23,13 +23,17 @@
 //   - Pósters (cuadrado, rectangular o circular): se pega la dirección https de una imagen; se cuelga en la pared y
 //     la imagen se vuelve a pedir cada 5 minutos (si cambia en internet, cambia en la casa).
 //
+// Música: el dueño pega un enlace de YouTube (🎵 arriba a la izquierda) y suena para todos los que entren.
+//   Pausa, silencio y volumen son de cada uno (src/ui/house-music.js).
+//
 // Cómo se comparte (igual que los lotes): cada cambio se manda en vivo y se guarda en el broker MQTT (retained)
-// bajo casa~<lote>. Registro: { c: id de la casa, o: dueño, v: versión, items: [{ i, m, p: [x, z], y: grados }] }.
+// bajo casa~<lote>. Registro: { c: id de la casa, o: dueño, v: versión, items: [{ i, m, p: [x, z], y: grados }], mu: { v: video, l: lista } }.
 // Jugando solo se guarda en el navegador (localStorage).
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { loadJSON, loadGLB } from '../core/assets.js';
 import { makeUnlit, setShade } from './shading.js';
+import { createHouseMusic, cleanMusic } from '../ui/house-music.js';
 
 const SOLO_STORE = 'coronda.casas.solo';
 const MAX_ITEMS = 150;
@@ -93,7 +97,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
       p: [Number(it?.p?.[0]) || 0, Number(it?.p?.[1]) || 0], y: Number(it?.y) || 0,
       ...(it?.m === 'poster' ? { k: cleanPoster(it.k) } : {}),
     })).filter((it) => it.i && it.m) : [];
-    return { c, o: r.o ? String(r.o).slice(0, 40) : null, v, items };
+    return { c, o: r.o ? String(r.o).slice(0, 40) : null, v, items, mu: cleanMusic(r.mu) };
   }
   // Póster: { f: 'cuadrado' | 'rectangular' | 'circular', u: url https de la imagen }
   function cleanPoster(k) {
@@ -107,7 +111,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   function current(key) {
     const lot = lotes.record(key);
     const r = records.get(key);
-    if (!lot?.o || !lot.c || !r || r.c !== lot.c) return { c: lot?.c ?? null, o: lot?.o ?? null, v: r?.v ?? 0, items: [] };
+    if (!lot?.o || !lot.c || !r || r.c !== lot.c) return { c: lot?.c ?? null, o: lot?.o ?? null, v: r?.v ?? 0, items: [], mu: null };
     return r;
   }
   function accept(key, rec) {
@@ -116,6 +120,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     records.set(key, rec);
     if (solo) writeJSON(SOLO_STORE, Object.fromEntries(records));
     if (inside?.key === key && !carry) renderItems();
+    if (inside?.key === key) syncMusic();
     return true;
   }
   async function receive(key, r) {
@@ -128,11 +133,11 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     net.casas.send({ k: key, r: rec });
     net.casas.persist(key, rec);
   }
-  function save(key, items) {
+  function save(key, items, mu = current(key).mu ?? null) {
     const lot = lotes.record(key);
     if (lot?.o !== uid) return;
     const cur = records.get(key);
-    const rec = { c: lot.c, o: uid, v: (cur?.v ?? 0) + 1, items };
+    const rec = { c: lot.c, o: uid, v: (cur?.v ?? 0) + 1, items, mu };
     accept(key, rec);
     publish(key, rec);
   }
@@ -392,6 +397,18 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   let onExit = null;
   exitPrompt.addEventListener('click', () => onExit?.());
 
+  // ---------- Música (enlace de YouTube que pone el dueño; ver src/ui/house-music.js) ----------
+  const music = createHouseMusic({
+    parent: stage.parentElement,
+    notify,
+    onSet(mu) {
+      if (!inside || !isOwner()) return;
+      save(inside.key, current(inside.key).items, mu);
+      notify(mu ? 'Música puesta: la escuchan todos los que entren' : 'Música quitada');
+    },
+  });
+  function syncMusic() { if (inside) music.show(current(inside.key).mu, isOwner()); }
+
   // Grilla del piso: una línea cada 25 cm (la misma grilla en la que se acomodan los muebles), más marcada cada metro
   function makeGrid() {
     if (!inside || grid) return;
@@ -597,16 +614,17 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     // Después de cargar cualquier escena: si no es un interior, se apaga todo lo de las casas
     afterScene(sceneId) {
       if (inside && inside.id !== sceneId) inside = null;
-      if (!inside) { design = false; carry = null; topView = false; camera.up.set(0, 1, 0); grid = null; ui.hidden = true; exitPrompt.hidden = true; }
-      else drawUI();
+      if (!inside) { design = false; carry = null; topView = false; camera.up.set(0, 1, 0); grid = null; ui.hidden = true; exitPrompt.hidden = true; music.leave(); }
+      else { drawUI(); music.enter(isOwner()); syncMusic(); }
     },
     setOnExit(fn) { onExit = fn; },
     get inside() { return inside; },
     get designing() { return design; },
+    get music() { return music.state; },
     // Se destruyó la casa (lotes.js): se borra su interior para todos
     clear(key) {
       const cur = records.get(key);
-      const rec = { c: null, o: null, v: (cur?.v ?? 0) + 1, items: [] };
+      const rec = { c: null, o: null, v: (cur?.v ?? 0) + 1, items: [], mu: null };
       records.set(key, rec);
       if (solo) writeJSON(SOLO_STORE, Object.fromEntries(records));
       publish(key, rec);

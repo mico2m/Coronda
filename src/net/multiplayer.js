@@ -1,5 +1,5 @@
 // Multijugador sin servidor propio: los navegadores se conectan entre sí (WebRTC) con Trystero.
-// Para encontrarse usan relays públicos de Nostr (gratis, no hay que crear cuentas). Ver src/vendor/trystero.js.
+// Para encontrarse usan relays públicos de Nostr y trackers de WebTorrent (gratis, sin cuentas). Ver src/vendor/trystero.js.
 //
 // Qué se comparte: posición, hacia dónde mira, la animación, el personaje elegido, el nombre y la escena.
 // Cada jugador ve a los otros que están en su misma escena. Los diálogos, flags y NPC son de cada uno.
@@ -52,13 +52,74 @@ function localRoom(roomId) {
   return room;
 }
 
+// Relays de Nostr conocidos y con mucho uso (los que Trystero elige solo a veces están caídos)
+const NOSTR_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.primal.net', 'wss://relay.nostr.band', 'wss://purplerelay.com'];
+
+// Se entra a la sala por dos caminos a la vez (Nostr y BitTorrent): si uno anda mal, el otro igual conecta.
+// Desde afuera se ve como una sola sala; un jugador conectado por los dos caminos cuenta una vez.
+function mergeRooms(rooms, selfId, status) {
+  const via = new Map(); // peerId -> Set(índice de sala)
+  const actions = new Map();
+  const merged = {
+    selfId,
+    onPeerJoin: null,
+    onPeerLeave: null,
+    status,
+    get peers() { return via.size; },
+    makeAction(name) {
+      if (actions.has(name)) return actions.get(name);
+      const parts = rooms.map((r) => r.makeAction(name));
+      const a = {
+        onMessage: null,
+        send(data, opts) {
+          parts.forEach((p, i) => {
+            if (opts?.target && !via.get(opts.target)?.has(i)) return;
+            try { p.send(data, opts); } catch { /* ese camino todavía no está listo */ }
+          });
+        },
+      };
+      parts.forEach((p) => { p.onMessage = (data, ctx) => a.onMessage?.(data, ctx); });
+      actions.set(name, a);
+      return a;
+    },
+    leave() { rooms.forEach((r) => { try { r.leave(); } catch { /* nada */ } }); },
+  };
+  rooms.forEach((r, i) => {
+    r.onPeerJoin = (id) => {
+      const set = via.get(id) ?? new Set();
+      const isNew = !set.size;
+      set.add(i); via.set(id, set);
+      console.info(`Multijugador: se conectó ${id} (${i ? 'BitTorrent' : 'Nostr'})`);
+      if (isNew) merged.onPeerJoin?.(id);
+    };
+    r.onPeerLeave = (id) => {
+      const set = via.get(id);
+      if (!set) return;
+      set.delete(i);
+      if (!set.size) { via.delete(id); merged.onPeerLeave?.(id); }
+    };
+  });
+  return merged;
+}
+
 async function openRoom(roomId) {
   const local = new URLSearchParams(location.search).get('mp') === 'local';
   if (local) return localRoom(roomId);
-  const { joinRoom, selfId } = await import('../vendor/trystero.js');
-  const room = joinRoom({ appId: APP_ID }, roomId);
-  room.selfId = selfId;
-  addEventListener('pagehide', () => { try { room.leave(); } catch { /* nada */ } });
+  const t = await import('../vendor/trystero.js');
+  const rooms = [];
+  try { rooms.push(t.joinNostr({ appId: APP_ID, relayConfig: { urls: NOSTR_RELAYS } }, roomId)); } catch (err) { console.warn('Multijugador (Nostr):', err); }
+  try { rooms.push(t.joinTorrent({ appId: APP_ID }, roomId)); } catch (err) { console.warn('Multijugador (BitTorrent):', err); }
+  if (!rooms.length) throw new Error('no se pudo entrar a la sala');
+  // Cuántos relays/trackers están conectados (para ver si la red anda)
+  const status = () => {
+    let open = 0, total = 0;
+    for (const get of [t.nostrSockets, t.torrentSockets]) {
+      for (const ws of Object.values(get?.() ?? {})) { total++; if (ws?.readyState === 1) open++; }
+    }
+    return { open, total };
+  };
+  const room = mergeRooms(rooms, t.selfId, status);
+  addEventListener('pagehide', () => room.leave());
   return room;
 }
 
@@ -97,6 +158,8 @@ export async function connectServer(roomId = 'coronda') {
   const net = {
     selfId: room.selfId,
     onCount: null,
+    // { open, total } relays/trackers conectados, y con cuántos navegadores hay conexión directa
+    get network() { return { ...(room.status?.() ?? { open: 1, total: 1 }), peers: peers.size }; },
     // Cuántos están adentro del mundo (sin contar los que miran el menú). Si vos estás jugando, te cuenta.
     get count() { let n = playing ? 1 : 0; for (const p of peers.values()) if (p.data?.playing) n++; return n; },
     start(opts) { scene3d = opts.scene; me = opts.me; playing = true; sendNow(); emitCount(); },

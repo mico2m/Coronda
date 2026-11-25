@@ -171,6 +171,7 @@ export function showStartMenu({ characters, connect }) {
             <span>Jugar en el servidor</span>
             <span class="sm-count"><i class="sm-dot"></i><span class="sm-count-text">Conectando…</span></span>
           </button>
+          <p class="sm-net" aria-live="polite"></p>
           <p class="sm-note">En el servidor ves a los demás jugadores y ellos te ven a vos, con el personaje que elijas.</p>
         </div>
       </div>
@@ -215,6 +216,15 @@ export function showStartMenu({ characters, connect }) {
     setTimeout(() => { searching = false; setCount(n.count); }, 4000);
     countText.textContent = 'Buscando…';
     n.onCount = (c) => { if (!searching || c > 0) { searching = false; setCount(c); } };
+    // Estado de la red (para saber si el problema es la conexión)
+    const netEl = $('.sm-net');
+    const tick = () => {
+      if (!el.isConnected) return;
+      const s = n.network;
+      netEl.textContent = s.open ? `Red: ${s.open} de ${s.total} puntos de encuentro · ${s.peers} conectado(s) con vos` : 'Red: conectando a los puntos de encuentro…';
+      setTimeout(tick, 1000);
+    };
+    tick();
     return n;
   }).catch((err) => {
     console.warn('Multijugador:', err);

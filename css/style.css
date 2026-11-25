@@ -198,3 +198,4 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
   padding: 6px 12px; border-radius: 999px; background: rgba(12, 22, 30, 0.55); color: #f4f8fa;
   font: 500 12px var(--font-body); backdrop-filter: blur(6px); pointer-events: none;
 }
+.sm-net { margin: 0; font-size: 11px; color: rgba(244, 248, 250, 0.55); min-height: 1em; }

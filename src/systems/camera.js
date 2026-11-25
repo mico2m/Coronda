@@ -39,6 +39,7 @@ export function createCameraControls(camera, stage, { pad, speedOut } = {}) {
   const normalize = (code) => (code === 'ShiftRight' ? 'ShiftLeft' : code);
   window.addEventListener('keydown', (e) => {
     if (!enabled || !MOVE_KEYS.has(e.code)) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.target?.isContentEditable) return; // escribiendo: las letras no mueven
     const a = document.activeElement;
     if (a && a !== document.body && a.blur) a.blur();
     keys[normalize(e.code)] = true;

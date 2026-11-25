@@ -1,0 +1,10 @@
+{
+  "_ayuda": "Talar árboles (ver src/systems/bosque.js). Cada golpes_por_tanda golpes se recibe madera_por_tanda de madera; después de tandas_por_arbol tandas el árbol se cae y vuelve a crecer a los rebrote_minutos minutos. animacion = clip del personaje al talar. radio = a cuántos metros del tronco aparece 'E Talar'.",
+  "golpes_por_tanda": 3,
+  "madera_por_tanda": 2,
+  "tandas_por_arbol": 3,
+  "rebrote_minutos": 5,
+  "animacion": "talar",
+  "radio": 1.6,
+  "recurso": "madera"
+}

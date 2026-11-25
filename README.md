@@ -564,3 +564,10 @@ En `dev.html` está en la consola como `inventario` (ej. `inventario.add('recurs
 - **Cómo se ve:** cada `momento` tiene `tinte` y `brillo` (multiplican los colores de todo) y `fondo` (cielo y niebla; `null` = el de la escena). Se mezcla de uno al siguiente. Adentro de las casas no cambia (`environment.ciclo = false`).
 - **Horario de la tienda:** `tienda.abre` / `tienda.cierra`.
 - Desde la consola del juego: `corondaTiempo.texto()`, `corondaTiempo.abierta()`, `corondaTiempo.setConfig({ desfase_horas: 6 })`.
+
+## Bosque de Coronda (talar madera)
+
+- **Cómo se llega:** en la plaza, el cartel del oeste (`[-32, 0, -6]`, objeto `cartel_bosque` + puerta en `data/scenes/coronda_plaza.json`) → **E Ir al Bosque de Coronda**. En el bosque, el cartel al lado de la llegada vuelve a la plaza.
+- **Escena:** `data/scenes/bosque_coronda.json` + `assets/models/worlds/Bosque_Coronda.glb`. Es provisoria: la genera `blender -b -P blender/generar_bosque.py` (también deja `blender/bosque_coronda.blend` para editarla). Para la tuya, conservá los nombres: `arbol_001`, `arbol_002`… (cada árbol; adentro, lo que se llame `*_tocon` queda al talarlo y el resto desaparece), `col_arbol_…` (colisión del tronco), `spawn`, `cartel_volver`, `col_suelo`.
+- **Talar:** acercate a un árbol → **E Talar**. El personaje hace su clip `talar` (si no lo tiene, el árbol igual se sacude). Cada 3 golpes da 2 de madera; después de 3 tandas el árbol se cae y vuelve a crecer a los 5 minutos. Los árboles caídos son los mismos para todo el servidor.
+- **Configuración:** `data/tables/bosque.json` (`golpes_por_tanda`, `madera_por_tanda`, `tandas_por_arbol`, `rebrote_minutos`, `animacion`, `radio`). Código: `src/systems/bosque.js`. Sirve en cualquier escena que tenga objetos `arbol_…`.

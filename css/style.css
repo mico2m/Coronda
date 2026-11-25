@@ -452,3 +452,11 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .reloj-h { font-size: 16px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 .reloj-m { color: var(--muted); font-size: 12px; }
 body:has(.talking) .reloj { opacity: 0.4; }
+
+/* ---------- Talar (src/systems/bosque.js) ---------- */
+.tala-prompt small { margin-left: 6px; opacity: 0.75; font-size: 0.8em; }
+.tala-pop { position: absolute; left: 50%; top: 38%; z-index: 6; transform: translate(-50%, 0); pointer-events: none;
+  padding: 6px 14px; border-radius: 999px; background: rgba(12, 20, 26, 0.88); color: #ffe7a8; font: 700 18px var(--font-body); letter-spacing: 0.04em; }
+.tala-pop[hidden] { display: none; }
+.tala-pop.sube { animation: tala-sube 1.3s ease-out forwards; }
+@keyframes tala-sube { from { opacity: 0; transform: translate(-50%, 10px); } 15% { opacity: 1; transform: translate(-50%, 0); } 75% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -24px); } }

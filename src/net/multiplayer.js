@@ -20,7 +20,7 @@ import { makeUnlit, setShade } from '../systems/shading.js';
 const APP_ID = 'coronda-mirkuwu-3d';
 const SEND_EVERY = 0.1;      // s entre envíos de posición (10 por segundo)
 const HEARTBEAT = 2;         // s: aunque no te muevas, se avisa que seguís ahí
-const TIMEOUT = 8;           // s sin noticias -> se lo saca
+const TIMEOUT = 75;          // s sin noticias de alguien conectado -> deja de contarse (la pestaña quedó congelada)
 const NAME_HEIGHT = 2.05;    // m: altura de la etiqueta con el nombre
 
 // Sala de prueba entre pestañas (misma PC): imita la API de Trystero que usamos
@@ -152,7 +152,7 @@ export async function connectServer(roomId = 'coronda') {
   const state = room.makeAction('estado');   // { s: escena, p: [x,y,z], f: giro, a: clip, m: modelo, n: nombre, … }
   const peers = new Map();                    // peerId -> { last, data, avatar }
   let me = null, scene3d = null, shade = null, playing = false;
-  let sendT = 0, beatT = 0, lastSent = '';
+  let beatT = 0, lastSent = '';
   const templates = new Map();                // modelo -> Promise<gltf>
 
   const net = {
@@ -162,12 +162,24 @@ export async function connectServer(roomId = 'coronda') {
     get network() { return { ...(room.status?.() ?? { open: 1, total: 1 }), peers: peers.size }; },
     // Cuántos están adentro del mundo (sin contar los que miran el menú). Si vos estás jugando, te cuenta.
     get count() { let n = playing ? 1 : 0; for (const p of peers.values()) if (p.data?.playing) n++; return n; },
-    start(opts) { scene3d = opts.scene; me = opts.me; playing = true; sendNow(); emitCount(); },
+    start(opts) {
+      scene3d = opts.scene; me = opts.me; playing = true; sendNow(); emitCount();
+      // Envío con un reloj propio (no con los cuadros): sigue andando aunque la pestaña quede en segundo plano
+      setInterval(() => {
+        beatT += SEND_EVERY;
+        const s = myState();
+        const j = JSON.stringify(s);
+        if (j !== lastSent || beatT >= HEARTBEAT) { lastSent = j; beatT = 0; state.send(s); }
+      }, SEND_EVERY * 1000);
+    },
     setShade(s) { shade = s; for (const p of peers.values()) if (p.avatar?.model) setShade(p.avatar.model, shade); },
     update,
     leave() { try { room.leave(); } catch { /* nada */ } },
   };
   const emitCount = () => net.onCount?.(net.count);
+  // Para revisar desde la consola (F12): corondaNet.debug()
+  net.debug = () => ({ yo: room.selfId, jugando: playing, red: net.network, otros: [...peers].map(([id, p]) => ({ id, jugando: !!p.data?.playing, escena: p.data?.s, nombre: p.data?.n, hace: Math.round((performance.now() - p.last) / 100) / 10 })) });
+  window.corondaNet = net;
 
   room.onPeerJoin = (id) => {
     peers.set(id, { last: performance.now(), data: null, avatar: null });
@@ -258,20 +270,11 @@ export async function connectServer(roomId = 'coronda') {
 
   function update(dt) {
     const now = performance.now();
-    // Enviar lo tuyo: 10 veces por segundo si cambió, y cada 2 s aunque no cambie
-    if (playing) {
-      sendT += dt; beatT += dt;
-      if (sendT >= SEND_EVERY) {
-        sendT = 0;
-        const s = myState();
-        const j = JSON.stringify(s);
-        if (j !== lastSent || beatT >= HEARTBEAT) { lastSent = j; beatT = 0; state.send(s); }
-      }
-    }
     const myScene = playing ? me?.()?.s : null;
     for (const [id, p] of peers) {
       p.id = id;
-      if (now - p.last > TIMEOUT * 1000 && p.data) { drop(id); emitCount(); continue; }
+      // Sin noticias hace mucho: no se cuenta ni se muestra (la conexión la cierra onPeerLeave)
+      if (p.data?.playing && now - p.last > TIMEOUT * 1000) { p.data = { playing: false }; removeAvatar(p); emitCount(); continue; }
       const d = p.data;
       const visible = playing && d?.playing && d.s === myScene;
       if (!visible) { if (p.avatar) p.avatar.root.visible = false; continue; }

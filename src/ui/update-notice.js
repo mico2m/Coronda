@@ -2,7 +2,6 @@
 // "Enviar"), a los que tienen el juego abierto les aparece "Hay una nueva actualización" con un botón para recargar.
 // Se revisa cada minuto y cada vez que volvés a la pestaña.
 const EVERY = 60 * 1000;
-const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 async function read() {
   try {
@@ -24,7 +23,7 @@ export async function createUpdateNotice() {
 
   function show(d) {
     shown = d;
-    el.innerHTML = `<div class="update-text"><b>¡Hay una nueva actualización de Coronda!</b>${d.mensaje && !/^Cambios desde el Studio/i.test(d.mensaje) ? `<span>${esc(d.mensaje)}</span>` : '<span>Recargá para jugar con la última versión.</span>'}</div>
+    el.innerHTML = `<div class="update-text"><b>¡Hay una nueva actualización de Coronda!</b><span>Recargá para jugar con la última versión.</span></div>
       <button type="button" class="update-go">Actualizar</button><button type="button" class="update-later" aria-label="Más tarde">Más tarde</button>`;
     el.hidden = false;
   }

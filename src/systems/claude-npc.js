@@ -483,7 +483,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     const h = entry.holder;
     const dx = x - h.position.x, dz = z - h.position.z;
     const d = Math.hypot(dx, dz);
-    if (d <= stopAt) { if (entry.current !== entry.idle) npcs.play(entry, null); return true; }
+    if (d <= stopAt + 0.01) { if (entry.current !== entry.idle) npcs.play(entry, null); return true; } // (+1 cm: si no, por redondeo nunca llega)
     const step = Math.min(d - stopAt, speed * dt);
     h.position.x += (dx / d) * step; h.position.z += (dz / d) * step;
     entry.targetYaw = Math.atan2(dx, dz) + entry.yawOffset;

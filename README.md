@@ -589,3 +589,9 @@ Claude atiende la tienda y fabrica muebles a cambio de madera. Código: `src/sys
 - **Diálogos armados en el momento:** un nodo `{ "dinamico": "tienda_menu" }` le pide los nodos a la tienda (catálogo con tu madera, tus pedidos, etc.). Sirve para cualquier sistema (ver `hooks.dynamic` en `dialogue.js`).
 - **Modo diseño con la mochila:** en tu casa solo podés poner los muebles que tenés en la mochila (los retirados de la tienda); al colocarlos salen de la mochila y si quitás uno ya puesto vuelve a la mochila. Los pósters siguen siendo gratis.
 - **Consola:** `corondaClaude.state`, `coronda.getTienda().pedidos()` (en `dev.html`).
+
+## Buzones
+
+Cada casa tiene un buzón: `blender -b -P blender/agregar_buzon.py` le agrega uno a los `.glb` de `data/tables/casas.json` que existan (un Empty `buzon` con el buzón adentro, al frente a la derecha; deja `blender/<casa>_buzon.blend`) y crea `assets/models/objects/buzon.glb`. Las casas que no traen buzón reciben `buzon.glb` al frente. El juego lo renombra `lote_<número>_buzon` y ahí Claude deja la nota de los pedidos listos (ver *La Carpintería*).
+
+Para tu propio modelo de casa alcanza con un objeto (malla o Empty) llamado `buzon`.

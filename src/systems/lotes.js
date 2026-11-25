@@ -6,6 +6,10 @@
 //     La escala del Empty NO se le aplica: el modelo de la casa sale en metros reales.
 //   - Si un modelo de casa trae objetos col_… (o colision = 1), la casa colisiona (ver collision.js).
 //
+// Flecha: sobre cada lote LIBRE flota una flecha que sube y baja, pero solo aparece cuando el jugador se acerca (a menos de
+//   30 m del centro). Se achica y desaparece al alejarse o cuando alguien adquiere el lote.
+//   En el Empty se puede ajustar con Custom Properties: lote_aviso_radio (m, 0 = sin flecha) y lote_flecha_altura (m).
+//
 // Casas disponibles: data/casas.json  { "maxPorJugador": 1, "casas": [{ id, nombre, archivo }] }
 // El .glb de cada casa va en assets/models/objects/. El origen del modelo = el centro del lote, a nivel del suelo.
 // Si el archivo todavía no existe se muestra una caja de prueba (así se puede probar el sistema antes de modelar).
@@ -35,6 +39,10 @@ const UID_STORE = 'coronda.uid';
 const MINE_STORE = 'coronda.lotes.mios';
 const SOLO_STORE = 'coronda.lotes.solo';
 const HEAL_DELAY = 4000; // ms: se espera a recibir lo guardado en el broker antes de reponer lo propio
+const ARROW_RADIUS = 30;   // m: a esta distancia del centro del lote (o menos) aparece la flecha
+const ARROW_HEIGHT = 4.5;  // m sobre el Empty
+const ARROW_BOB = 0.45;    // m que sube y baja
+const ARROW_COLOR = 0xffd23f;
 const FALLBACK_COLORS = [0xd9a066, 0x6fa8dc, 0x93c47d, 0xe06666, 0xc27ba0];
 
 // ¿Este modelo trae colisión propia (col_… o colision en sus propiedades)? Si no, poner o sacar la casa no cambia las colisiones
@@ -177,6 +185,20 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     }, HEAL_DELAY);
   }
 
+  // ---------- Flecha indicadora ----------
+  function makeArrow() {
+    const mat = new THREE.MeshBasicMaterial({ color: ARROW_COLOR, fog: false });
+    const g = new THREE.Group();
+    g.name = 'lote-flecha';
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.9, 1.4, 4), mat); // punta hacia abajo
+    head.rotation.x = Math.PI; head.position.y = 0.7;
+    const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.1, 0.7), mat);
+    shaft.position.y = 1.95;
+    g.add(head, shaft);
+    g.visible = false;
+    return g;
+  }
+
   // ---------- Casas en el mundo ----------
   function template(file) {
     if (!templates.has(file)) templates.set(file, loadGLB(file));
@@ -314,6 +336,12 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
             pos: _p.clone(), quat: _q.clone(), size: _s.clone().multiplyScalar(2),
             inv: o.matrixWorld.clone().invert(),
           };
+          const rad = o.userData?.lote_aviso_radio;
+          spot.arrowRadius = rad !== undefined && rad !== '' && Number.isFinite(Number(rad)) ? Number(rad) : ARROW_RADIUS;
+          const hgt = Number(o.userData?.lote_flecha_altura);
+          spot.arrowHeight = Number.isFinite(hgt) && hgt > 0 ? hgt : ARROW_HEIGHT;
+          spot.arrowK = 0;
+          if (spot.arrowRadius > 0) { spot.arrow = makeArrow(); root.add(spot.arrow); }
           if (dev) { // modo desarrollador: se dibuja la zona (verde = libre · celeste = tuyo · rojo = de otro)
             const h = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(2, 2, 2)), new THREE.LineBasicMaterial({ color: 0x84cc16 }));
             h.matrixAutoUpdate = false; h.matrix.copy(o.matrixWorld); h.name = 'lote-helper';
@@ -337,7 +365,22 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     claim, release,
 
     // `focus`: punto del jugador (o de la cámara libre). Cada cuadro.
-    update(focus, feetY = focus.y - 1) {
+    update(focus, feetY = focus.y - 1, dt = 1 / 60) {
+      // Flechas: aparecen (crecen) cuando te acercás a un lote libre y suben y bajan
+      const t = performance.now() / 1000;
+      const k = Math.min(1, dt * 8);
+      for (const s of spots) {
+        if (!s.arrow) continue;
+        const free = !state.get(s.key)?.o;
+        const close = Math.hypot(focus.x - s.pos.x, focus.z - s.pos.z) < s.arrowRadius;
+        s.arrowK += ((free && close ? 1 : 0) - s.arrowK) * k;
+        const on = s.arrowK > 0.02;
+        s.arrow.visible = on;
+        if (!on) continue;
+        s.arrow.scale.setScalar(s.arrowK);
+        s.arrow.position.set(s.pos.x, s.pos.y + s.arrowHeight + Math.sin(t * 2.6) * ARROW_BOB, s.pos.z);
+        s.arrow.rotation.y = t * 1.2;
+      }
       if (panelKey !== null) return;
       let best = null, bestD = Infinity;
       if (!blocked()) {

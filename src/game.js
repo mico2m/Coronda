@@ -127,7 +127,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     doors?.tick(dt);
     const feetY = mode === 'player' && player ? player.position.y : camera.position.y - 1.7;
     doors?.update(focus, feetY);
-    lotes?.update(focus, feetY); // después de las puertas: si hay una puerta cerca, la E es de ella
+    lotes?.update(focus, feetY, dt); // después de las puertas: si hay una puerta cerca, la E es de ella
     renderer.render(scene, camera);
     textbox.render(); // caja de diálogo, encima del mundo
   }

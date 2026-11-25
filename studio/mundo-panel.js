@@ -3,7 +3,7 @@
 // tienda (lo que hace Claude, el stock del taller y los pedidos).
 // Todo lo que cambiás se aplica al toque en la vista previa y se guarda en su JSON (data/tables/tiempo.json,
 // bosque.json, tienda.json y data/muebles.json), conservando el resto del archivo.
-const FILES = { tiempo: 'data/tables/tiempo.json', bosque: 'data/tables/bosque.json', tienda: 'data/tables/tienda.json', muebles: 'data/muebles.json' };
+const FILES = { tiempo: 'data/tables/tiempo.json', bosque: 'data/tables/bosque.json', tienda: 'data/tables/tienda.json', muebles: 'data/muebles.json', niveles: 'data/tables/niveles.json' };
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // opts: root (elemento), game() -> iframe.contentWindow.coronda, api(path) -> url, quiet (Map), toast(msg, err)
@@ -29,6 +29,19 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {}, has
       <label>Energía por día (hachazos; 0 = sin límite) <input type="number" min="0" max="999" step="1" data-k="resistencia_por_dia"></label>
       <label>Energía por segundo corriendo (0 = no gasta) <input type="number" min="0" max="20" step="0.05" data-k="energia_correr_por_seg"></label>
       <label>Animación del personaje <input type="text" data-k="animacion"></label>
+    </form>
+    <form class="mp-sec" data-f="niveles"><b>Niveles y aptitudes (tecla N en el juego)</b>
+      <label>XP por hachazo <input type="number" min="0" max="999" step="1" data-k="xp_por_hachazo"></label>
+      <label>XP al voltear un árbol <input type="number" min="0" max="999" step="1" data-k="xp_por_arbol"></label>
+      <label>XP por retirar un mueble <input type="number" min="0" max="999" step="1" data-k="xp_por_mueble"></label>
+      <label>XP base para subir <input type="number" min="1" max="100000" step="5" data-k="xp_base"></label>
+      <label>Curva (exponente) <input type="number" min="0" max="4" step="0.1" data-k="xp_exponente"></label>
+      <label>Nivel máximo <input type="number" min="1" max="200" step="1" data-k="nivel_max"></label>
+      <label>Puntos por nivel <input type="number" min="0" max="10" step="1" data-k="puntos_por_nivel"></label>
+      <label>Energía por punto <input type="number" min="0" max="100" step="1" data-k="aptitudes.energia.por_punto"></label>
+      <label>Puntos máx. en Energía <input type="number" min="0" max="100" step="1" data-k="aptitudes.energia.max_puntos"></label>
+      <div id="mpNivel" class="k"></div>
+      <div class="mp-row"><button type="button" id="mpXp">+100 XP</button><button type="button" id="mpNivelReset">Reiniciar nivel</button></div>
     </form>
     <form class="mp-sec" data-f="tienda"><b>Carpintería</b>
       <label>Corta la charla tras (s) <input type="number" min="5" max="600" step="1" data-k="inactividad_seg"></label>
@@ -67,6 +80,7 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {}, has
       if (name === 'bosque') g.getBosque?.()?.setConfig(data.bosque);
       if (name === 'tienda') g.getTienda?.()?.setConfig?.(data.tienda);
       if (name === 'muebles') g.getTienda?.()?.setCatalog?.(data.muebles.muebles ?? []);
+      if (name === 'niveles') g.getNiveles?.()?.setConfig?.(data.niveles);
     } catch { /* la vista previa todavía no cargó */ }
   }
   root.querySelectorAll('form[data-f]').forEach((form) => {
@@ -112,6 +126,8 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {}, has
     live('muebles'); save('muebles');
   });
 
+  $('#mpXp').onclick = () => { try { game().getNiveles().ganar(100); } catch { toast('La vista previa todavía no cargó', true); } };
+  $('#mpNivelReset').onclick = () => { if (!confirm('¿Volver al nivel 1 y sacar los puntos de la vista previa?')) return; try { game().getNiveles().reiniciar(); } catch { /* nada */ } };
   $('#mpMadera').onclick = () => { try { game().getInventario().add('recursos', 'madera', 10); } catch { toast('La vista previa todavía no cargó', true); } };
   $('#mpVaciar').onclick = () => { try { game().getInventario().reset(); } catch { toast('La vista previa todavía no cargó', true); } };
   $('#mpPedidos').addEventListener('click', (e) => {
@@ -146,6 +162,8 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {}, has
       const inv = g.getInventario?.()?.snapshot?.() ?? {};
       const fmt = (o) => Object.entries(o ?? {}).filter(([, n]) => n > 0).map(([k, n]) => `${esc(k)} ×${n}`).join(' · ') || '—';
       const muebles = Object.entries(inv.muebles ?? {}).filter(([, n]) => n > 0).map(([k, n]) => `<div>${esc(mueble(k)?.nombre ?? k)} ×${n}${glbTag(mueble(k), k)}</div>`).join('') || '—';
+      const nv = g.getNiveles?.()?.estado;
+      if (nv) $('#mpNivel').textContent = `Vista previa: nivel ${nv.nivel} · ${Math.floor(nv.xpNivel)} / ${nv.siguiente || '—'} XP · ${nv.puntos} punto(s) libre(s) · energía +${g.getNiveles().bonus('energia')}`;
       $('#mpInv').innerHTML = `<div><span class="k">Recursos</span> ${fmt(inv.recursos)}</div><div><span class="k">Muebles</span> ${muebles}</div>`;
     } catch { /* nada */ }
   }

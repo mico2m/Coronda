@@ -143,3 +143,15 @@
   .app.wow .loading { left: var(--edge-l); top: calc(var(--edge-t) + 50px); transform: none; text-align: left; font-size: 14px;
     max-width: calc(100% - var(--map) - var(--edge-l) - var(--edge-r) - 16px); }
 }
+
+/* ---------- Nivel: insignia en el retrato, ⭐ en la barra de ítems, barra de XP estilo MMO ---------- */
+.wow-nivel { position: absolute; left: -4px; bottom: -4px; min-width: 22px; height: 22px; padding: 0 3px; box-sizing: border-box; border-radius: 99px; display: grid; place-items: center;
+  font: 700 12px var(--wow-serif); color: var(--wow-amarillo); background: #120d08; border: 2px solid var(--wow-oro); box-shadow: 0 0 0 1px #000; }
+.app.wow .apt-btn { background: radial-gradient(circle at 50% 35%, #3a2d1a 0%, #120d08 75%); border: 2px solid var(--wow-oro); color: var(--wow-texto); }
+.app.wow .xp-bar { border-radius: 2px; border: 1px solid #000; box-shadow: 0 0 0 2px var(--wow-oro-osc), 0 0 0 3px #000; background: #140d05; }
+.app.wow .xp-bar i { background: linear-gradient(180deg, #d8b4fe 0%, #8b5cf6 45%, #4c1d95 100%); }
+@media (hover: hover) and (pointer: fine) {
+  .app.wow .xp-bar { bottom: calc(var(--edge-b) + 60px); width: min(460px, calc(100% - 24px)); }
+  .app.wow .actions { bottom: calc(var(--edge-b) + 82px); }
+  .app.wow .xp-pop { bottom: calc(var(--edge-b) + 84px); }
+}

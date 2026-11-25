@@ -42,7 +42,7 @@ const esc = (t) => String(t ?? '');
 const norm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 export function createTienda({ stage = null, getRoot, net = null, claude = null, inventario = null, tiempo = null, lotes = null, casas = null,
-  myName = 'Viajero', myUid = 'yo', getPlayer = () => null, getSceneId = () => null, notify = () => {} } = {}) {
+  myName = 'Viajero', myUid = 'yo', getPlayer = () => null, getSceneId = () => null, notify = () => {}, onEntrega = () => {} } = {}) {
   let cfg = { id: 'tienda', zona: [5, 10], techo: 'techo', inactividad_seg: 20, espera_seg: 5, reparto_horas: 3, max_pedidos_por_jugador: 5 };
   loadJSON('data/tables/tienda.json').then((c) => { cfg = { ...cfg, ...c }; }).catch(() => {});
   const catalog = new Map(); // id -> { id, nombre, costo, tiempo_min, caja, archivo }
@@ -506,6 +506,7 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
         inventario?.add('muebles', o.m, 1);
         drop(d.id);
         notify(`Claude te dio: ${nombre(o.m)} (ya está en tu mochila 🎒)`);
+        try { onEntrega(o); } catch { /* nada */ } // XP por retirar un mueble (ver systems/niveles.js)
       }
     };
   }

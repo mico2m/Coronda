@@ -3,7 +3,8 @@
 // chat…: ahí Esc cierra eso). En el celular, con el botón ⚙️ (o tocando 🎙️ con el micrófono apagado).
 //
 // opts: stage, voz (systems/voz.js, o null jugando solo), blocked() (otra cosa usa Esc), onOpen() / onClose()
-export function createMenu({ stage, voz = null, blocked = () => false, onOpen = () => {}, onClose = () => {} }) {
+// extras: [{ texto, accion }] botones de otras ventanas (ej. Nivel y aptitudes), arriba de "Volver al juego"
+export function createMenu({ stage, voz = null, extras = [], blocked = () => false, onOpen = () => {}, onClose = () => {} }) {
   const el = document.createElement('div');
   el.className = 'menu-esc'; el.hidden = true;
   el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Menú');
@@ -34,6 +35,7 @@ export function createMenu({ stage, voz = null, blocked = () => false, onOpen = 
           <label class="menu-fila">Volumen de las voces <input type="range" name="volumen" min="0" max="1.5" step="0.05" value="${a.volumen}"></label>
           <div class="menu-cerca"></div>` : '<p class="menu-nota">El chat de voz funciona en el servidor, con otros jugadores.</p>'}
         </section>
+        ${extras.map((x, i) => `<button type="button" class="menu-extra" data-extra="${i}">${esc(x.texto)}</button>`).join('')}
         <button type="button" class="menu-volver">Volver al juego</button>
       </div>`;
     dibujarCerca();
@@ -62,7 +64,11 @@ export function createMenu({ stage, voz = null, blocked = () => false, onOpen = 
     else if (t.name === 'escuchar') voz?.set({ escuchar: t.checked });
   });
   el.addEventListener('input', (e) => { if (e.target.name === 'volumen') voz?.set({ volumen: e.target.value }); });
-  el.addEventListener('click', (e) => { if (e.target.closest('.menu-x, .menu-volver')) cerrar(); });
+  el.addEventListener('click', (e) => {
+    const x = e.target.closest('[data-extra]');
+    if (x) { cerrar(); setTimeout(() => extras[Number(x.dataset.extra)]?.accion?.(), 0); return; }
+    if (e.target.closest('.menu-x, .menu-volver')) cerrar();
+  });
   el.addEventListener('pointerdown', (e) => { e.stopPropagation(); if (e.target === el) cerrar(); }); // clic en lo oscuro: cierra
   el.addEventListener('wheel', (e) => e.stopPropagation(), { passive: true });
 

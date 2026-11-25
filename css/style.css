@@ -529,6 +529,55 @@ body:has(.talking) .energia { opacity: 0.4; }
   .energia-bar { width: 110px; }
 }
 
+/* ---------- Niveles y aptitudes (systems/niveles.js) ---------- */
+.xp-bar { position: absolute; z-index: 3; left: 50%; bottom: calc(var(--edge-b, 12px) + 58px); transform: translateX(-50%); width: min(420px, calc(100% - 24px)); height: 12px;
+  border-radius: 99px; background: rgba(12, 20, 26, 0.75); border: 1px solid rgba(255, 255, 255, 0.25); overflow: hidden; pointer-events: auto; cursor: pointer; }
+.xp-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7c3aed, #c084fc); transition: width 0.4s ease; }
+.xp-bar span { position: absolute; inset: 0; display: grid; place-items: center; font: 700 9.5px var(--font-body); color: #fff; text-shadow: 0 1px 1px #000, 0 0 2px #000; white-space: nowrap; }
+.xp-pop { position: absolute; z-index: 6; left: 50%; bottom: calc(var(--edge-b, 12px) + 78px); transform: translateX(-50%); pointer-events: none; font: 800 15px var(--font-body); color: #d8b4fe; text-shadow: 0 1px 0 #000, 0 0 4px #000; }
+.xp-pop[hidden] { display: none; }
+.xp-pop.sube { animation: xp-sube 1.2s ease-out forwards; }
+@keyframes xp-sube { from { opacity: 0; transform: translate(-50%, 6px); } 15% { opacity: 1; transform: translate(-50%, 0); } 70% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -20px); } }
+.nivel-cartel { position: absolute; z-index: 7; left: 50%; top: 22%; transform: translateX(-50%); display: grid; gap: 4px; justify-items: center; text-align: center; pointer-events: none; }
+.nivel-cartel[hidden] { display: none; }
+.nivel-cartel b { font: 700 42px var(--font-display); color: #ffd100; text-shadow: 0 3px 0 #000, 0 0 12px rgba(255, 209, 0, 0.6); letter-spacing: 0.03em; }
+.nivel-cartel small { font: 600 14px var(--font-body); color: #fff; text-shadow: 0 1px 0 #000, 0 0 4px #000; }
+.nivel-cartel.entra { animation: nivel-entra 0.5s cubic-bezier(0.2, 1.4, 0.4, 1); }
+@keyframes nivel-entra { from { opacity: 0; transform: translateX(-50%) scale(0.6); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+.apt-btn { display: none; position: absolute; z-index: 3; width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 20px; line-height: 1; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); }
+.apt-btn.con-puntos::after { content: attr(data-puntos); position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 99px;
+  background: #22c55e; color: #fff; font: 800 10px/16px var(--font-body); box-shadow: 0 0 0 2px #000; }
+.apt-btn.con-puntos { animation: apt-brilla 1.6s ease-in-out infinite; }
+@keyframes apt-brilla { 50% { box-shadow: 0 0 12px rgba(255, 209, 0, 0.9); } }
+.apt-panel { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(0, 0, 0, 0.5); padding: 16px; box-sizing: border-box; }
+.apt-panel[hidden] { display: none; }
+.apt-card { width: min(400px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box; padding: 0 14px 12px; border-radius: 6px; color: #f4e7c8;
+  background: linear-gradient(180deg, #221a10 0%, #0e0b07 100%); box-shadow: 0 0 0 1px #000, 0 0 0 3px #6e5220, 0 0 0 4px #000, 0 12px 36px rgba(0, 0, 0, 0.6); font: 500 13px var(--font-body); }
+.apt-head { display: flex; justify-content: space-between; align-items: center; margin: 0 -14px 10px; padding: 8px 14px; border-bottom: 1px solid #6e5220;
+  background: linear-gradient(180deg, #3a2a14, #1a130a); font: 700 17px "Cinzel", Georgia, serif; color: #ffd100; }
+.apt-x { border: 0; background: none; color: #f3d78a; font-size: 16px; cursor: pointer; }
+.apt-xp small { display: block; margin-top: 4px; color: #bfa979; font-size: 11.5px; }
+.apt-xp-bar { height: 12px; border-radius: 2px; background: #140d05; box-shadow: inset 0 1px 3px #000; overflow: hidden; border: 1px solid #000; }
+.apt-xp-bar i { display: block; height: 100%; background: linear-gradient(180deg, #d8b4fe, #7c3aed 60%, #4c1d95); }
+.apt-puntos { margin: 10px 0 4px; color: #f4e7c8; } .apt-puntos b { color: #4ade80; font-size: 15px; }
+.apt-sub { margin: 10px 0 6px; font: 600 12px "Cinzel", Georgia, serif; color: #bfa979; letter-spacing: 0.04em; }
+.apt-fila { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid #3d321f; border-radius: 4px; background: rgba(0, 0, 0, 0.3); }
+.apt-ico { width: 40px; height: 40px; flex: none; display: grid; place-items: center; font-size: 22px; border-radius: 3px; border: 1px solid #6e5220;
+  background: radial-gradient(circle at 50% 40%, #3e3424 0%, #120e09 85%); box-shadow: inset 0 0 6px #000; }
+.apt-txt { flex: 1; display: grid; gap: 2px; } .apt-txt b { color: #ffd100; } .apt-rango { color: #4ade80; font-weight: 700; margin-left: 4px; }
+.apt-txt small { color: #cdbb93; font-size: 11.5px; } .apt-txt em { display: block; font-style: normal; color: #9ca3af; }
+.apt-fila button { width: 32px; height: 32px; flex: none; border-radius: 4px; border: 1px solid #d4af37; background: linear-gradient(180deg, #2f7d3e, #14401e); color: #fff;
+  font: 800 18px var(--font-body); cursor: pointer; }
+.apt-fila button:disabled { opacity: 0.35; filter: grayscale(1); cursor: default; }
+.apt-pie { margin-top: 10px; font-size: 11px; color: #8f7d58; }
+.menu-extra { display: block; width: 100%; margin-top: 10px; padding: 9px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: inherit; font: 600 14px var(--font-body); cursor: pointer; }
+/* Celular: la barra de XP finita abajo de todo (se toca para abrir las aptitudes); ⭐ va en el menú ⚙️ */
+@media (pointer: coarse) {
+  .xp-bar { left: var(--edge-l, 12px); right: var(--edge-r, 12px); width: auto; transform: none; bottom: max(3px, env(safe-area-inset-bottom, 0px)); height: 11px; }
+  .xp-pop { bottom: calc(var(--edge-b, 12px) + 200px); }
+}
+
 /* ---------- Primera persona: cruceta (game.js) ---------- */
 .fp-mira { position: absolute; left: 50%; top: 50%; z-index: 2; width: 22px; height: 22px; transform: translate(-50%, -50%); pointer-events: none; }
 .fp-mira[hidden] { display: none; }

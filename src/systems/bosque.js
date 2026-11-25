@@ -24,7 +24,8 @@ const STUMP_RE = /_tocon/i;
 const _v = new THREE.Vector3();
 
 // opts: stage, net, getRoot(), getSceneId(), getPlayer(), inventario, tiempo (reloj del juego), blocked(), notify(msg)
-export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer, inventario, tiempo = null, blocked = () => false, notify = () => {} }) {
+//       extraEnergia() (energía máxima extra: aptitud Energía, ver systems/niveles.js), onXp(que) ('hachazo' | 'arbol')
+export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer, inventario, tiempo = null, blocked = () => false, notify = () => {}, extraEnergia = () => 0, onXp = () => {} }) {
   let cfg = { ...BOSQUE_DEFAULT };
   loadJSON('data/tables/bosque.json').then((c) => setConfig(c)).catch(() => {});
   function setConfig(c) {
@@ -41,10 +42,11 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
   const hoy = () => (tiempo ? tiempo.dia() : Math.floor(Date.now() / 864e5));
   let res = { dia: hoy(), usados: 0 };
   try { const g = JSON.parse(localStorage.getItem(RES_KEY)); if (g && Number.isFinite(g.dia)) res = { dia: g.dia, usados: Math.max(0, Number(g.usados) || 0) }; } catch { /* nada */ }
+  const maxE = () => cfg.resistencia_por_dia + Math.max(0, Number(extraEnergia()) || 0); // la del día + la aptitud Energía
   function quedan() {
     if (!cfg.resistencia_por_dia) return Infinity;
     if (res.dia !== hoy()) res = { dia: hoy(), usados: 0 }; // día nuevo: resistencia llena
-    return Math.max(0, cfg.resistencia_por_dia - res.usados);
+    return Math.max(0, maxE() - res.usados);
   }
   function gastar() {
     if (!cfg.resistencia_por_dia) return;
@@ -60,7 +62,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
       return false;
     }
     avisado = false;
-    res.usados = Math.min(cfg.resistencia_por_dia, res.usados + cfg.energia_correr_por_seg * dt);
+    res.usados = Math.min(maxE(), res.usados + cfg.energia_correr_por_seg * dt);
     guardarT += dt;
     if (guardarT > 1) { guardarT = 0; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }
     return true;
@@ -153,6 +155,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     if (!t || busy || !player || isDown(t)) return;
     if (quedan() <= 0) { toast('😮‍💨 Sin fuerzas'); notify(`Estás agotado: no podés talar más hoy. Recuperás la resistencia ${recupera()}.`); return; }
     gastar();
+    onXp('hachazo');
     busy = true; // el botón sigue a la vista, atenuado, mientras da el hachazo
     const face = { x: t.pos.x, z: t.pos.z };
     let ok = false;
@@ -165,9 +168,9 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
       t.hits = 0; t.tandas++;
       inventario?.add('recursos', cfg.recurso, cfg.madera_por_tanda);
       toast(`+${cfg.madera_por_tanda} 🪵 ${cfg.recurso === 'madera' ? 'madera' : cfg.recurso}`);
-      if (t.tandas >= cfg.tandas_por_arbol) { fell(t); toast(`¡Cayó el árbol! +${cfg.madera_por_tanda} 🪵`); }
+      if (t.tandas >= cfg.tandas_por_arbol) { fell(t); toast(`¡Cayó el árbol! +${cfg.madera_por_tanda} 🪵`); onXp('arbol'); }
     } else toast(`${'●'.repeat(t.hits)}${'○'.repeat(cfg.golpes_por_tanda - t.hits)}`);
-    const q = quedan();
+    const q = Math.ceil(quedan() - 1e-6);
     if (q === 0) setTimeout(() => notify(`Te quedaste sin fuerzas por hoy. Recuperás la resistencia ${recupera()}.`), 900);
     else if (q === 5) setTimeout(() => notify('Te quedan 5 hachazos por hoy ⚡'), 900);
     busy = false;
@@ -209,7 +212,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     recargar() { res = { dia: hoy(), usados: 0 }; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }, // (admin)
     correr,
     // quedan: entero (redondeado hacia arriba) para mostrar · exacto: con decimales (correr gasta de a poco)
-    get resistencia() { const q = quedan(); return { quedan: Number.isFinite(q) ? Math.ceil(q - 1e-6) : null, exacto: Number.isFinite(q) ? q : null, max: cfg.resistencia_por_dia, dia: res.dia }; },
+    get resistencia() { const q = quedan(); return { quedan: Number.isFinite(q) ? Math.ceil(q - 1e-6) : null, exacto: Number.isFinite(q) ? q : null, max: cfg.resistencia_por_dia ? maxE() : 0, dia: res.dia }; },
     get trees() { return trees.map((t) => ({ id: t.id, caido: isDown(t), hasta: fallen.get(t.key) ?? 0 })); },
   };
 }

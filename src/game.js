@@ -83,6 +83,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
   const followers = createFollowers(); // objetos con la propiedad `seguir` (ver systems/followers.js)
   let dialogue = null;
   let inventario = null; // mochila del jugador (ver systems/inventario.js)
+  let niveles = null;    // nivel, XP y aptitudes del jugador (ver systems/niveles.js)
   let tienda = null;     // la Carpintería de Claude (ver systems/tienda.js)
   let tiempo = null;     // hora del juego y día/noche (ver systems/tiempo.js)
   let bosque = null;     // talar árboles (ver systems/bosque.js)
@@ -371,7 +372,16 @@ export async function startGame({ dev = false, retro = null } = {}) {
     tiempo = createTiempo({ scene, stage, dev, getSceneData: () => sceneManager.current, getBaseShade: () => sceneManager.shade });
     window.corondaTiempo = tiempo;
     // Talar árboles (en cualquier escena que tenga arbol_001, arbol_002…)
+    // Niveles y aptitudes: XP por talar y retirar muebles, puntos para mejorar la energía (ver systems/niveles.js; tecla N)
+    const { createNiveles } = await import('./systems/niveles.js');
+    niveles = createNiveles({
+      stage, blocked: () => !!dialogue?.active,
+      notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
+      onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
+      onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
+    });
     bosque = createBosque({
+      extraEnergia: () => niveles.bonus('energia'), onXp: (que) => niveles.ganar(que),
       stage, net, inventario, tiempo, getRoot: () => sceneManager.root, getSceneId: () => sceneManager.current?.id ?? null,
       getPlayer: () => (mode === 'player' ? player : null), blocked: () => !!dialogue?.active || !!casas?.inside,
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
@@ -411,6 +421,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       getRoot: () => sceneManager.root, getSceneId: () => sceneManager.current?.id ?? null,
       getPlayer: () => (mode === 'player' ? player : null),
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 4500); },
+      onEntrega: () => niveles?.ganar('mueble'),
     });
     async function travel(go, text) {
       player.frozen = true;
@@ -571,7 +582,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     if (!dev) {
       const { createWowHud } = await import('./ui/wow-hud.js');
       createWowHud({
-        stage, nombre: choice?.name ?? 'Viajero', personaje: choice?.character?.name ?? '',
+        stage, nombre: choice?.name ?? 'Viajero', personaje: choice?.character?.name ?? '', nivel: niveles?.estado?.nivel ?? 1,
         getZona: () => { const c = sceneManager.current; return c?.name ?? c?.data?.name ?? String(c?.id ?? '').replace(/^scene_/, '').replace(/_/g, ' ').replace(/\b\w/g, (x) => x.toUpperCase()); },
       });
     }
@@ -589,7 +600,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     }
     const { createMenu } = await import('./ui/menu.js');
     menu = createMenu({
-      stage, voz,
+      stage, voz, extras: [{ texto: '⭐ Nivel y aptitudes (N)', accion: () => niveles?.abrir() }],
       blocked: () => !!dialogue?.active || (lotes?.blocked ?? false) || (casas?.designing ?? false),
       onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
       onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
@@ -604,5 +615,5 @@ export async function startGame({ dev = false, retro = null } = {}) {
     ui.setStatus(String(err.message || err));
   }
   // Para las herramientas del modo desarrollador (panel de NPC, etc.)
-  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null, getInventario: () => inventario, getTienda: () => tienda, getTiempo: () => tiempo, getBosque: () => bosque };
+  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null, getInventario: () => inventario, getTienda: () => tienda, getTiempo: () => tiempo, getBosque: () => bosque, getNiveles: () => niveles };
 }

@@ -10,7 +10,7 @@ const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const humanizar = (id) => String(id ?? '').replace(/^scene_/, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 // opts: stage, nombre (del jugador), personaje (nombre del personaje elegido), getZona() -> nombre de la escena
-export function createWowHud({ stage, nombre = 'Viajero', personaje = '', getZona = () => '' }) {
+export function createWowHud({ stage, nombre = 'Viajero', personaje = '', getZona = () => '', nivel = 1 }) {
   const app = stage?.closest('.app') ?? document.querySelector('.app') ?? document.body;
   app.classList.add('wow');
   const compu = typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches;
@@ -28,7 +28,7 @@ export function createWowHud({ stage, nombre = 'Viajero', personaje = '', getZon
   const marco = document.createElement('div');
   marco.className = 'wow-player';
   const inicial = (String(nombre).trim()[0] ?? '?').toUpperCase();
-  marco.innerHTML = `<div class="wow-retrato" aria-hidden="true"><span>${esc(inicial)}</span></div>
+  marco.innerHTML = `<div class="wow-retrato" aria-hidden="true"><span>${esc(inicial)}</span><b class="wow-nivel" title="Nivel">${esc(nivel)}</b></div>
     <div class="wow-pinfo"><div class="wow-pnombre">${esc(nombre)}</div>${personaje ? `<div class="wow-pclase">${esc(personaje)}</div>` : ''}<div class="wow-pbarras"></div></div>`;
   stage.append(marco);
   const barras = marco.querySelector('.wow-pbarras');
@@ -40,7 +40,7 @@ export function createWowHud({ stage, nombre = 'Viajero', personaje = '', getZon
   stage.append(micro);
   // Está dentro de #stage: sin esto la cámara se queda con el clic (setPointerCapture) y los botones no responden
   for (const el of [marco, micro]) el.addEventListener('pointerdown', (e) => e.stopPropagation());
-  const ORDEN = ['inv-btn', 'players-open', 'voz-btn', 'menu-btn'];
+  const ORDEN = ['inv-btn', 'apt-btn', 'players-open', 'voz-btn', 'menu-btn'];
 
   function acomodar() {
     const en = document.querySelector('.energia');

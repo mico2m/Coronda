@@ -22,6 +22,7 @@ import { createDialogue } from './systems/dialogue.js';
 import { createTextbox } from './ui/textbox.js';
 import { isSkyName } from './systems/shading.js';
 import { boot } from './ui/boot.js';
+import { createTouchControls } from './ui/touch-controls.js';
 
 const _focus = new THREE.Vector3();
 
@@ -40,8 +41,11 @@ export async function startGame({ dev = false, retro = null } = {}) {
   const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 2000);
   camera.position.set(0, 1.7, 8);
 
+  // Celular: joystick + botón para centrar la cámara (ver ui/touch-controls.js). Lo usan el jugador y la cámara libre.
+  const touch = createTouchControls({ pad: document.getElementById('pad'), onRecenter: () => player?.recenterCamera() });
   const controls = createCameraControls(camera, stage, {
     pad: document.getElementById('pad'),
+    touch,
     speedOut: document.getElementById('speedOut'),
   });
   const ui = createUI();
@@ -111,6 +115,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
   function setMode(m) {
     mode = m;
     const asPlayer = m === 'player';
+    touch.setRecenterVisible(asPlayer); // 🎥 solo con el personaje
+    document.getElementById('pad')?.classList.toggle('free', !asPlayer); // ▲ ▼ solo en la cámara libre
     if (asPlayer) {
       // desde la cámara libre: el jugador aparece debajo de la cámara, mirando hacia donde mirabas
       player.place([camera.position.x, camera.position.y - EYE, camera.position.z], controls.getYaw());
@@ -202,7 +208,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       }
       net = choice.online ? choice.net : null;
     }
-    player = await createPlayer({ scene, camera, stage, pad: document.getElementById('pad'), config: playerConfig });
+    player = await createPlayer({ scene, camera, stage, pad: document.getElementById('pad'), touch, config: playerConfig });
     const audio = createAudio(musicTable);
     const sceneManager = createSceneManager({ scene, camera, controls, audio, ui, scenesTable });
     if (!dev || /[?&]minimapa/.test(location.search)) { // en dev.html el inspector ocupa ese lugar (con ?minimapa aparece igual)

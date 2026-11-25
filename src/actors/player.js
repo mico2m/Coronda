@@ -1,5 +1,7 @@
 // Jugador: personaje en tercera persona con cámara que lo sigue.
 //  WASD = mover (relativo a la cámara) · Shift = correr · arrastrar = girar cámara · rueda = zoom
+//  Celular (ver ui/touch-controls.js): joystick analógico (poco = caminar despacio, al borde = correr) ·
+//  un dedo en la pantalla = girar la cámara · dos dedos = zoom · doble toque o botón 🎥 = centrar la cámara
 //  Cámara como en Ocarina: te sigue de atrás sola mientras caminás · Z = centrarla detrás del personaje ·
 //  flechas = mirar alrededor desde la cabeza (un rango corto); al soltarlas vuelve despacio a donde estaba.
 //  Ajustes en data/tables/player.json > camera: follow, lookYaw, lookPitch, lookSpeed, lookReturn, recenterTime.
@@ -72,7 +74,7 @@ const ALIAS = { ShiftRight: 'ShiftLeft' }; // las flechas no mueven: miran (ver 
 const TAU = Math.PI * 2;
 const INTERACT = 'interactuar'; // clave de la animación de puertas en `clips`
 
-export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
+export async function createPlayer({ scene, camera, stage, pad, touch = null, config = {} }) {
   const cfg = { ...DEFAULTS, ...config, camera: { ...DEFAULTS.camera, ...config.camera }, animation: { ...DEFAULTS.animation, ...config.animation }, collision: { ...DEFAULTS.collision, ...config.collision } };
 
   const root = new THREE.Group(); // posición = pies
@@ -197,7 +199,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   window.addEventListener('blur', () => { keys = {}; });
 
   // Botones táctiles
-  pad?.querySelectorAll('button').forEach((b) => {
+  pad?.querySelectorAll('button[data-key]').forEach((b) => {
     const k = b.dataset.key;
     b.addEventListener('pointerdown', (e) => { if (active) keys[k] = true; try { b.setPointerCapture(e.pointerId); } catch {} });
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => b.addEventListener(ev, () => { delete keys[k]; }));
@@ -242,21 +244,45 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     recenter = { from: cam.yaw, to: cam.yaw + angleDiff(cam.yaw, to), pitchFrom: cam.pitch, t: 0 };
   }
 
-  // Cámara: arrastrar para girar, rueda para el zoom
-  let dragging = false, lx = 0, ly = 0;
+  // Cámara: arrastrar para girar (mouse o un dedo), dos dedos = zoom, doble toque = centrar; rueda = zoom
+  const pointers = new Map(); // dedos / mouse sobre la escena: id -> { x, y, sx, sy, t, touch }
+  let pinch = null;           // { d: distancia inicial entre los dedos, dist: zoom de ese momento }
+  let lastTap = null;         // { t, x, y } del último toque corto (para el doble toque)
+  const pair = () => { const [a, b] = pointers.values(); return Math.hypot(a.x - b.x, a.y - b.y); };
   stage.addEventListener('pointerdown', (e) => {
     if (!active) return;
-    dragging = true; lx = e.clientX; ly = e.clientY;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), touch: e.pointerType === 'touch' });
     try { stage.setPointerCapture(e.pointerId); } catch {}
+    if (pointers.size === 2) pinch = { d: Math.max(1, pair()), dist: cam.dist };
   });
   stage.addEventListener('pointermove', (e) => {
-    if (!active || !dragging) return;
+    const p = pointers.get(e.pointerId);
+    if (!active || !p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    p.x = e.clientX; p.y = e.clientY;
+    if (pointers.size >= 2) { // dos dedos: zoom (pellizcar), sin girar
+      if (pinch && !preset?.locked) {
+        cam.dist = THREE.MathUtils.clamp(pinch.dist * (pinch.d / Math.max(1, pair())), cfg.camera.minDistance, cfg.camera.maxDistance);
+      }
+      return;
+    }
     recenter = null;
-    cam.yaw -= (e.clientX - lx) * 0.005;
-    cam.pitch = THREE.MathUtils.clamp(cam.pitch + (e.clientY - ly) * 0.004, -0.1, 1.3);
-    lx = e.clientX; ly = e.clientY;
+    // En pantalla táctil el dedo recorre menos que el mouse: más sensible
+    cam.yaw -= dx * (p.touch ? 0.009 : 0.005);
+    cam.pitch = THREE.MathUtils.clamp(cam.pitch + dy * (p.touch ? 0.007 : 0.004), -0.1, 1.3);
   });
-  const endDrag = () => { dragging = false; };
+  const endDrag = (e) => {
+    const p = pointers.get(e.pointerId);
+    if (!p) return;
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    // Toque corto sin arrastrar: si es el segundo seguido en el mismo lugar, centra la cámara
+    if (p.touch && e.type === 'pointerup' && performance.now() - p.t < 250 && Math.hypot(p.x - p.sx, p.y - p.sy) < 12) {
+      const now = performance.now();
+      if (lastTap && now - lastTap.t < 350 && Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < 40) { lastTap = null; if (!frozen) centerCamera(); }
+      else lastTap = { t: now, x: p.x, y: p.y };
+    }
+  };
   stage.addEventListener('pointerup', endDrag);
   stage.addEventListener('pointercancel', endDrag);
   stage.addEventListener('wheel', (e) => {
@@ -408,8 +434,11 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       actionPanel.hidden = !v || !actions.length;
       if (v && !currentClip) playClip('idle');
       keys = {};
-      dragging = false;
+      pointers.clear();
+      pinch = null;
     },
+    // Cámara detrás del personaje (tecla Z / botón 🎥 del celular)
+    recenterCamera() { if (active && !frozen) centerCamera(); },
     get yaw() { return cam.yaw; },
     setShade(shade) { setShade(pivot, shade); },
 
@@ -418,9 +447,12 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       mixer?.update(dt);
       let moving = false;
 
-      // Movimiento relativo a la cámara
-      const fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
-      const side = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+      // Movimiento relativo a la cámara: teclado, o el joystick del celular si no hay teclas apretadas
+      let fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
+      let side = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+      const stick = touch?.move;
+      const analog = !fwd && !side && stick?.mag > 0 ? stick.mag : 0; // 0 = teclado
+      if (analog) { fwd = stick.y; side = stick.x; }
       if (doing && !frozen && (fwd || side)) doing = null; // moverse cancela la acción (te levantás)
       if (!frozen && !doing && (fwd || side)) {
         const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
@@ -428,12 +460,15 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
         let dz = -cy * fwd - sy * side;
         const len = Math.hypot(dx, dz);
         dx /= len; dz /= len;
-        const running = !!keys.ShiftLeft;
-        const speed = running ? cfg.runSpeed : cfg.walkSpeed;
+        const running = analog ? stick.run : !!keys.ShiftLeft;
+        let speed = running ? cfg.runSpeed : cfg.walkSpeed;
+        // Joystick inclinado de a poco: camina más despacio (como en Ocarina), nunca menos de un tercio
+        if (analog && !running) speed *= THREE.MathUtils.clamp(analog / 0.85, 0.35, 1);
         moving = true;
         playClip(running ? 'run' : 'walk');
+        // La animación acompaña la velocidad para que los pies no resbalen
         const animSpeed = running ? cfg.animation.runAnimSpeed : cfg.animation.walkAnimSpeed;
-        if (animSpeed > 0 && currentClip) currentClip.setEffectiveTimeScale(speed / animSpeed);
+        currentClip?.setEffectiveTimeScale(animSpeed > 0 ? speed / animSpeed : running ? 1 : speed / cfg.walkSpeed);
         // En pasos cortos (máx. medio radio) para no atravesar paredes finas a 20 fps
         const dist = speed * dt;
         const steps = Math.max(1, Math.ceil(dist / (col.radius * 0.5)));
@@ -484,7 +519,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
         cam.yaw = recenter.from + (recenter.to - recenter.from) * k;
         cam.pitch = recenter.pitchFrom + ((preset?.pitch ?? cc.pitch) - recenter.pitchFrom) * k;
         if (recenter.t >= 1) recenter = null;
-      } else if (moving && cc.follow > 0 && !dragging) {
+      } else if (moving && cc.follow > 0 && !pointers.size) {
         // Caminando te sigue de atrás de a poco; si venís hacia la cámara no da la vuelta
         const d = angleDiff(cam.yaw, facing - Math.PI);
         if (Math.abs(d) < 2.2) cam.yaw += d * Math.min(1, cc.follow * dt * Math.min(1, Math.abs(d) * 1.5));

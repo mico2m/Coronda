@@ -32,7 +32,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   const solo = !net;
   const myUid = net?.uid ?? 'yo';
   let cfg = { endpoint: '', activa: true, comentarios: true, comentarios_cada: [90, 240] };
-  loadJSON('data/tables/ia.json').then((c) => { cfg = { ...cfg, ...c }; }).catch(() => {});
+  const cfgReady = loadJSON('data/tables/ia.json').then((c) => { cfg = { ...cfg, ...c }; }).catch(() => {});
 
   // Estado compartido (lo decide el que maneja)
   const st = { x: 0, y: 0, z: 0, f: 0, a: '', m: 'route', w: null, wn: '', scene: null };
@@ -221,7 +221,9 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   // ---------- Lo que ve Claude (se lo cuenta a la IA para que sepa dónde está y qué tiene alrededor) ----------
   // Devuelve textos cortos: "Ana (4 m, enfrente)". Dirección desde donde mira Claude: enfrente / a mi derecha / a mi izquierda / a mi espalda.
   function vista() {
-    if (!entry) return null;
+    const h = new Date().getHours();
+    const momento = h < 6 ? 'madrugada' : h < 12 ? 'mañana' : h < 14 ? 'mediodía' : h < 19 ? 'tarde' : h < 21 ? 'atardecer' : 'noche';
+    if (!entry) return { momento };
     const me = entry.holder.position;
     const yaw = (driving ? entry.targetYaw : (remote?.f ?? entry.targetYaw)) - (entry.yawOffset || 0);
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
@@ -247,8 +249,6 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     const nodes = entry.route?.data?.nodes ?? routeData?.nodes ?? {};
     const lugares = top(Object.entries(nodes).map(([id, n]) => (Array.isArray(n.position) ? item(PLACE_NAMES[id] ?? id, n.position[0], n.position[2], 15) : null)), 3);
     const otros = top((npcs.list ?? []).filter((n) => n.id !== ID && n.holder).map((n) => item(n.talk?.speaker ?? n.id, n.holder.position.x, n.holder.position.z, 30)), 4);
-    const h = new Date().getHours();
-    const momento = h < 6 ? 'madrugada' : h < 12 ? 'mañana' : h < 14 ? 'mediodía' : h < 19 ? 'tarde' : h < 21 ? 'atardecer' : 'noche';
     return { momento, jugadores, casas, lugares, otros_npc: otros };
   }
 
@@ -257,6 +257,37 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     const owners = (lotes.list ?? []).map((sp) => ({ lote: sp.label, dueno: lotes.record(sp.key)?.n || null })).filter((x) => x.dueno);
     const places = Object.keys(routeData?.nodes ?? {}).map((id) => ({ id, nombre: PLACE_NAMES[id] ?? id }));
     return { jugadores_en_la_plaza: here, casas: owners, lugares: places, modo_actual: driving ? mode.type : (remote?.m ?? 'route'), vista: vista() };
+  }
+
+  // ---------- Saludo de la IA (se pide por adelantado, en la pantalla de carga, para que al hablarle no haya que esperar) ----------
+  // Cada vez que alguien le habla, Claudito usa el saludo que ya tenía listo y enseguida pide otro para la próxima.
+  // Si todavía no llegó (o la IA no anda), usa sus saludos de siempre (data/dialogues/claude.json).
+  let saludo = null, saludoBusy = false;
+  async function precargarSaludo() {
+    if (saludo || saludoBusy) return;
+    saludoBusy = true;
+    try {
+      await cfgReady;
+      if (!aiOn()) return;
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 15000);
+      const r = await fetch(cfg.endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+        body: JSON.stringify({ modo: 'saludo', jugador: myName, texto: '', historial: [], mundo: mundoActual() }),
+      });
+      clearTimeout(to);
+      if (!r.ok) return;
+      const res = await r.json();
+      const t = typeof res?.decir === 'string' ? res.decir.trim().slice(0, 200) : '';
+      if (t) saludo = t;
+    } catch { /* sin IA por ahora: usa los saludos de siempre */ } finally { saludoBusy = false; }
+  }
+  function greeting(e) {
+    if (e?.id !== ID) return null;
+    const g = saludo;
+    saludo = null;
+    setTimeout(precargarSaludo, 1500); // el de la próxima vez
+    return g;
   }
 
   // ---------- Comentarios por el chat (los tira la IA de vez en cuando; solo los pide el que maneja a Claude) ----------
@@ -405,7 +436,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   }
 
   return {
-    update, gate, ended, ask, choiceOk, act, heard,
+    update, gate, ended, ask, choiceOk, act, heard, greeting, precargarSaludo,
     set onSay(fn) { onSay = fn; },
     get driving() { return driving; },
     get state() { return { driving, mode: driving ? mode.type : remote?.m, talkingWith: driving ? talk.n : remote?.wn, ai: aiOn() }; },

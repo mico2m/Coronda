@@ -20,7 +20,8 @@
       "set": {
         "conoce_claude": true
       },
-      "next": "menu"
+      "next": "menu",
+      "saludo_ia": true
     },
     "saludo_001": {
       "text": "¡Hola de nuevo! Justo estaba contando las baldosas de la plaza. Perdí la cuenta en la 40.",
@@ -84,7 +85,12 @@
         "saludo_010",
         "saludo_011",
         "saludo_012"
-      ]
+      ],
+      "saludo_ia": true,
+      "next": "menu",
+      "set": {
+        "conoce_claude": true
+      }
     },
     "menu": {
       "ask": true,

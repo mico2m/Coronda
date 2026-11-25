@@ -96,6 +96,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       ended: (e) => claudeNpc?.ended(e),
       choiceOk: (c) => claudeNpc?.choiceOk(c) ?? c?.needs !== 'ia',
       ask: (e, t) => claudeNpc?.ask(e, t) ?? Promise.resolve({ text: '…' }),
+      greeting: (e) => claudeNpc?.greeting(e) ?? null,
     },
   });
 
@@ -333,6 +334,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
         net, npcs, lotes, getPlayer: () => (mode === 'player' ? player : null), getSceneId: () => sceneManager.current?.id ?? null,
         myName: choice?.name ?? 'Viajero', notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
       });
+      claudeNpc.precargarSaludo(); // el saludo de la IA se pide ya, mientras carga el juego
       window.corondaClaude = claudeNpc; // para revisar desde la consola: corondaClaude.state
     }
 

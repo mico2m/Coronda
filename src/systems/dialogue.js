@@ -197,8 +197,13 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
   }
 
   function goto(id, hops = 0) {
-    const raw = s.script.nodes[id];
+    let raw = s.script.nodes[id];
     if (!raw) { console.warn(`Diálogo: no existe el nodo "${id}".`); end(); return; }
+    // Nodo con "saludo_ia": si la IA ya dejó un saludo preparado (hooks.greeting), se dice ese en lugar del texto del nodo
+    if (raw.saludo_ia && hooks.greeting) {
+      const g = hooks.greeting(s.entry);
+      if (g) { const { random, ...rest } = raw; raw = { ...rest, text: g }; }
+    }
     if (Array.isArray(raw.random) && hops < 8) {
       if (raw.set && typeof raw.set === 'object') for (const [k, v] of Object.entries(raw.set)) flags.set(k, v);
       const to = pickRandom(id, raw.random);

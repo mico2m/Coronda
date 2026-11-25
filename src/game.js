@@ -52,9 +52,15 @@ export async function startGame({ dev = false, retro = null } = {}) {
   const fade = createFade({ duration: 0.6 });
 
   function resize() {
-    if (retro) { // resolución interna fija; el navegador escala la imagen (ver css .retro)
-      renderer.setSize(retro.width, retro.height, false);
-      camera.aspect = retro.width / retro.height;
+    if (retro) {
+      // Resolución interna baja (la misma cantidad de píxeles que retro.width × retro.height) pero con la forma de la
+      // ventana: la imagen llena toda la pantalla, sin franjas negras, y el HUD y el chat quedan siempre adentro del juego
+      // en cualquier resolución o tamaño de ventana (celular parado, monitor ancho…). El navegador la escala (css .retro).
+      const W = stage.clientWidth || innerWidth || 1, H = stage.clientHeight || innerHeight || 1;
+      const k = Math.sqrt((retro.width * retro.height) / (W * H));
+      const w = Math.max(64, Math.round(W * k)), h = Math.max(64, Math.round(H * k));
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
       return;
     }

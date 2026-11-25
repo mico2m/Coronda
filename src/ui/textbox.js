@@ -90,7 +90,7 @@ export function createTextbox({ renderer, retro = null }) {
   // a qué resolución corre el juego (320x240, 800x600 o pantalla completa). Así la caja y la letra miden siempre lo mismo
   // en proporción a la pantalla, como en Ocarina. Después se estira a la imagen del juego con píxeles nítidos.
   function fit() {
-    const size = retro ? { x: retro.width, y: retro.height } : renderer.getDrawingBufferSize(new THREE.Vector2());
+    const size = renderer.getDrawingBufferSize(new THREE.Vector2()); // con retro también: la imagen toma la forma de la ventana (ver resize en game.js)
     const h = STYLE.baseHeight;
     const w = Math.max(1, Math.round((size.x * h) / Math.max(1, size.y)));
     if (w !== W || h !== H) {

@@ -528,3 +528,29 @@ Un NPC propio: `assets/models/objects/npc_claude.glb` (modelo y animaciones *idl
 - **IA (opcional):** *Decile algo (escribile)* en su menú: le escribís y contesta una IA, y puede seguirte, ir a tu casa (o a la de otro), ir a un lugar de la plaza, quedarse o volver a pasear. Se configura una sola vez: ver `servidor-ia/README.md`. Si la IA no está configurada, esa opción no aparece; si se agota, dice *¡Me abrumaste jajaja! ¿En un rato seguimos, querés?* y por 10 minutos usa sus frases.
 - **Escribirle a cualquier NPC:** un nodo `{ "ask": true, "back": "menu", "bye": "despedida" }` abre un campo de texto (lo usa la IA de Claude).
 - **Ruta:** `data/routes/claude.json`, 7 paradas por la plaza con posiciones (sin Empties), elige la próxima al azar y espera entre 4 y 14 segundos en cada una. Tiene `"avoid": false` (camina derecho), porque la plaza no tiene suelo con colisión para calcular desvíos. Si le agregás un Empty, podés cambiar `"position"` por `"point": "nombre_del_empty"`.
+
+
+## La tienda de Claude (Carpintería)
+
+Claude ya no pasea por la plaza: trabaja en su tienda, que está en la plaza (por ahora en `[30, 0, -22]`, mirando hacia +Z; se mueve cambiando `position` en `data/scenes/coronda_plaza.json > objects`).
+
+- **Modelo:** `assets/models/objects/tienda.glb`, generado por `python3 blender/generar_tienda.py` (low poly, colores lisos, 10 × 20 m: sala de ventas con mostrador y taller con la grilla de fabricación). Cuando tengas el tuyo, reemplazá el `.glb` y conservá los nombres de los Empties:
+  `pos_mostrador` (Claude detrás del mostrador) · `pos_cliente` y `cola_1…cola_5` (dónde espera el jugador) · `pos_taller` (Claude trabajando) · `banco_obra` (acá se verá el mueble en construcción) · `pos_entrada` / `pos_afuera` · `slot_01…slot_50` (grilla de 5 × 10 de pedidos, 1 m de separación). Las colisiones son los `col_…` y el techo se llama `techo` (se oculta al entrar).
+- **Colocación sin Empty:** `data/scenes/*.json > objects` acepta `{ "id", "objeto", "position": [x,y,z], "yaw", "scale" }` y carga ese `assets/models/objects/<objeto>.glb` ahí (igual que un Empty con `objeto`).
+- **Suelo de la plaza:** `suelo_plaza.glb` (una caja invisible con la cara de arriba en y = 0) le da suelo sólido al mapa. Hacía falta: sin suelo el personaje flota, y con el piso de la tienda se habría caído al salir. Si algún día el `.glb` de la plaza trae su propio `col_suelo`, borrá ese objeto del JSON.
+- **Ruta de Claude:** `data/routes/claude.json` (mostrador ↔ taller). Las paradas de la plaza quedan como lugares a los que la IA puede mandarlo; desde ahí vuelve a la tienda.
+- **Código:** `src/systems/tienda.js` (techo y puntos del edificio en coordenadas del mundo: `tienda.point('pos_mostrador')`, `tienda.slots()`). Config en `data/tables/tienda.json`.
+
+## Inventario del jugador
+
+Mochila con **recursos** (madera; se definen en `data/tables/recursos.json`) y **muebles** (los de `data/muebles.json` que retiró de la tienda). Se abre con **I** o con el botón 🎒 (en `dev.html` la I es del inspector: ahí, solo el botón). Se guarda en el navegador (`localStorage`, `coronda.inventario`). Código: `src/systems/inventario.js`.
+
+```js
+inv.add('recursos', 'madera', 3)      // suma (respeta el "max" del recurso)
+inv.has({ madera: 5 })                // ¿alcanza?
+inv.pay({ madera: 5 })                // descuenta todo junto, o nada
+inv.add('muebles', 'mesa', 1)         // un mueble retirado
+inv.remove('muebles', 'mesa', 1)      // lo pone en la casa
+inv.onChange((tipo, id, delta, total) => …)
+```
+En `dev.html` está en la consola como `inventario` (ej. `inventario.add('recursos','madera',20)`), y el Studio lo ve con `iframe.contentWindow.coronda.getInventario()`. Como los lotes, no hay validación de servidor: un jugador tramposo puede editar sus datos.

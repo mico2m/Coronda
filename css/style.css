@@ -427,3 +427,19 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .dlg-ask-in { flex: 1; min-width: 0; font: 500 15px var(--font-body); padding: 9px 11px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.34); background: #f6f9fa; color: #0b1418; }
 .dlg-ask button { flex: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font: 600 14px var(--font-body); color: #f6f9fa; background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.34); }
 .dlg-ask button[type="submit"] { background: #5eead4; color: #062a25; border-color: #5eead4; }
+
+/* ---------- Inventario (src/systems/inventario.js) ---------- */
+.inv-btn { position: absolute; top: 156px; right: 16px; z-index: 3; width: 44px; height: 44px; padding: 0; font-size: 22px; line-height: 1; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
+.inv-panel { position: absolute; top: 206px; right: 12px; z-index: 4; width: min(260px, calc(100vw - 24px)); max-height: calc(100% - 230px); overflow: auto; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); font: 500 14px var(--font-body); color: var(--ink, inherit); }
+.inv-panel[hidden] { display: none; }
+.inv-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-family: var(--font-display); font-size: 16px; }
+.inv-x { padding: 2px 8px; border: 0; background: transparent; color: inherit; font-size: 16px; cursor: pointer; }
+.inv-sec { margin: 8px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.65; }
+.inv-panel ul { list-style: none; margin: 0; padding: 0; }
+.inv-panel li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.inv-panel li:last-child { border-bottom: 0; }
+.inv-ico { width: 22px; text-align: center; }
+.inv-name { flex: 1; }
+.inv-n { font-variant-numeric: tabular-nums; }
+.inv-empty { opacity: 0.55; font-style: italic; }
+@media (pointer: coarse) { .inv-btn { top: 160px; } .inv-panel { top: 210px; } }

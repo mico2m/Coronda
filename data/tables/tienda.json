@@ -1,0 +1,7 @@
+{
+  "_ayuda": "La tienda de Claude (la Carpintería). objeto = nombre en assets/models/objects/ y en data/scenes/coronda_plaza.json > objects (ahí se cambia su lugar). zona = media anchura y media profundidad del edificio en metros: adentro de esa zona se oculta el techo para que la cámara vea al personaje.",
+  "id": "tienda",
+  "objeto": "tienda",
+  "zona": [5, 10],
+  "techo": "techo"
+}

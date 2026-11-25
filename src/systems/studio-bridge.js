@@ -1,6 +1,8 @@
 // Puente entre el juego (dentro de la vista previa) y el Coronda Studio (la página de afuera).
 // Solo se carga en dev.html. El Studio lo usa así:  iframe.contentWindow.coronda
 //   .npcs · .camera · .controls            los motores del juego
+//   .getInventario()                       inventario del jugador (recursos y muebles; .snapshot(), .add(), .remove())
+//   .getTienda()                           la tienda: .point('pos_mostrador'), .slots()
 //   .forgetJSON(url)                       olvida un JSON cacheado
 //   .routePoints()                         Empties de la escena: [{ name, x, y, z }] (para elegir los puntos de un recorrido)
 //   .showRoute(json | null)                dibuja un recorrido (data/routes/*.json) dentro de la vista previa

@@ -1,11 +1,14 @@
 // Intermediario de la IA de Claude (el NPC de Coronda). Corre gratis en Cloudflare Workers.
-// El juego le manda lo que escribió el jugador; este Worker le pregunta a la IA (Groq, plan gratis) y devuelve
+// El juego le manda lo que escribió el jugador; este Worker le pregunta a una IA y devuelve
 //   { "decir": "texto de Claude", "acciones": [ { "tipo": "seguir", "jugador": "Ana" }, … ] }
-// La clave de Groq queda guardada acá como secreto (GROQ_API_KEY): nunca está en el juego ni en GitHub.
-// Variables opcionales: MODELO (por defecto llama-3.3-70b-versatile), ORIGENES (direcciones del juego, separadas por coma).
+// IA: la de Cloudflare (Workers AI, gratis hasta 10.000 "neuronas" por día) con el enlace (binding) "AI".
+//     Si además ponés el secreto GROQ_API_KEY, usa Groq (plan gratis, más cupo). Las claves nunca están en el juego.
+// Variables opcionales: MODELO_CF (por defecto @cf/zai-org/glm-4.7-flash), MODELO (Groq, por defecto
+// llama-3.3-70b-versatile), ORIGENES (direcciones del juego, separadas por coma).
 // Pasos para publicarlo: ver servidor-ia/README.md.
 
 const MODELO = 'llama-3.3-70b-versatile';
+const MODELO_CF = '@cf/zai-org/glm-4.7-flash';
 const POR_MINUTO = 6;            // preguntas por minuto por jugador (para no gastar el cupo gratis)
 const recientes = new Map();     // ip -> [horas]
 
@@ -17,36 +20,18 @@ Si te piden algo que no podés hacer, decilo con gracia.
 Podés moverte por la plaza con estas acciones: seguir (a un jugador), ir_a_casa (de un jugador que tenga casa), ir_a (un lugar de la lista), quedarse (quieto donde estás), volver (a tu recorrido de siempre), animar (clip "talk" para gesticular).
 Usá acciones solo si el jugador te pide moverte o tiene sentido. "Vení", "seguime", "acompañame" = seguir a ese jugador. "Vení a mi casa" = ir_a_casa del jugador que habla.
 Para "jugador" usá el nombre exacto de la lista, o "yo" si es el que te habla. Para "lugar" usá un id de la lista de lugares.
-Siempre respondés llamando a la función responder.`;
+Respondé SIEMPRE y SOLO con un JSON así, sin texto afuera:
+{"decir": "lo que decís", "acciones": [{"tipo": "seguir", "jugador": "yo"}]}
+(acciones puede ser una lista vacía).`;
 
-const HERRAMIENTA = {
-  type: 'function',
-  function: {
-    name: 'responder',
-    description: 'Lo que Claude dice y hace.',
-    parameters: {
-      type: 'object',
-      properties: {
-        decir: { type: 'string', description: 'Lo que Claude contesta, corto (máximo dos oraciones).' },
-        acciones: {
-          type: 'array',
-          description: 'Acciones para el NPC (puede estar vacío).',
-          items: {
-            type: 'object',
-            properties: {
-              tipo: { type: 'string', enum: ['seguir', 'ir_a_casa', 'ir_a', 'quedarse', 'volver', 'animar'] },
-              jugador: { type: 'string' },
-              lugar: { type: 'string' },
-              clip: { type: 'string' },
-            },
-            required: ['tipo'],
-          },
-        },
-      },
-      required: ['decir'],
-    },
-  },
-};
+// Saca el JSON de la respuesta (aunque venga con texto alrededor); si no hay JSON, el texto es lo que dice
+function leer(texto) {
+  const t = String(texto ?? '').trim();
+  if (!t) return null;
+  const i = t.indexOf('{'), j = t.lastIndexOf('}');
+  if (i >= 0 && j > i) { try { const o = JSON.parse(t.slice(i, j + 1)); if (o && typeof o.decir === 'string') return o; } catch { /* sigue */ } }
+  return { decir: t.replace(/^["']|["']$/g, '').slice(0, 400), acciones: [] };
+}
 
 function cors(env, req) {
   const origin = req.headers.get('Origin') || '';
@@ -65,7 +50,7 @@ export default {
     const h = cors(env, req);
     if (req.method === 'OPTIONS') return new Response(null, { headers: h });
     if (req.method !== 'POST') return json({ error: 'usar POST' }, 405, h);
-    if (!env.GROQ_API_KEY) return json({ error: 'falta la clave GROQ_API_KEY' }, 500, h);
+    if (!env.GROQ_API_KEY && !env.AI) return json({ error: 'falta el enlace AI (Workers AI) o la clave GROQ_API_KEY' }, 500, h);
 
     // Límite por jugador (aproximado: por IP)
     const ip = req.headers.get('CF-Connecting-IP') || 'x';
@@ -95,24 +80,34 @@ Ahora estás: ${mundo.modo_actual ?? 'paseando'}.`;
       { role: 'user', content: texto },
     ];
 
-    let r;
-    try {
-      r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: env.MODELO || MODELO, messages: mensajes, temperature: 0.8, max_tokens: 300,
-          tools: [HERRAMIENTA], tool_choice: { type: 'function', function: { name: 'responder' } },
-        }),
-      });
-    } catch { return json({ error: 'sin conexión con la IA' }, 502, h); }
-    if (r.status === 429) return json({ error: 'limite' }, 429, h);
-    if (!r.ok) return json({ error: `IA ${r.status}` }, 502, h);
-    const data = await r.json();
-    const msg = data?.choices?.[0]?.message;
     let out = null;
-    try { out = JSON.parse(msg?.tool_calls?.[0]?.function?.arguments ?? 'null'); } catch { out = null; }
-    if (!out?.decir && msg?.content) out = { decir: String(msg.content), acciones: [] };
+    if (env.GROQ_API_KEY) {
+      let r;
+      try {
+        r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: env.MODELO || MODELO, messages: mensajes, temperature: 0.8, max_tokens: 300, response_format: { type: 'json_object' } }),
+        });
+      } catch { return json({ error: 'sin conexión con la IA' }, 502, h); }
+      if (r.status === 429) return json({ error: 'limite' }, 429, h);
+      if (!r.ok) return json({ error: `IA ${r.status}` }, 502, h);
+      const data = await r.json();
+      out = leer(data?.choices?.[0]?.message?.content);
+    } else {
+      let data;
+      try {
+        data = await env.AI.run(env.MODELO_CF || MODELO_CF, { messages: mensajes, max_tokens: 300, temperature: 0.8 });
+      } catch (err) {
+        const m = String(err?.message || err);
+        if (/429|limit|neuron|quota|capacity/i.test(m)) return json({ error: 'limite' }, 429, h);
+        return json({ error: `IA: ${m.slice(0, 120)}` }, 502, h);
+      }
+      const texto2 = typeof data?.response === 'string' ? data.response
+        : data?.response && typeof data.response === 'object' ? JSON.stringify(data.response)
+        : data?.choices?.[0]?.message?.content ?? '';
+      out = leer(texto2);
+    }
     if (!out?.decir) return json({ error: 'respuesta vacía' }, 502, h);
     const acciones = (Array.isArray(out.acciones) ? out.acciones : []).slice(0, 4)
       .filter((a) => ['seguir', 'ir_a_casa', 'ir_a', 'quedarse', 'volver', 'animar'].includes(a?.tipo))

@@ -42,10 +42,13 @@
       "model": "assets/models/worlds/Coronda_Plaza.glb"
     }
   ],
-  "objects": [],
+  "objects": [
+    { "id": "suelo_plaza", "objeto": "suelo_plaza", "position": [0, 0, 0] },
+    { "id": "tienda", "objeto": "tienda", "position": [30, 0, -22], "yaw": 0 }
+  ],
   "actors": [
     { "empty": "npc_tokse", "id": "tokse" },
-    { "id": "claude", "model": "npc_claude", "position": [12, 0.1, 3], "yaw": -90, "speaker": "Claude", "dialogue": "claude", "route": "claude", "talkAnim": "talk", "talkLabel": "Hablar con Claude" }
+    { "id": "claude", "model": "npc_claude", "position": [29, 0.1, -17.6], "yaw": 0, "speaker": "Claude", "dialogue": "claude", "route": "claude", "talkAnim": "talk", "talkLabel": "Hablar con Claude" }
   ],
   "doors": []
 }

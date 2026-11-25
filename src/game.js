@@ -9,6 +9,8 @@ import { createUI } from './ui/ui.js';
 import { createFade } from './systems/fade.js';
 import { createDoors } from './systems/doors.js';
 import { createLotes } from './systems/lotes.js';
+import { createInventario } from './systems/inventario.js';
+import { createTienda } from './systems/tienda.js';
 import { createCasas } from './systems/casas.js';
 import { createFollowers } from './systems/followers.js';
 import { createPlayer } from './actors/player.js';
@@ -68,6 +70,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
   const npcs = createNpcs();
   const followers = createFollowers(); // objetos con la propiedad `seguir` (ver systems/followers.js)
   let dialogue = null;
+  let inventario = null; // mochila del jugador (ver systems/inventario.js)
+  let tienda = null;     // la Carpintería de Claude (ver systems/tienda.js)
   let doors = null;
   let lotes = null; // lotes que los jugadores pueden adquirir (ver systems/lotes.js)
   let minimap = null; // ver ui/minimap.js
@@ -141,6 +145,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     doors?.update(focus, feetY);
     lotes?.update(focus, feetY, dt); // después de las puertas: si hay una puerta cerca, la E es de ella
     casas?.update(focus);
+    tienda?.update(focus);
     minimap?.update({
       me: mode === 'player' && player ? { x: player.position.x, z: player.position.z, facing: player.facing } : { x: camera.position.x, z: camera.position.z, facing: controls.getYaw() + Math.PI },
       others: net?.positions?.() ?? [],
@@ -327,6 +332,15 @@ export async function startGame({ dev = false, retro = null } = {}) {
       getShade: () => sceneManager.shade,
     });
 
+    // Inventario del jugador (recursos y muebles) y la tienda donde Claude fabrica los muebles
+    inventario = createInventario({
+      stage,
+      dev,
+      blocked: () => dialogue?.blocked ?? false,
+      notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
+    });
+    tienda = createTienda({ getRoot: () => sceneManager.root });
+
     // Claude: uno solo para todo el servidor, charla de a uno y (si hay IA configurada) le podés escribir
     {
       const { createClaudeNpc } = await import('./systems/claude-npc.js');
@@ -508,5 +522,5 @@ export async function startGame({ dev = false, retro = null } = {}) {
     ui.setStatus(String(err.message || err));
   }
   // Para las herramientas del modo desarrollador (panel de NPC, etc.)
-  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null };
+  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null, getInventario: () => inventario, getTienda: () => tienda };
 }

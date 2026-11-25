@@ -31,7 +31,7 @@ const ERRAND_MAX = 150;      // s máximos para llegar (ida y vuelta, cada una)
 const CHAT_MAX = 120;        // letras por mensaje de chat (igual que net/multiplayer.js)
 const OVERLOAD = '¡Me abrumaste jajaja! ¿En un rato seguimos, querés?';
 const norm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-const PLACE_NAMES = { casa: 'mi lugar de siempre', centro: 'el centro de la plaza', este: 'el lado este', norte: 'el lado norte', oeste: 'el lado oeste', cartel: 'el cartel de bienvenida', borde: 'el borde oeste' };
+const PLACE_NAMES = { mostrador: 'el mostrador de mi tienda', taller: 'el taller de mi tienda', casa: 'el lado este de la plaza, cerca de mi tienda', centro: 'el centro de la plaza', este: 'el lado este', norte: 'el lado norte', oeste: 'el lado oeste', cartel: 'el cartel de bienvenida', borde: 'el borde oeste' };
 
 // opts: net (o null), npcs, lotes, getPlayer(), getSceneId(), myName, notify(msg)
 export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId, myName = 'Viajero', notify = () => {} }) {

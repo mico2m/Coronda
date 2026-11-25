@@ -246,6 +246,7 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
   .chat-open { display: block; }
 }
 .talking .chat-form { display: none; }
+.talking .chat { visibility: hidden; } /* hablando con un NPC: el 💬 y los mensajes no tapan la caja de diálogo; vuelven al terminar */
 
 /* ---------- Pantalla de carga (src/ui/boot.js) ---------- */
 .boot {

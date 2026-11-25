@@ -3,7 +3,10 @@
   "start": "inicio",
   "nodes": {
     "inicio": {
-      "text": "¿Vos tambien caiste aca?"
+      "text": [
+        "¿Vos tambien caiste aca?",
+        "¿Ya  viste el cartel de bienvenida?"
+      ]
     }
   },
   "editor": {

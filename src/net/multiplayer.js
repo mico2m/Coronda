@@ -193,7 +193,7 @@ export async function connectServer(roomId = 'coronda') {
       const t = String(text ?? '').trim().slice(0, CHAT_MAX);
       if (!t || !playing) return null;
       const s = me?.();
-      chat.send({ n: s?.n ?? 'Jugador', t, s: s?.s ?? null });
+      chat.send({ n: s?.n ?? 'Jugador', t, s: s?.s ?? null, i: Math.random().toString(36).slice(2, 10) + Date.now().toString(36) }); // i: id único, para descartar copias
       return t;
     },
     leave() { try { room.leave(); } catch { /* nada */ } },
@@ -231,9 +231,22 @@ export async function connectServer(roomId = 'coronda') {
     if (p.avatar && p.avatar.modelUrl !== data.m) { removeAvatar(p); }
   };
 
+  // Cada mensaje llega una vez por cada camino (MQTT en 2 brokers, Nostr, BitTorrent): se muestra solo la primera copia.
+  // Los mensajes traen un id (i). Si viene de una versión vieja sin id, se descarta el mismo texto del mismo jugador a los 3 s.
+  const chatSeen = new Map(); // clave -> hasta cuándo se recuerda (ms)
+  function chatDuplicate(peerId, data, t) {
+    const now = performance.now();
+    for (const [k, until] of chatSeen) if (until < now) chatSeen.delete(k);
+    const id = typeof data?.i === 'string' && data.i ? data.i.slice(0, 40) : null;
+    const key = id ? `${peerId}:${id}` : `${peerId}|${t}`;
+    if (chatSeen.has(key)) return true;
+    chatSeen.set(key, now + (id ? 120000 : 3000));
+    return false;
+  }
   chat.onMessage = (data, { peerId }) => {
     const t = String(data?.t ?? '').trim().slice(0, CHAT_MAX);
     if (!t) return;
+    if (chatDuplicate(peerId, data, t)) return;
     const p = peers.get(peerId);
     const name = String(data?.n || p?.data?.n || 'Jugador').slice(0, 20);
     net.onChat?.(name, t, peerId);

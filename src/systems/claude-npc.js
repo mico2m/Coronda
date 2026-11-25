@@ -212,6 +212,40 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     return [];
   }
 
+  // ---------- Lo que ve Claude (se lo cuenta a la IA para que sepa dónde está y qué tiene alrededor) ----------
+  // Devuelve textos cortos: "Ana (4 m, enfrente)". Dirección desde donde mira Claude: enfrente / a mi derecha / a mi izquierda / a mi espalda.
+  function vista() {
+    if (!entry) return null;
+    const me = entry.holder.position;
+    const yaw = (driving ? entry.targetYaw : (remote?.f ?? entry.targetYaw)) - (entry.yawOffset || 0);
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    const dirTo = (x, z) => {
+      const dx = x - me.x, dz = z - me.z;
+      const deg = (Math.atan2(-dx * fz + dz * fx, dx * fx + dz * fz) * 180) / Math.PI; // + = a su derecha
+      const ad = Math.abs(deg);
+      return ad < 50 ? 'enfrente' : ad > 130 ? 'a mi espalda' : (deg > 0 ? 'a mi derecha' : 'a mi izquierda');
+    };
+    const item = (nombre, x, z, max) => {
+      const d = Math.hypot(x - me.x, z - me.z);
+      return d <= max ? { d, t: `${nombre} (${Math.round(d)} m, ${dirTo(x, z)})` } : null;
+    };
+    const top = (arr, n) => arr.filter(Boolean).sort((a, b) => a.d - b.d).slice(0, n).map((o) => o.t);
+    const jugadores = top(roster().filter((r) => r.s === getSceneId()).map((r) => {
+      const pos = r.me ? getPlayer()?.position : (r.p ? { x: r.p[0], z: r.p[2] } : null);
+      return pos ? item(r.me ? `${r.n}, el que te habla` : r.n, pos.x, pos.z, 40) : null;
+    }), 8);
+    const casas = top((lotes.list ?? []).map((sp) => {
+      const dueno = lotes.record(sp.key)?.n;
+      return sp.pos ? item(`casa ${sp.label}${dueno ? ` de ${dueno}` : ' (libre)'}`, sp.pos.x, sp.pos.z, 30) : null;
+    }), 4);
+    const nodes = entry.route?.data?.nodes ?? routeData?.nodes ?? {};
+    const lugares = top(Object.entries(nodes).map(([id, n]) => (Array.isArray(n.position) ? item(PLACE_NAMES[id] ?? id, n.position[0], n.position[2], 15) : null)), 3);
+    const otros = top((npcs.list ?? []).filter((n) => n.id !== ID && n.holder).map((n) => item(n.talk?.speaker ?? n.id, n.holder.position.x, n.holder.position.z, 30)), 4);
+    const h = new Date().getHours();
+    const momento = h < 6 ? 'madrugada' : h < 12 ? 'mañana' : h < 14 ? 'mediodía' : h < 19 ? 'tarde' : h < 21 ? 'atardecer' : 'noche';
+    return { momento, jugadores, casas, lugares, otros_npc: otros };
+  }
+
   // ---------- IA ----------
   let lastAsk = 0;
   const history = [];
@@ -232,7 +266,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     const places = Object.keys(routeData?.nodes ?? {}).map((id) => ({ id, nombre: PLACE_NAMES[id] ?? id }));
     const body = {
       jugador: myName, texto: String(text).slice(0, 200), historial: history.slice(-6),
-      mundo: { jugadores_en_la_plaza: here, casas: owners, lugares: places, modo_actual: driving ? mode.type : (remote?.m ?? 'route') },
+      mundo: { jugadores_en_la_plaza: here, casas: owners, lugares: places, modo_actual: driving ? mode.type : (remote?.m ?? 'route'), vista: vista() },
     };
     let res;
     try {

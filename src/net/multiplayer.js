@@ -248,6 +248,7 @@ export async function connectServer(roomId = 'coronda') {
   net.bosque = channel('bosque', 'bosque~'); // ver systems/bosque.js (árboles caídos)
   net.tienda = channel('tienda', 'tienda~'); // ver systems/tienda.js (pedidos de muebles)
   net.admin = channel('admin', 'admin~');    // ver systems/admin.js (comandos de admin firmados por el worker)
+  net.voz = channel('voz', 'voz~');          // ver systems/voz.js (señales para armar las llamadas de voz; el audio va directo)
   const SEEN = 'visto~';                 // última conexión de cada jugador (ver players())
   const NAME = 'nombre~';                // registro de nombres: cada nombre es de un solo jugador (ver checkName)
   room.onPersisted = (key, data) => {
@@ -352,6 +353,8 @@ export async function connectServer(roomId = 'coronda') {
     }
     return out;
   };
+  // El personaje dibujado de otro jugador (ya interpolado): para el sonido 3D y el ícono de "hablando"
+  net.avatarRoot = (peerId) => peers.get(peerId)?.avatar?.root ?? null;
   net.positions = () => {
     const mine = me?.()?.s;
     const out = [];

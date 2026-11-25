@@ -551,6 +551,25 @@ export async function startGame({ dev = false, retro = null } = {}) {
       const say0 = net.say;
       net.say = (t) => { const r = say0(t); if (r) claudeNpc.heard(choice.name, r); return r; };
     }
+    // Chat de voz por proximidad (solo en el servidor, ver systems/voz.js) y menú de Esc con sus ajustes (ver ui/menu.js)
+    let menu = null;
+    let voz = null;
+    if (net) {
+      const { createVoz } = await import('./systems/voz.js');
+      voz = createVoz({
+        net, stage, getCamera: () => camera,
+        blocked: () => !!dialogue?.active,
+        onMenu: () => menu?.abrir(),
+        notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 4000); },
+      });
+    }
+    const { createMenu } = await import('./ui/menu.js');
+    menu = createMenu({
+      stage, voz,
+      blocked: () => !!dialogue?.active || (lotes?.blocked ?? false) || (casas?.designing ?? false),
+      onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
+      onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
+    });
     // si el personaje o sus animaciones tienen problemas, se avisa en pantalla (con un NPC elegido en el menú
     // es normal que falten caminar/correr: no se avisa)
     const notice = player.loadError ?? (choice && choice.character.id !== 'personaje' ? null : player.animNotice);

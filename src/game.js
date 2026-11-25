@@ -216,9 +216,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
         ui.setStatus(`Lotes: ${err.message || err}`);
       }
       casas?.afterScene(sceneManager.current.id);
-      // Adentro de una casa la cámara es la de siempre pero con el zoom fijo lo más cerca del personaje
-      // (como al hacer scroll hacia adelante afuera)
-      player.setCameraPreset(casas?.inside ? { distance: player.minDistance, locked: true } : null);
+      // Al entrar a una casa la cámara arranca con el zoom lo más cerca del personaje (como al hacer scroll hacia
+      // adelante afuera); después se puede ajustar con la rueda
+      player.setCameraPreset(casas?.inside ? { distance: player.minDistance } : null);
       minimap?.capture(sceneManager.root); // el mapa desde arriba, antes de que aparezcan los NPC
       spawnDebug?.attach(sceneManager.root, sceneManager.current, doors.list); // después de las colisiones: los postes no chocan
       // NPC: Empties npc_* del .glb + "actors" del JSON (ver src/actors/npc.js). Van después de armar las colisiones.

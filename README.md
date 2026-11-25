@@ -460,7 +460,7 @@ o `coronda.lotes.mios` (online).
 Cuando alguien adquiere un lote se crea la escena **`scene_lote<nro>_<dueño>`** (ej. `scene_lote04_mirko`) con el interior vacío. Si el dueño **destruye** la casa o **cede** el lote a otro jugador, todo lo que tenía esa escena se borra (avisa antes). El modelo de casa queda fijo: para cambiarlo hay que destruirla y volver a adquirir el lote. Código: `src/systems/casas.js`.
 
 - **Entrar:** desde el menú del lote (**E**). Todos pueden visitar; solo el dueño diseña. Para salir, la puerta (**E Salir de la casa**): aparecés delante del lote.
-- **Adentro** no se ve el techo y la cámara queda con el zoom fijo lo más cerca del personaje (como al hacer scroll hacia adelante afuera).
+- **Adentro** no se ve el techo y la cámara arranca con el zoom lo más cerca del personaje (como al hacer scroll hacia adelante afuera); después se ajusta con la rueda.
 - **Ceder:** en tu lote, *Ceder lote* > escribís el nombre del jugador. Pasa a ser suyo con una casa nueva (vacía).
 
 ### El interior base (lo modelás vos)

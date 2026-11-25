@@ -11,7 +11,7 @@ Usar:     en la vista 3D apretá N > pestaña "Coronda" > activá "GLB autosave"
 bl_info = {
     "name": "Coronda · GLB autosave",
     "author": "Coronda",
-    "version": (1, 1, 0),
+    "version": (1, 2, 0),
     "blender": (3, 6, 0),
     "location": "Vista 3D > N > Coronda",
     "description": "Exporta el .glb solo al guardar (o al cambiar algo)",
@@ -91,7 +91,7 @@ def _gltf(opts):
     try:
         bpy.ops.export_scene.gltf(**opts)
     except TypeError:  # exportadores viejos no conocen alguna opción
-        for k in ("use_visible", "export_apply", "export_animations"):
+        for k in ("use_visible", "export_apply", "export_animations", "export_morph_animation"):
             opts.pop(k, None)
         bpy.ops.export_scene.gltf(**opts)
 
@@ -128,12 +128,15 @@ def export_now():
         except RuntimeError as e:
             if not opts.get("export_animations"):
                 raise
-            # El exportador de Blender a veces falla con las animaciones (ej. un esqueleto con drivers o
-            # que no se exporta). Se exporta igual, sin animaciones, y se avisa en el panel.
-            print("[GLB autosave] falló con animaciones, reintento sin ellas:", str(e).strip().splitlines()[-1:])
-            run(dict(opts, export_animations=False))
-            last = str(e).strip().splitlines()[-1] if str(e).strip() else ""
-            state["warning"] = f"Exportado SIN animaciones: el exportador falló con ellas ({last[:60]})"
+            # Bug del exportador de glTF (Blender 5.x): KeyError en get_sk_drivers al exportar un esqueleto
+            # animado. Sin "Shape Keys Animation" esa parte no se ejecuta y las animaciones de huesos salen igual.
+            print("[GLB autosave] el exportador falló:", str(e).strip().splitlines()[-1:], "-> reintento sin animación de shape keys")
+            try:
+                run(dict(opts, export_morph_animation=False))
+                state["warning"] = "SHAPEKEYS"
+            except RuntimeError:
+                run(dict(opts, export_animations=False))
+                state["warning"] = "SINANIM"
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         # Se reemplaza de una: el juego nunca lee un .glb a medio escribir
         for intento in range(5):
@@ -286,6 +289,11 @@ class CORONDA_PT_glb_autosave(bpy.types.Panel):
             lay.label(text="Exportando…", icon="TIME")
         elif state["error"]:
             lay.label(text=state["error"], icon="ERROR")
+        elif state["warning"] == "SHAPEKEYS":
+            col = lay.column(align=True)
+            col.label(text=f"Exportado {_ago(state['last_ok'])}, con animaciones", icon="CHECKMARK")
+            col.label(text="(sin animación de shape keys: el")
+            col.label(text="exportador de Blender falla con ella)")
         elif state["warning"]:
             col = lay.column(align=True)
             col.label(text="Exportado, pero SIN animaciones:", icon="ERROR")

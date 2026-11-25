@@ -1,4 +1,7 @@
-import bpy, math
+import bpy, math, os
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT_BLEND = os.path.join(ROOT, 'blender/npc_claude.blend')
+OUT_GLB = os.path.join(ROOT, 'assets/models/objects/npc_claude.glb')
 from mathutils import Vector
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
@@ -107,10 +110,24 @@ action('talk', [
     (19, {'cabeza': (None, (-6, 0, -2)), 'brazo.L': (None, (0, 0, 0)), 'brazo.R': (None, (-30, 0, -20)), 'cuerpo': ((0, 0.01, 0), Z), 'chispa': (None, (0, 270, 0))}),
     (25, {'cabeza': (None, (0, 0, 0)), 'brazo.L': (None, (0, 0, 0)), 'brazo.R': (None, (0, 0, 0)), 'cuerpo': ((0, 0, 0), Z), 'chispa': (None, (0, 360, 0))}),
 ])
+# work: martilla en el banco (brazo derecho arriba y abajo, mira hacia abajo)
+action('work', [
+    (1,  {'brazo.R': (None, (-110, 0, -10)), 'brazo.L': (None, (-40, 0, 15)), 'cabeza': (None, (12, 0, 0)), 'cuerpo': ((0, 0, 0), (6, 0, 0)), 'chispa': (None, (0, 0, 0))}),
+    (5,  {'brazo.R': (None, (-20, 0, -10)), 'brazo.L': (None, (-40, 0, 15)), 'cabeza': (None, (16, 0, 0)), 'cuerpo': ((0, -0.01, 0), (8, 0, 0)), 'chispa': (None, (0, 90, 0))}),
+    (9,  {'brazo.R': (None, (-110, 0, -10)), 'brazo.L': (None, (-40, 0, 15)), 'cabeza': (None, (12, 0, 0)), 'cuerpo': ((0, 0, 0), (6, 0, 0)), 'chispa': (None, (0, 180, 0))}),
+    (13, {'brazo.R': (None, (-20, 0, -10)), 'brazo.L': (None, (-40, 0, 15)), 'cabeza': (None, (16, 0, 0)), 'cuerpo': ((0, -0.01, 0), (8, 0, 0)), 'chispa': (None, (0, 270, 0))}),
+    (17, {'brazo.R': (None, (-110, 0, -10)), 'brazo.L': (None, (-40, 0, 15)), 'cabeza': (None, (12, 0, 0)), 'cuerpo': ((0, 0, 0), (6, 0, 0)), 'chispa': (None, (0, 360, 0))}),
+])
+# carry: lleva algo con los dos brazos adelante
+action('carry', [
+    (1,  {'brazo.L': (None, (-75, 0, 10)), 'brazo.R': (None, (-75, 0, -10)), 'pierna.L': (None, (25, 0, 0)), 'pierna.R': (None, (-25, 0, 0)), 'cuerpo': ((0, 0, 0), (-4, 0, 0))}),
+    (9,  {'brazo.L': (None, (-75, 0, 10)), 'brazo.R': (None, (-75, 0, -10)), 'pierna.L': (None, (-25, 0, 0)), 'pierna.R': (None, (25, 0, 0)), 'cuerpo': ((0, 0.03, 0), (-4, 0, 0))}),
+    (17, {'brazo.L': (None, (-75, 0, 10)), 'brazo.R': (None, (-75, 0, -10)), 'pierna.L': (None, (25, 0, 0)), 'pierna.R': (None, (-25, 0, 0)), 'cuerpo': ((0, 0, 0), (-4, 0, 0))}),
+])
 for p in pb: p.location = (0, 0, 0); p.rotation_euler = (0, 0, 0)
 sc.frame_set(1)
-bpy.ops.wm.save_as_mainfile(filepath='/home/claude/npc/npc_claude.blend')
+bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
 bpy.ops.object.select_all(action='SELECT')
-bpy.ops.export_scene.gltf(filepath='/home/claude/npc/npc_claude.glb', export_format='GLB', export_animations=True,
+bpy.ops.export_scene.gltf(filepath=OUT_GLB, export_format='GLB', export_animations=True,
     export_animation_mode='NLA_TRACKS', export_morph_animation=False, export_apply=False, export_yup=True)
 print('OK')

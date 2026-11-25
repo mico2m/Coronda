@@ -1,11 +1,12 @@
 {
+  "_ayuda": "Muebles del juego. costo = lo que pide Claude en la tienda (recursos de data/tables/recursos.json); tiempo_min = minutos reales que tarda en fabricarlo. caja = medidas si todavía no existe el .glb.",
   "muebles": [
-    {"id": "cubo_prueba", "nombre": "Modelo de prueba", "archivo": "assets/models/muebles/cubo_prueba.glb", "caja": [1, 1, 1]},
-    {"id": "mesa", "nombre": "Mesa", "archivo": "assets/models/muebles/mesa.glb", "caja": [1.4, 0.75, 0.8]},
-    {"id": "silla", "nombre": "Silla", "archivo": "assets/models/muebles/silla.glb", "caja": [0.45, 0.9, 0.45]},
-    {"id": "sillon", "nombre": "Sillón", "archivo": "assets/models/muebles/sillon.glb", "caja": [2, 0.85, 0.9]},
-    {"id": "cama", "nombre": "Cama", "archivo": "assets/models/muebles/cama.glb", "caja": [1.6, 0.55, 2.1]},
-    {"id": "estante", "nombre": "Estante", "archivo": "assets/models/muebles/estante.glb", "caja": [1.2, 1.8, 0.4]},
-    {"id": "planta", "nombre": "Planta", "archivo": "assets/models/muebles/planta.glb", "caja": [0.5, 1.2, 0.5]}
+    {"id": "cubo_prueba", "nombre": "Modelo de prueba", "archivo": "assets/models/muebles/cubo_prueba.glb", "caja": [1, 1, 1], "costo": {"madera": 2}, "tiempo_min": 1},
+    {"id": "mesa", "nombre": "Mesa", "archivo": "assets/models/muebles/mesa.glb", "caja": [1.4, 0.75, 0.8], "costo": {"madera": 8}, "tiempo_min": 4},
+    {"id": "silla", "nombre": "Silla", "archivo": "assets/models/muebles/silla.glb", "caja": [0.45, 0.9, 0.45], "costo": {"madera": 4}, "tiempo_min": 2},
+    {"id": "sillon", "nombre": "Sillón", "archivo": "assets/models/muebles/sillon.glb", "caja": [2, 0.85, 0.9], "costo": {"madera": 12}, "tiempo_min": 6},
+    {"id": "cama", "nombre": "Cama", "archivo": "assets/models/muebles/cama.glb", "caja": [1.6, 0.55, 2.1], "costo": {"madera": 14}, "tiempo_min": 8},
+    {"id": "estante", "nombre": "Estante", "archivo": "assets/models/muebles/estante.glb", "caja": [1.2, 1.8, 0.4], "costo": {"madera": 10}, "tiempo_min": 5},
+    {"id": "planta", "nombre": "Planta", "archivo": "assets/models/muebles/planta.glb", "caja": [0.5, 1.2, 0.5], "costo": {"madera": 3}, "tiempo_min": 2}
   ]
 }

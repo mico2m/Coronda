@@ -19,7 +19,8 @@
         10,
         5
       ]
-    }
+    },
+    "ciclo": false
   },
   "music": "plaza_dia",
   "spawn": {
@@ -30,7 +31,9 @@
     ],
     "yaw": 0
   },
-  "collision": { "default": "none" },
+  "collision": {
+    "default": "none"
+  },
   "rooms": [
     {
       "id": "interior",

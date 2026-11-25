@@ -1,0 +1,6 @@
+{
+  "_ayuda": "Recursos que se juntan en el mundo (id -> nombre, icono y tope por jugador). Los muebles no van acá: están en data/muebles.json. Agregá un recurso nuevo y ya aparece en la mochila.",
+  "recursos": {
+    "madera": { "nombre": "Madera", "icono": "🪵", "max": 999 }
+  }
+}

@@ -60,7 +60,7 @@ async function fileExists(url) { try { return (await fetch(url, { method: 'HEAD'
 
 // opts: net, uid, lotes (para saber de quién es cada lote), stage, camera, getPlayer(), getShade(), notify(msg),
 //       blocked() (otra cosa usa las teclas), onDesign(on) (para frenar/soltar al jugador), onChange() (rehacer colisiones)
-export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, getShade = () => ({}), notify = () => {}, blocked = () => false, onChange }) {
+export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, getShade = () => ({}), notify = () => {}, blocked = () => false, onChange, inventario = null }) {
   const solo = !net;
   const records = new Map(); // loteKey -> registro
   let catalog = new Map();
@@ -176,7 +176,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
       id,
       data: {
         id,
-        environment: { background: '#1c1815', shading: 'unlit', tint: getShade()?.tint ?? '#ffffff', brightness: 1 },
+        environment: { background: '#1c1815', shading: 'unlit', ciclo: false, tint: getShade()?.tint ?? '#ffffff', brightness: 1 },
         rooms: glb ? [{ id: 'interior', model: file }] : [],
         spawn: { position: [0, 1.7, d / 2 - 2.4], yaw: 0 }, // si el modelo tiene un Empty "spawn", se usa ese
         collision: { default: 'none' },
@@ -459,7 +459,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
           <button type="button" data-a="top" aria-pressed="${topView}">Vista desde arriba <kbd>V</kbd></button>
           <button type="button" data-a="grid" aria-pressed="${showGrid}">Grilla <kbd>G</kbd></button>
         </div>
-        <div class="casa-cat">${list.map((m) => `<button type="button" data-m="${esc(m.id)}">${esc(m.nombre)}</button>`).join('') || '<p>No hay muebles en data/muebles.json</p>'}</div>
+        <div class="casa-cat">${inventario ? '<span>Tus muebles (de la mochila):</span>' : ''}${list.map((m) => { const n = have(m.id); return `<button type="button" data-m="${esc(m.id)}"${n < 1 ? ' disabled' : ''}>${esc(m.nombre)}${inventario ? ` <small>×${n}</small>` : ''}</button>`; }).join('') || '<p>No hay muebles en data/muebles.json</p>'}
+          ${inventario && !list.some((m) => have(m.id) > 0) ? '<p class="casa-hint">No tenés muebles. Encargalos en la Carpintería de Claude (con madera del Bosque de Coronda).</p>' : ''}</div>
         <div class="casa-cat casa-posters"><span>Pósters:</span>
           <button type="button" data-poster="cuadrado">▢ Cuadrado</button>
           <button type="button" data-poster="rectangular">▭ Rectangular</button>
@@ -513,8 +514,12 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     else if (showGrid) makeGrid();
     drawUI();
   }
+  // Muebles que tenés en la mochila (los pósters son gratis). Sin mochila (ej. pruebas), infinitos.
+  const have = (m) => (inventario ? inventario.count('muebles', m) : Infinity);
+  inventario?.onChange((kind) => { if (design && kind === 'muebles') drawUI(); });
   async function startNew(m, k) {
     if (carry) cancelCarry();
+    if (m !== 'poster' && have(m) < 1) { notify('No tenés ese mueble: encargalo en la Carpintería de Claude'); return; }
     if (current(inside.key).items.length >= MAX_ITEMS) { notify(`Máximo ${MAX_ITEMS} muebles`); return; }
     const item = { i: Math.random().toString(36).slice(2, 10), m, p: [0, 0], y: 0, ...(m === 'poster' ? { k: cleanPoster(k) } : {}) };
     const slow = setTimeout(() => { loadingItem = true; drawUI(); }, 150); // la primera vez el modelo tiene que bajar
@@ -559,6 +564,9 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   }
   function drop() {
     if (!carry) return;
+    if (carry.isNew && carry.item.m !== 'poster' && inventario && !inventario.remove('muebles', carry.item.m, 1)) { // sale de la mochila
+      notify('Ya no tenés ese mueble en la mochila'); cancelCarry(); return;
+    }
     const items = current(inside.key).items.filter((x) => x.i !== carry.item.i);
     items.push({ ...carry.item, p: [...carry.item.p] });
     if (carry.isNew) { inside.items.set(carry.item.i, carry.obj); }
@@ -572,9 +580,12 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     carry.obj.removeFromParent();
     inside.items.delete(carry.item.i);
     const items = current(inside.key).items.filter((x) => x.i !== carry.item.i);
-    const wasNew = carry.isNew;
+    const wasNew = carry.isNew, m = carry.item.m;
     carry = null;
-    if (!wasNew) { save(inside.key, items); onChange?.(); }
+    if (!wasNew) {
+      save(inside.key, items); onChange?.();
+      if (m !== 'poster' && inventario) { inventario.add('muebles', m, 1); notify('El mueble volvió a tu mochila 🎒'); }
+    }
     drawUI();
   }
 
@@ -628,6 +639,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     get inside() { return inside; },
     get designing() { return design; },
     get music() { return music.state; },
+    // Un mueble del catálogo listo para poner en el mundo (lo usa la tienda: slots, banco de trabajo, lo que lleva Claude)
+    modelo(m) { return makeItem({ m, i: `tienda_${m}` }); },
     // Se destruyó la casa (lotes.js): se borra su interior para todos
     clear(key) {
       const cur = records.get(key);

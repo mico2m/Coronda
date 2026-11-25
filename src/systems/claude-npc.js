@@ -31,7 +31,7 @@ const ERRAND_MAX = 150;      // s máximos para llegar (ida y vuelta, cada una)
 const CHAT_MAX = 120;        // letras por mensaje de chat (igual que net/multiplayer.js)
 const OVERLOAD = '¡Me abrumaste jajaja! ¿En un rato seguimos, querés?';
 const norm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-const PLACE_NAMES = { casa: 'mi lugar de siempre', centro: 'el centro de la plaza', este: 'el lado este', norte: 'el lado norte', oeste: 'el lado oeste', cartel: 'el cartel de bienvenida', borde: 'el borde oeste' };
+const PLACE_NAMES = { mostrador: 'el mostrador de mi tienda', taller: 'el taller de mi tienda', casa: 'el lado este de la plaza, cerca de mi tienda', centro: 'el centro de la plaza', este: 'el lado este', norte: 'el lado norte', oeste: 'el lado oeste', cartel: 'el cartel de bienvenida', borde: 'el borde oeste' };
 
 // opts: net (o null), npcs, lotes, getPlayer(), getSceneId(), myName, notify(msg)
 export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId, myName = 'Viajero', notify = () => {} }) {
@@ -41,9 +41,12 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   const cfgReady = loadJSON('data/tables/ia.json').then((c) => { cfg = { ...cfg, ...c }; }).catch(() => {});
 
   // Estado compartido (lo decide el que maneja)
-  const st = { x: 0, y: 0, z: 0, f: 0, a: '', m: 'route', w: null, wn: '', scene: null };
+  const st = { x: 0, y: 0, z: 0, f: 0, a: '', m: 'route', w: null, wn: '', c: '', scene: null };
   let driving = false, entry = null, sendT = 0, lastHeard = 0;
-  let mode = { type: 'route' };            // route | go { to, then } | follow { u, until } | stay { until }
+  let mode = { type: 'route' };            // route | go { to, then } | follow { u, until } | stay { until } | task { to, speed, near, done } (la tienda)
+  let carry = '';                           // mueble que lleva en las manos (lo dibuja tienda.js)
+  let onTienda = null;                      // pedidos de la tienda que llegan de otros jugadores (solo el que lo maneja)
+  let onTiendaMsg = null;                   // avisos de la tienda para todos (ej. "te entregué la mesa")
   let talk = { u: null, n: '', keep: 0 };  // con quién charla (solo lo usa el que maneja)
   let remote = null;                        // último estado recibido { x, y, z, f, a, w, wn, t }
   const target = new THREE.Vector3();
@@ -80,17 +83,19 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       if (driving && d.from !== myUid && String(d.from) < myUid) driving = false; // otro con id menor ya lo maneja
       const s2 = d.st;
       if (!Number.isFinite(s2.x) || !Number.isFinite(s2.z)) return;
-      remote = { x: s2.x, y: s2.y ?? 0, z: s2.z, f: s2.f ?? 0, a: String(s2.a ?? ''), w: s2.w ? String(s2.w) : null, wn: String(s2.wn ?? ''), m: s2.m };
+      remote = { x: s2.x, y: s2.y ?? 0, z: s2.z, f: s2.f ?? 0, a: String(s2.a ?? ''), w: s2.w ? String(s2.w) : null, wn: String(s2.wn ?? ''), m: s2.m, c: String(s2.c ?? '') };
       lastHeard = performance.now();
       if (!driving) { st.w = remote.w; st.wn = remote.wn; }
       flushWaiters();
       return;
     }
+    if (d.tienda) { onTiendaMsg?.(d.tienda); return; } // aviso de la tienda (lo manda el que maneja a Claude)
     if (!driving || !d.req) return;
+    if (d.req === 'tienda') { onTienda?.(d); return; }
     const u = String(d.u ?? '');
     if (d.req === 'talk') { if (!talk.u || talk.u === u || !alive(talk.u)) { talk = { u, n: String(d.n ?? 'alguien').slice(0, 20), keep: performance.now() }; } broadcast(); }
     else if (d.req === 'keep' && talk.u === u) talk.keep = performance.now();
-    else if (d.req === 'end' && talk.u === u) { talk = { u: null, n: '', keep: 0 }; resumeAfterTalk(); broadcast(); }
+    else if (d.req === 'end' && talk.u === u && !talk.job) { talk = { u: null, n: '', keep: 0 }; resumeAfterTalk(); broadcast(); }
     else if (d.req === 'act' && Array.isArray(d.actions)) run(d.actions.slice(0, 4), u, String(d.n ?? ''));
   }
   const alive = (u) => roster().some((r) => r.u === u);
@@ -100,8 +105,8 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     st.x = +h.position.x.toFixed(2); st.y = +h.position.y.toFixed(2); st.z = +h.position.z.toFixed(2);
     st.f = +entry.targetYaw.toFixed(3);
     st.a = entry.current?.getClip?.().name ?? '';
-    st.w = talk.u; st.wn = talk.n; st.m = mode.type;
-    send({ from: myUid, st: { x: st.x, y: st.y, z: st.z, f: st.f, a: st.a, w: st.w, wn: st.wn, m: st.m } });
+    st.w = talk.u; st.wn = talk.n; st.m = mode.type; st.c = carry;
+    send({ from: myUid, st: { x: st.x, y: st.y, z: st.z, f: st.f, a: st.a, w: st.w, wn: st.wn, m: st.m, c: st.c } });
     flushWaiters();
   }
   function flushWaiters() {
@@ -113,15 +118,15 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   // Antes de abrir el diálogo: ¿está libre?
   async function gate(e) {
     if (e.id !== ID) return true;
-    if (solo) return true;
+    if (solo) { talk = { u: myUid, n: myName, keep: performance.now() }; myTalking = true; return true; } // jugando solo: igual queda "ocupado" mientras charlás
     if (driving) {
-      if (talk.u && talk.u !== myUid && alive(talk.u)) return `Claude está charlando con ${talk.n || 'alguien'}. Esperá un ratito.`;
+      if (talk.u && talk.u !== myUid && alive(talk.u)) return `Claude está hablando con ${talk.n || 'alguien'}. Esperá tu turno.`;
       talk = { u: myUid, n: myName, keep: performance.now() };
       myTalking = true; broadcast();
       return true;
     }
     const busyWith = remote && performance.now() - lastHeard < 5000 ? remote.w : null;
-    if (busyWith && busyWith !== myUid) return `Claude está charlando con ${remote.wn || 'alguien'}. Esperá un ratito.`;
+    if (busyWith && busyWith !== myUid) return `Claude está hablando con ${remote.wn || 'alguien'}. Esperá tu turno.`;
     if (!remote || performance.now() - lastHeard > 5000) { myTalking = true; return true; } // nadie lo maneja: charla libre
     send({ req: 'talk', u: myUid, n: myName });
     const ok = await new Promise((resolve) => {
@@ -129,12 +134,12 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       waiters.push((w) => { if (!w) return false; clearTimeout(t); resolve(w === myUid ? true : 'otro'); return true; });
     });
     if (ok === true || ok === 'timeout') { myTalking = true; return true; }
-    return `Claude está charlando con ${remote?.wn || 'alguien'}. Esperá un ratito.`;
+    return `Claude está hablando con ${remote?.wn || 'alguien'}. Esperá tu turno.`;
   }
   function ended(e) {
     if (e.id !== ID || !myTalking) return;
     myTalking = false;
-    if (driving) { talk = { u: null, n: '', keep: 0 }; resumeAfterTalk(); broadcast(); }
+    if (driving) { if (!talk.job) { talk = { u: null, n: '', keep: 0 }; resumeAfterTalk(); broadcast(); } }
     else send({ req: 'end', u: myUid });
   }
   function holdRoute() { if (entry && !entry._held) { entry.route?.hold?.(true); entry._held = true; } }
@@ -478,7 +483,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     const h = entry.holder;
     const dx = x - h.position.x, dz = z - h.position.z;
     const d = Math.hypot(dx, dz);
-    if (d <= stopAt) { if (entry.current !== entry.idle) npcs.play(entry, null); return true; }
+    if (d <= stopAt + 0.01) { if (entry.current !== entry.idle) npcs.play(entry, null); return true; } // (+1 cm: si no, por redondeo nunca llega)
     const step = Math.min(d - stopAt, speed * dt);
     h.position.x += (dx / d) * step; h.position.z += (dz / d) * step;
     entry.targetYaw = Math.atan2(dx, dz) + entry.yawOffset;
@@ -508,8 +513,8 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
 
     if (driving) {
       const now = performance.now();
-      if (talk.u && talk.u !== myUid && (now - talk.keep > TALK_LOST * 1000 || !alive(talk.u))) { talk = { u: null, n: '', keep: 0 }; resumeAfterTalk(); }
-      if (talk.u) { // charlando: quieto y mirando al que le habla (si es otro jugador; si sos vos, lo hace el diálogo)
+      if (talk.u && talk.u !== myUid && !talk.job && (now - talk.keep > TALK_LOST * 1000 || !alive(talk.u))) { talk = { u: null, n: '', keep: 0 }; resumeAfterTalk(); }
+      if (talk.u && !talk.job) { // charlando: quieto y mirando al que le habla (si es otro jugador; si sos vos, lo hace el diálogo)
         holdRoute();
         if (talk.u !== myUid) {
           const p = playerPos(talk.u);
@@ -527,6 +532,12 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
         if (moveTowards(mode.to.x, mode.to.z, 2.4, dt, 0.4)) {
           if (mode.then === 'inside' || mode.then === 'away') hideAway(mode.then, mode.to);
           else mode = { type: 'stay', until: now + STAY_SECS * 1000 };
+        }
+      } else if (mode.type === 'task') { // lo maneja la tienda (systems/tienda.js): caminar a un punto y avisar
+        if (mode.to && moveTowards(mode.to.x, mode.to.z, mode.speed ?? 2.2, dt, mode.near ?? 0.3)) {
+          const done = mode.done; mode = { type: 'task' };
+          if (Number.isFinite(done?.face)) entry.targetYaw = done.face + entry.yawOffset;
+          done?.resolve?.();
         }
       } else if (mode.type === 'errand') {
         errandStep(dt, now);
@@ -551,6 +562,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       const cur = entry.current?.getClip?.().name ?? '';
       if (remote.a && remote.a !== cur) npcs.play(entry, remote.a === entry.idleName ? null : remote.a);
       entry.holder.visible = !hidden();
+      carry = remote.c || '';
       if (entry.obstacle) { entry.obstacle.x = hidden() ? 99999 : h.position.x; entry.obstacle.z = h.position.z; }
     }
   }
@@ -558,6 +570,27 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   return {
     update, gate, ended, ask, choiceOk, act, heard, greeting, precargarSaludo,
     set onSay(fn) { onSay = fn; },
+    // ---- Para la tienda (systems/tienda.js) ----
+    get entry() { return entry; },
+    get mode() { return driving ? mode.type : remote?.m ?? 'route'; },
+    get busyByAI() { return driving && ['follow', 'go', 'errand', 'inside', 'away'].includes(mode.type); },
+    get talkingWith() { return driving ? talk.u : remote?.w ?? null; },
+    get carry() { return carry; },
+    setCarry(id) { carry = id || ''; broadcast(); },
+    // Camina hasta (x, z) y resuelve al llegar (solo el que lo maneja). face: hacia dónde mira al llegar (radianes, yaw del mundo)
+    walkTo(x, z, { speed = 2.2, near = 0.3, face = null } = {}) {
+      return new Promise((resolve) => { holdRoute(); mode = { type: 'task', to: { x, z }, speed, near, done: { resolve, face } }; });
+    },
+    stopTask() { mode = { type: 'task' }; holdRoute(); },        // quieto, sin ruta (lo maneja la tienda)
+    freeRoute() { if (mode.type === 'task') { mode = { type: 'route' }; resumeRoute(); } },
+    play(clip) { if (entry) npcs.play(entry, clip || null); },
+    // Charla "ocupada" por un trabajo (ej. buscar el pedido de alguien): nadie más le puede hablar hasta terminar
+    holdTalk(u, n) { talk = { u, n: String(n ?? '').slice(0, 20), keep: performance.now(), job: true }; broadcast(); },
+    releaseTalk(u) { if (!u || talk.u === u) { talk = { u: null, n: '', keep: 0 }; broadcast(); } },
+    tiendaReq(d) { if (driving || solo) onTienda?.({ u: myUid, n: myName, ...d }); else send({ req: 'tienda', u: myUid, n: myName, ...d }); },
+    tiendaMsg(d) { onTiendaMsg?.(d); send({ tienda: d }); },
+    set onTienda(fn) { onTienda = fn; },
+    set onTiendaMsg(fn) { onTiendaMsg = fn; },
     get driving() { return driving; },
     get state() { return { driving, mode: driving ? mode.type : remote?.m, talkingWith: driving ? talk.n : remote?.wn, ai: aiOn() }; },
   };

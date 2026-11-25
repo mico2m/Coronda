@@ -241,9 +241,27 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       roof.position.y = h + h * 0.3; roof.rotation.y = Math.PI / 4;
       obj.add(body, roof);
     }
+    await addMailbox(obj, spot);
     if (unlit) { makeUnlit(obj); setShade(obj, getShade()); }
     obj.name = `lote-casa:${modelId}`;
     return obj;
+  }
+  // Buzón de la casa: un objeto "buzon" en el .glb de la casa (ver blender/agregar_buzon.py). Se renombra
+  // lote_<número>_buzon para que la tienda sepa dónde dejar la nota. Si la casa no trae, se pone buzon.glb al frente.
+  async function addMailbox(obj, spot) {
+    const nro = Number(/(\d+)\s*$/.exec(spot.key)?.[1] ?? 0);
+    let b = null;
+    obj.traverse((o) => { if (!b && /^buzon$/i.test(o.name)) b = o; });
+    if (!b) {
+      try {
+        const g = await template('assets/models/objects/buzon.glb');
+        b = cloneSkinned(g.scene);
+        const box = new THREE.Box3().setFromObject(obj);
+        b.position.set(box.max.x - 1, 0, box.max.z + 0.8); // al frente (+Z) a la derecha
+        obj.add(b);
+      } catch { return; }
+    }
+    b.name = `lote_${nro}_buzon`;
   }
 
   async function render(key) {

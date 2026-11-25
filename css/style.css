@@ -88,12 +88,27 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .hint kbd { font: 600 11px var(--font-body); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
 .hint b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
 
-.pad { display: none; position: absolute; left: 12px; bottom: 12px; z-index: 2; gap: 6px; grid-template-columns: repeat(3, 46px); grid-auto-rows: 46px; user-select: none; -webkit-user-select: none; }
+/* ---------- Controles táctiles (src/ui/touch-controls.js) ----------
+   .pad es la zona del joystick (abajo a la izquierda): tocás en cualquier lugar de ahí y aparece bajo el dedo.
+   En reposo se ve tenue en su lugar. El resto de la pantalla mueve la cámara (un dedo) y hace zoom (dos dedos). */
+.pad { display: none; position: absolute; left: 0; bottom: 0; z-index: 1; width: min(55%, 380px); height: min(48%, 320px);
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .pad button { padding: 0; width: 46px; height: 46px; background: var(--panel); touch-action: none; font-size: 15px; }
 @media (pointer: coarse) {
-  .pad { display: grid; }
+  .pad { display: block; }
   .hint { display: none; }
 }
+.joy-zone { position: absolute; inset: 0; touch-action: none; }
+.joy-base { position: absolute; left: 92px; top: calc(100% - 92px); width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%;
+  background: rgba(12, 20, 26, 0.35); border: 2px solid rgba(255, 255, 255, 0.4); opacity: 0.55; pointer-events: none; transition: opacity 0.2s; }
+.joy-base.on { opacity: 1; transition: none; }
+.joy-base.run { border-color: #5eead4; box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.25); }
+.joy-knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
+  background: rgba(246, 249, 250, 0.88); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
+.pad .joy-recenter { position: absolute; left: 172px; bottom: 22px; border-radius: 50%; font-size: 20px; line-height: 1; touch-action: manipulation; }
+.joy-recenter[hidden] { display: none; }
+.pad-fly { position: absolute; left: 172px; bottom: 80px; display: none; flex-direction: column; gap: 6px; }
+.pad.free .pad-fly { display: flex; }
 @media (max-width: 520px) {
   .panel { width: auto; right: 12px; }
 }
@@ -227,7 +242,7 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 }
 .chat-open { display: none; justify-self: start; width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(10, 16, 20, 0.55); font-size: 18px; cursor: pointer; }
 @media (pointer: coarse) {
-  .chat { bottom: 132px; } /* arriba de los botones W A S D */
+  .chat { bottom: 160px; } /* arriba del joystick */
   .chat-open { display: block; }
 }
 .talking .chat-form { display: none; }
@@ -375,7 +390,7 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 
 /* ---------- Música de las casas (src/ui/house-music.js): arriba a la izquierda, solo "Sonando: …" ---------- */
 .casa-music {
-  position: absolute; top: 12px; left: 12px; z-index: 4; width: max-content; max-width: min(300px, calc(100% - 170px)); display: grid; gap: 6px; padding: 6px;
+  position: absolute; top: 54px; left: 12px; z-index: 4; width: max-content; max-width: min(300px, calc(100% - 170px)); display: grid; gap: 6px; padding: 6px;
   border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font: 500 13px var(--font-body);
 }
 .casa-music[hidden], .casa-music [hidden] { display: none !important; }
@@ -427,3 +442,41 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .dlg-ask-in { flex: 1; min-width: 0; font: 500 15px var(--font-body); padding: 9px 11px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.34); background: #f6f9fa; color: #0b1418; }
 .dlg-ask button { flex: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; font: 600 14px var(--font-body); color: #f6f9fa; background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.34); }
 .dlg-ask button[type="submit"] { background: #5eead4; color: #062a25; border-color: #5eead4; }
+
+/* ---------- Inventario (src/systems/inventario.js) ---------- */
+.inv-btn { position: absolute; top: 156px; right: 16px; z-index: 3; width: 44px; height: 44px; padding: 0; font-size: 22px; line-height: 1; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
+.inv-panel { position: absolute; top: 206px; right: 12px; z-index: 4; width: min(260px, calc(100vw - 24px)); max-height: calc(100% - 230px); overflow: auto; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); font: 500 14px var(--font-body); color: var(--ink, inherit); }
+.inv-panel[hidden] { display: none; }
+.inv-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-family: var(--font-display); font-size: 16px; }
+.inv-x { padding: 2px 8px; border: 0; background: transparent; color: inherit; font-size: 16px; cursor: pointer; }
+.inv-sec { margin: 8px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.65; }
+.inv-panel ul { list-style: none; margin: 0; padding: 0; }
+.inv-panel li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.inv-panel li:last-child { border-bottom: 0; }
+.inv-ico { width: 22px; text-align: center; }
+.inv-name { flex: 1; }
+.inv-n { font-variant-numeric: tabular-nums; }
+.inv-empty { opacity: 0.55; font-style: italic; }
+@media (pointer: coarse) { .inv-btn { top: 160px; } .inv-panel { top: 210px; } }
+
+/* ---------- Reloj del juego (src/systems/tiempo.js): arriba a la izquierda ---------- */
+.reloj { position: absolute; top: 12px; left: 12px; z-index: 4; display: flex; align-items: baseline; gap: 7px; padding: 6px 12px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--line); font: 500 13px var(--font-body); color: var(--fg, #f6f9fa); pointer-events: none; }
+.reloj-ico { font-size: 15px; color: #ffd36e; }
+.reloj.noche .reloj-ico { color: #c9d4ff; }
+.reloj-h { font-size: 16px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.reloj-m { color: var(--muted); font-size: 12px; }
+body:has(.talking) .reloj { opacity: 0.4; }
+
+/* ---------- Talar (src/systems/bosque.js) ---------- */
+.tala-prompt small { margin-left: 6px; opacity: 0.75; font-size: 0.8em; }
+.tala-pop { position: absolute; left: 50%; top: 38%; z-index: 6; transform: translate(-50%, 0); pointer-events: none;
+  padding: 6px 14px; border-radius: 999px; background: rgba(12, 20, 26, 0.88); color: #ffe7a8; font: 700 18px var(--font-body); letter-spacing: 0.04em; }
+.tala-pop[hidden] { display: none; }
+.tala-pop.sube { animation: tala-sube 1.3s ease-out forwards; }
+@keyframes tala-sube { from { opacity: 0; transform: translate(-50%, 10px); } 15% { opacity: 1; transform: translate(-50%, 0); } 75% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -24px); } }
+
+/* Modo diseño: muebles de la mochila */
+.casa-cat button[disabled] { opacity: 0.45; cursor: not-allowed; }
+.casa-cat button small { opacity: 0.8; font-weight: 600; }
+.casa-hint { margin: 4px 0 0; font-size: 12px; color: var(--muted); }

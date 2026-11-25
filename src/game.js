@@ -9,6 +9,10 @@ import { createUI } from './ui/ui.js';
 import { createFade } from './systems/fade.js';
 import { createDoors } from './systems/doors.js';
 import { createLotes } from './systems/lotes.js';
+import { createInventario } from './systems/inventario.js';
+import { createTienda } from './systems/tienda.js';
+import { createTiempo } from './systems/tiempo.js';
+import { createBosque } from './systems/bosque.js';
 import { createCasas } from './systems/casas.js';
 import { createFollowers } from './systems/followers.js';
 import { createPlayer } from './actors/player.js';
@@ -18,6 +22,7 @@ import { createDialogue } from './systems/dialogue.js';
 import { createTextbox } from './ui/textbox.js';
 import { isSkyName } from './systems/shading.js';
 import { boot } from './ui/boot.js';
+import { createTouchControls } from './ui/touch-controls.js';
 
 const _focus = new THREE.Vector3();
 
@@ -36,8 +41,11 @@ export async function startGame({ dev = false, retro = null } = {}) {
   const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 2000);
   camera.position.set(0, 1.7, 8);
 
+  // Celular: joystick + botón para centrar la cámara (ver ui/touch-controls.js). Lo usan el jugador y la cámara libre.
+  const touch = createTouchControls({ pad: document.getElementById('pad'), onRecenter: () => player?.recenterCamera() });
   const controls = createCameraControls(camera, stage, {
     pad: document.getElementById('pad'),
+    touch,
     speedOut: document.getElementById('speedOut'),
   });
   const ui = createUI();
@@ -68,6 +76,10 @@ export async function startGame({ dev = false, retro = null } = {}) {
   const npcs = createNpcs();
   const followers = createFollowers(); // objetos con la propiedad `seguir` (ver systems/followers.js)
   let dialogue = null;
+  let inventario = null; // mochila del jugador (ver systems/inventario.js)
+  let tienda = null;     // la Carpintería de Claude (ver systems/tienda.js)
+  let tiempo = null;     // hora del juego y día/noche (ver systems/tiempo.js)
+  let bosque = null;     // talar árboles (ver systems/bosque.js)
   let doors = null;
   let lotes = null; // lotes que los jugadores pueden adquirir (ver systems/lotes.js)
   let minimap = null; // ver ui/minimap.js
@@ -97,12 +109,16 @@ export async function startGame({ dev = false, retro = null } = {}) {
       choiceOk: (c) => claudeNpc?.choiceOk(c) ?? c?.needs !== 'ia',
       ask: (e, t) => claudeNpc?.ask(e, t) ?? Promise.resolve({ text: '…' }),
       greeting: (e) => claudeNpc?.greeting(e) ?? null,
+      dynamic: (e, name) => tienda?.dynamic(e, name) ?? null, // nodos de la tienda (catálogo, pedidos, retirar)
+      idle: (e) => tienda?.idle(e) ?? null,                   // si no avanzás la charla con Claude, se corta
     },
   });
 
   function setMode(m) {
     mode = m;
     const asPlayer = m === 'player';
+    touch.setRecenterVisible(asPlayer); // 🎥 solo con el personaje
+    document.getElementById('pad')?.classList.toggle('free', !asPlayer); // ▲ ▼ solo en la cámara libre
     if (asPlayer) {
       // desde la cámara libre: el jugador aparece debajo de la cámara, mirando hacia donde mirabas
       player.place([camera.position.x, camera.position.y - EYE, camera.position.z], controls.getYaw());
@@ -141,6 +157,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
     doors?.update(focus, feetY);
     lotes?.update(focus, feetY, dt); // después de las puertas: si hay una puerta cerca, la E es de ella
     casas?.update(focus);
+    tienda?.update(focus, dt);
+    tiempo?.update(dt);
+    bosque?.update(mode === 'player' && player ? player.position : null, dt);
     minimap?.update({
       me: mode === 'player' && player ? { x: player.position.x, z: player.position.z, facing: player.facing } : { x: camera.position.x, z: camera.position.z, facing: controls.getYaw() + Math.PI },
       others: net?.positions?.() ?? [],
@@ -191,7 +210,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       }
       net = choice.online ? choice.net : null;
     }
-    player = await createPlayer({ scene, camera, stage, pad: document.getElementById('pad'), config: playerConfig });
+    player = await createPlayer({ scene, camera, stage, pad: document.getElementById('pad'), touch, config: playerConfig });
     const audio = createAudio(musicTable);
     const sceneManager = createSceneManager({ scene, camera, controls, audio, ui, scenesTable });
     if (!dev || /[?&]minimapa/.test(location.search)) { // en dev.html el inspector ocupa ese lugar (con ?minimapa aparece igual)
@@ -327,6 +346,23 @@ export async function startGame({ dev = false, retro = null } = {}) {
       getShade: () => sceneManager.shade,
     });
 
+    // Inventario del jugador (recursos y muebles) y la tienda donde Claude fabrica los muebles
+    inventario = createInventario({
+      stage,
+      dev,
+      blocked: () => dialogue?.blocked ?? false,
+      notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
+    });
+    // Hora del juego, día y noche y reloj (la misma hora para todos: sale del reloj de la compu)
+    tiempo = createTiempo({ scene, stage, dev, getSceneData: () => sceneManager.current, getBaseShade: () => sceneManager.shade });
+    window.corondaTiempo = tiempo;
+    // Talar árboles (en cualquier escena que tenga arbol_001, arbol_002…)
+    bosque = createBosque({
+      stage, net, inventario, getRoot: () => sceneManager.root, getSceneId: () => sceneManager.current?.id ?? null,
+      getPlayer: () => (mode === 'player' ? player : null), blocked: () => !!dialogue?.active || !!casas?.inside,
+      notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
+    });
+
     // Claude: uno solo para todo el servidor, charla de a uno y (si hay IA configurada) le podés escribir
     {
       const { createClaudeNpc } = await import('./systems/claude-npc.js');
@@ -347,6 +383,14 @@ export async function startGame({ dev = false, retro = null } = {}) {
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
       blocked: () => (dialogue?.blocked ?? false) || (lotes?.blocked ?? false),
       onChange: () => { rebuildCollision(); minimap?.capture(sceneManager.root); },
+      inventario,
+    });
+    // La Carpintería de Claude: pedidos de muebles a cambio de madera, retiro y notas en los buzones (ver systems/tienda.js)
+    tienda = createTienda({
+      stage, net, claude: claudeNpc, inventario, tiempo, lotes, casas, myName: choice?.name ?? 'Viajero', myUid: lotes.uid,
+      getRoot: () => sceneManager.root, getSceneId: () => sceneManager.current?.id ?? null,
+      getPlayer: () => (mode === 'player' ? player : null),
+      notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 4500); },
     });
     async function travel(go, text) {
       player.frozen = true;
@@ -508,5 +552,5 @@ export async function startGame({ dev = false, retro = null } = {}) {
     ui.setStatus(String(err.message || err));
   }
   // Para las herramientas del modo desarrollador (panel de NPC, etc.)
-  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null };
+  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null, getInventario: () => inventario, getTienda: () => tienda, getTiempo: () => tiempo, getBosque: () => bosque };
 }

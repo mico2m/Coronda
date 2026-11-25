@@ -1,0 +1,52 @@
+{
+  "id": "bosque_coronda",
+  "name": "Bosque de Coronda",
+  "environment": {
+    "shading": "unlit",
+    "tint": "#ffffff",
+    "brightness": 1,
+    "background": "#a9cfe0",
+    "fog": {
+      "color": "#a9cfe0",
+      "near": 30,
+      "far": 110
+    }
+  },
+  "music": "coronda_plaza",
+  "spawn": {
+    "position": [
+      0,
+      1.7,
+      -42
+    ],
+    "yaw": 3.1416
+  },
+  "collision": {
+    "default": "none"
+  },
+  "rooms": [
+    {
+      "id": "bosque",
+      "model": "assets/models/worlds/Bosque_Coronda.glb"
+    }
+  ],
+  "objects": [],
+  "actors": [],
+  "doors": [
+    {
+      "empty": "cartel_volver",
+      "target": "coronda_plaza",
+      "mode": "E",
+      "radius": 2.2,
+      "label": "Volver a la plaza",
+      "spawn": {
+        "position": [
+          -29.5,
+          1.7,
+          -6
+        ],
+        "yaw": -1.5708
+      }
+    }
+  ]
+}

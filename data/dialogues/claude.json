@@ -15,61 +15,62 @@
     "presentacion": {
       "text": [
         "¡Holaa! Soy Claudito, un NPC más de acá, de Coronda.",
+        "Ahora tengo la Carpintería: te hago muebles para tu casa a cambio de madera del Bosque de Coronda.",
         "Escribime lo que quieras, que acá estoy."
       ],
       "set": {
         "conoce_claude": true
       },
-      "next": "menu",
+      "next": "inicio",
       "saludo_ia": true
     },
     "saludo_001": {
       "text": "¡Hola de nuevo! Justo estaba contando las baldosas de la plaza. Perdí la cuenta en la 40.",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_002": {
       "text": "¡Eh, volviste! Me alegra verte por acá.",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_003": {
       "text": "¡Buenas! Hoy la plaza está tranquila, ideal para charlar.",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_004": {
       "text": "¡Hola! Te reconocí de lejos por cómo caminás.",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_005": {
       "text": "¡Qué bueno verte! Estaba pensando en vos. Bueno, en realidad estaba pensando en frutillas, pero también en vos.",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_006": {
       "text": "¡Hola, hola! ¿Venís a charlar o a pedirme un consejo?",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_007": {
       "text": "¡Mirá quién apareció! Pasá, que la plaza es de todos.",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_008": {
       "text": "¡Buenas! Recién terminé mi vuelta por la plaza. Diez de diez, sin novedades.",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_009": {
       "text": "¡Hola! Me pescaste en un momento de reflexión profunda. Igual no era tan profunda.",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_010": {
       "text": "¡Ey! Qué lindo día para no hacer nada productivo, ¿no?",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_011": {
       "text": "¡Hola! Si me ves caminando en círculos, es a propósito. Creo.",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo_012": {
       "text": "¡Bienvenido de vuelta! La plaza te extrañaba. Yo también, un poco.",
-      "next": "menu"
+      "next": "inicio"
     },
     "saludo": {
       "random": [
@@ -87,7 +88,7 @@
         "saludo_012"
       ],
       "saludo_ia": true,
-      "next": "menu",
+      "next": "inicio",
       "set": {
         "conoce_claude": true
       }
@@ -3781,6 +3782,26 @@
         "despedida_007",
         "despedida_008"
       ]
+    },
+    "inicio": {
+      "text": "¿Qué hacemos?",
+      "choices": [
+        {
+          "text": "Encargar o retirar muebles",
+          "next": "tienda"
+        },
+        {
+          "text": "Charlar",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "tienda": {
+      "dinamico": "tienda_menu"
     }
   }
 }

@@ -5,5 +5,8 @@
   },
   "scene_casa1": {
     "file": "data/scenes/scene_casa1.json"
+  },
+  "bosque_coronda": {
+    "file": "data/scenes/bosque_coronda.json"
   }
 }

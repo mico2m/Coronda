@@ -1,0 +1,14 @@
+{
+  "_ayuda": "La tienda de Claude (la Carpintería). objeto = nombre en assets/models/objects/ y en data/scenes/coronda_plaza.json > objects (ahí se cambia su lugar). zona = media anchura y media profundidad del edificio en metros: adentro de esa zona se oculta el techo para que la cámara vea al personaje. inactividad_seg = si el jugador no avanza la charla con Claude en ese tiempo, se corta y tiene que esperar espera_seg segundos. reparto_horas = horas del juego después del cierre en las que Claude reparte las notas a los buzones (si no le alcanza, sigue al día siguiente). max_pedidos_por_jugador = pedidos sin retirar por jugador. El horario de apertura y cierre está en data/tables/tiempo.json > tienda.",
+  "id": "tienda",
+  "objeto": "tienda",
+  "zona": [
+    5,
+    10
+  ],
+  "techo": "techo",
+  "inactividad_seg": 20,
+  "espera_seg": 5,
+  "reparto_horas": 3,
+  "max_pedidos_por_jugador": 5
+}

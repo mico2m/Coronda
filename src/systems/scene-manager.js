@@ -158,6 +158,20 @@ export function createSceneManager({ scene, camera, controls, audio, ui, scenesT
     // Lo que arma el código para esta escena (entry.build, ej. paredes y muebles de una casa)
     if (entry.build) await entry.build(group, data);
 
+    // Objetos colocados desde el JSON de la escena (sin Empty en el .glb):
+    //   "objects": [{ "id": "tienda", "objeto": "tienda", "position": [30, 0, -22], "yaw": 0, "scale": 1 }]
+    // Es lo mismo que un Empty con objeto = "tienda": carga assets/models/objects/<objeto>.glb en ese lugar.
+    for (const o of data.objects ?? []) {
+      if (!o?.objeto || !Array.isArray(o.position)) continue;
+      const spot = new THREE.Group();
+      spot.name = String(o.id ?? `objeto_${o.objeto}`);
+      spot.position.set(...o.position.map(Number));
+      spot.rotation.y = (Number(o.yaw) || 0) * Math.PI / 180;
+      if (Number(o.scale)) spot.scale.setScalar(Number(o.scale));
+      spot.userData.objeto = String(o.objeto);
+      group.add(spot);
+    }
+
     // Objetos reutilizables (Empties con "objeto"): se cargan antes de las colisiones, puertas y NPC
     await placeObjects(group);
 

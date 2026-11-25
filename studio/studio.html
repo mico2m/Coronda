@@ -40,7 +40,18 @@ details > div { padding-left: 12px; }
 #app { grid-template-columns: 300px minmax(0,1fr) 6px var(--pw, 45%); }
 #sideTabs { display: flex; border-bottom: 1px solid var(--bd); } #sideTabs button { flex: 1; border: 0; border-radius: 0; background: transparent; padding: 7px; color: var(--mu); border-bottom: 2px solid transparent; }
 #sideTabs button.on { color: var(--tx); border-bottom-color: var(--ac); }
-#filesPane, #npcPane, #gitPane { flex: 1; min-height: 0; display: flex; flex-direction: column; } #npcPane[hidden], #filesPane[hidden], #gitPane[hidden] { display: none; }
+#filesPane, #npcPane, #gitPane, #mundoPane { flex: 1; min-height: 0; display: flex; flex-direction: column; } #npcPane[hidden], #filesPane[hidden], #gitPane[hidden], #mundoPane[hidden] { display: none; }
+#mundoPane { overflow: auto; padding-bottom: 20px; }
+.mp-sec { display: grid; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--bd); } .mp-sec > b { font-weight: 600; }
+.mp-sec label { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--mu); }
+.mp-sec input { width: 90px; background: #1b1c1f; color: var(--tx); border: 1px solid var(--bd); border-radius: 4px; padding: 3px 6px; font: inherit; }
+.mp-sec input[type=text] { width: 120px; }
+.mp-row { display: flex; flex-wrap: wrap; gap: 4px; } .mp-row button { padding: 3px 8px; }
+.mp-grid { display: grid; grid-template-columns: 56px 1fr; gap: 3px 8px; } .mp-grid .k, .mp-sec .k { color: var(--mu); }
+.mp-grid .ok { color: #98c379; } .mp-grid .no { color: #e06c75; }
+.mp-t { width: 100%; border-collapse: collapse; font-size: 12px; } .mp-t th { text-align: left; color: var(--mu); font-weight: 500; } .mp-t td, .mp-t th { padding: 2px 4px; border-bottom: 1px solid #2c2e33; }
+.mp-t input { width: 56px; } .mp-t button { padding: 0 6px; }
+.mp-bar { display: inline-block; width: 50px; height: 6px; border-radius: 3px; background: #33363c; vertical-align: middle; overflow: hidden; } .mp-bar i { display: block; height: 100%; background: #e5c07b; }
 #gitPane { overflow: auto; } #gitHead { padding: 8px 10px; border-bottom: 1px solid var(--bd); display: grid; gap: 3px; }
 #gitHead .k { color: var(--mu); } #gitHead a { color: var(--ac); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #gitFiles { padding: 4px 0; border-bottom: 1px solid var(--bd); max-height: 40vh; overflow: auto; }
@@ -174,7 +185,7 @@ details > div { padding-left: 12px; }
 <body>
 <div id="app">
   <div id="side">
-    <div id="sideTabs"><button id="tFiles" class="on">Archivos</button><button id="tNpc">NPC</button><button id="tGit" title="Enviar los cambios al repositorio de GitHub">GitHub</button></div>
+    <div id="sideTabs"><button id="tFiles" class="on">Archivos</button><button id="tNpc">NPC</button><button id="tMundo" title="Hora, día/noche, talar, Carpintería y pedidos en vivo">Mundo</button><button id="tGit" title="Enviar los cambios al repositorio de GitHub">GitHub</button></div>
     <div id="filesPane">
       <div class="bar"><b id="proj">Proyecto</b><button id="bDlg" title="Diálogo nuevo">+ Diálogo</button><button id="bRoute" title="Ruta de NPC nueva">+ Ruta</button><button id="bNew" title="Archivo nuevo">+</button><button id="bRef" title="Actualizar árbol">⟳</button></div>
       <div id="tree"></div>
@@ -187,6 +198,7 @@ details > div { padding-left: 12px; }
       <div id="gitLog"></div>
       <div id="gitNote">Enviar = guardar todo en un commit y subirlo (antes trae lo que haya en GitHub). Usa tu usuario de git o de GitHub Desktop.</div>
     </div>
+    <div id="mundoPane" hidden></div>
     <div id="npcPane" hidden>
       <div id="npcHead"><select id="npcSel" title="NPC de la escena"></select><button id="bNpcGo" title="Lleva la cámara libre frente al NPC">Ir</button><button id="bNpcRef" title="Actualizar la lista (al cambiar de escena)">⟳</button></div>
       <div id="npcInfo"></div>
@@ -423,8 +435,9 @@ const npcFoot = (m, err) => { const f = $('#npcFoot'); f.textContent = m; f.clas
 
 function showTab(which) {
   npcTab = which === 'npc';
-  $('#filesPane').hidden = which !== 'files'; $('#npcPane').hidden = !npcTab; $('#gitPane').hidden = which !== 'git';
-  $('#tFiles').classList.toggle('on', which === 'files'); $('#tNpc').classList.toggle('on', npcTab); $('#tGit').classList.toggle('on', which === 'git');
+  $('#filesPane').hidden = which !== 'files'; $('#npcPane').hidden = !npcTab; $('#gitPane').hidden = which !== 'git'; $('#mundoPane').hidden = which !== 'mundo';
+  $('#tFiles').classList.toggle('on', which === 'files'); $('#tNpc').classList.toggle('on', npcTab); $('#tGit').classList.toggle('on', which === 'git'); $('#tMundo').classList.toggle('on', which === 'mundo');
+  if (which === 'mundo') mundoPanel();
   if (npcTab) refreshNpc(true); else stopPreview(true);
   if (which === 'git') gitRefresh();
 }
@@ -462,6 +475,14 @@ async function gitDo(url, body, label) {
   if (url.endsWith('traer') && r.ok) loadTree();
 }
 $('#tGit').onclick = () => showTab('git');
+$('#tMundo').onclick = () => showTab('mundo');
+// Panel Mundo: hora, día/noche, talar, Carpintería y pedidos en vivo (ver studio/mundo-panel.js)
+let mundo = null;
+async function mundoPanel() {
+  if (mundo) { mundo.refresh(); return; }
+  const { createMundoPanel } = await import('/studio/mundo-panel.js');
+  mundo = createMundoPanel({ root: $('#mundoPane'), game, api, quiet, toast });
+}
 $('#gitForm').onsubmit = (e) => { e.preventDefault(); gitDo('/__git/enviar', { mensaje: $('#gitMsg').value }, 'Enviando a GitHub'); };
 $('#gitMsg').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('#gitForm').requestSubmit(); } });
 $('#bGitPull').onclick = () => gitDo('/__git/traer', {}, 'Trayendo de GitHub');

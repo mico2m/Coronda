@@ -101,7 +101,8 @@ export function joinMqtt(appId, roomId, selfId, brokers = BROKERS) {
     onPeerLeave: null,
     onPersisted: null,   // (clave, dato) para cada mensaje guardado en el broker (llegan al suscribirse y cuando cambian)
     // Guarda un dato en el broker (retained) bajo `<sala>/guardado/<clave>`; lo recibe todo el que entre después
-    persist(key, data) { const text = JSON.stringify(data); sockets.forEach((s) => s.send(`${base}/guardado/${key}`, text, true)); },
+    // data = null lo borra del broker (mensaje retenido vacío)
+    persist(key, data) { const text = data === null ? '' : JSON.stringify(data); sockets.forEach((s) => s.send(`${base}/guardado/${key}`, text, true)); },
     makeAction(name) {
       const a = { onMessage: null, send(data) { const text = JSON.stringify({ id: selfId, t: name, d: data }); sockets.forEach((s) => s.send(`${base}/${selfId}`, text)); } };
       actions.set(name, a);
@@ -116,7 +117,7 @@ export function joinMqtt(appId, roomId, selfId, brokers = BROKERS) {
   const keep = `${base}/guardado/`;
   const onPublish = (topic, text) => {
     if (topic.startsWith(keep)) { // un dato guardado (no es un mensaje de un jugador)
-      let d = null; try { d = JSON.parse(text); } catch { return; }
+      let d = null; if (text !== '') { try { d = JSON.parse(text); } catch { return; } }
       room.onPersisted?.(topic.slice(keep.length), d);
       return;
     }

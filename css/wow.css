@@ -52,11 +52,12 @@
 /* ---------- Mensajes de estado: texto amarillo arriba al centro, sin caja ---------- */
 .app.wow .loading { left: 50%; top: calc(var(--edge-t) + 64px); transform: translateX(-50%); max-width: min(80vw, 620px); text-align: center; background: none; border: 0;
   padding: 0; font: 700 16px var(--font-body); color: var(--wow-amarillo); text-shadow: 0 1px 0 #000, 0 0 3px #000, 0 0 6px rgba(0, 0, 0, 0.8); pointer-events: none; }
-.app.wow .admin-anuncio { background: none; border: 0; box-shadow: none; color: #ff8a1c; font: 700 22px var(--wow-serif); text-shadow: 0 2px 0 #000, 0 0 6px #000; }
+.app.wow .admin-anuncio { top: calc(var(--edge-t) + 64px); background: none; border: 0; box-shadow: none; color: #ff8a1c; font: 700 22px var(--wow-serif); text-shadow: 0 2px 0 #000, 0 0 6px #000; }
 
 /* ---------- Chat: sin globos, texto con sombra sobre una franja oscura, nombres entre corchetes ---------- */
 .app.wow .chat-log { padding: 4px 6px; border-radius: 3px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.12)); }
 .app.wow .chat-log:empty { display: none; }
+.app.wow .chat-log:not(:has(li:not(.chat-old))) { background: none; } /* sin mensajes recientes: sin franja */
 .app.wow .chat-log li { background: none; padding: 1px 2px; border-radius: 0; color: #ffffff; text-shadow: 0 1px 0 #000, 0 0 2px #000; }
 .app.wow .chat-log li b { color: #ffffff; }
 .app.wow .chat-log li b::before { content: "["; } .app.wow .chat-log li b::after { content: "]"; }
@@ -71,7 +72,7 @@
 .app.wow .energia.poca .energia-bar i { background: linear-gradient(180deg, #ffb35c 0%, #f97316 50%, #a3460b 100%); }
 
 /* ---------- Barra de acciones (acostarse, saludar…): casilleros abajo al centro ---------- */
-.app.wow .actions { left: 50%; right: auto; bottom: var(--edge-b); transform: translateX(-50%); flex-direction: row; gap: 4px; padding: 6px; border-radius: 4px;
+.app.wow .actions { left: 50%; right: auto; bottom: calc(var(--edge-b) + 64px); /* arriba de la barra de ítems */ transform: translateX(-50%); flex-direction: row; gap: 4px; padding: 6px; border-radius: 4px;
   background: var(--wow-bg-solido); box-shadow: var(--wow-marco); }
 .app.wow .actions button { position: relative; min-width: 58px; height: 52px; padding: 16px 6px 4px; display: grid; place-items: center; text-align: center; border-radius: 3px;
   background: radial-gradient(circle at 50% 30%, #3b3020 0%, #15100a 80%); border: 1px solid var(--wow-oro-osc); color: var(--wow-texto); font: 600 11px var(--font-body);
@@ -99,8 +100,8 @@
 .app.wow .energia.en-marco.gasta { animation: none; }
 .app.wow .energia.en-marco .energia-n::before { content: "Energía"; font-weight: 600; }
 
-/* ---------- Compu: micro-menú abajo a la derecha ---------- */
-.wow-micro { position: absolute; z-index: 4; right: var(--edge-r); bottom: var(--edge-b); display: flex; gap: 5px; padding: 5px 6px; border-radius: 4px;
+/* ---------- Compu: micro-menú arriba al centro ---------- */
+.wow-micro { position: absolute; z-index: 4; left: 50%; bottom: var(--edge-b); transform: translateX(-50%); display: flex; gap: 5px; padding: 5px 6px; border-radius: 4px;
   background: var(--wow-bg-solido); box-shadow: var(--wow-marco); }
 .wow-micro > button { position: static !important; display: grid !important; place-items: center; width: 40px !important; height: 40px !important; padding: 0; margin: 0;
   border-radius: 4px !important; font-size: 19px; line-height: 1; cursor: pointer; transform: none; }
@@ -109,7 +110,7 @@
 @media (hover: hover) and (pointer: fine) {
   .app.wow .reloj { top: calc(var(--edge-t) + 22px + var(--map) + 10px); left: auto; right: var(--edge-r); width: var(--map); box-sizing: border-box; justify-content: center; padding: 3px 8px; border-radius: 3px; }
   .app.wow .reloj-m { display: none; }
-  .app.wow .chat { bottom: var(--edge-b); width: min(440px, calc(100% - 380px)); }
+  .app.wow .chat { bottom: var(--edge-b); width: min(440px, calc(50% - var(--edge-l) - 130px)); } /* sin pisar la barra de ítems del centro */
   .app.wow .loading { top: calc(var(--edge-t) + 96px); }
   /* el menú de la mochila (lista) ya no cuelga del minimapa: la mochila de la compu es la bolsa del centro */
 }

@@ -1,8 +1,7 @@
 // HUD estilo WoW (solo index.html; el aspecto está en css/wow.css). En la compu acomoda el HUD como un MMO:
 //   arriba a la izquierda  marco del jugador: retrato, nombre y la barra de energía (hachazos que quedan hoy)
 //   arriba a la derecha    nombre de la zona, minimapa con aro dorado y el reloj debajo
-//   abajo al centro        barra de acciones (las acciones del personaje, con su tecla)
-//   abajo a la derecha     micro-menú: 🎒 mochila · 👥 jugadores · 🎙️ voz · ⚙️ menú
+//   arriba al centro       micro-menú: 🎒 mochila · 👥 jugadores · 🎙️ voz · ⚙️ menú
 //   abajo a la izquierda   chat
 // En el celular no mueve nada (el HUD táctil ya está acomodado para el pulgar): solo cambia el aspecto.
 // Los elementos los crean otros sistemas, algunos más tarde (chat, 👥, 🎙️ solo en el servidor): un MutationObserver
@@ -34,7 +33,7 @@ export function createWowHud({ stage, nombre = 'Viajero', personaje = '', getZon
   stage.append(marco);
   const barras = marco.querySelector('.wow-pbarras');
 
-  // Micro-menú abajo a la derecha
+  // Micro-menú arriba al centro
   const micro = document.createElement('div');
   micro.className = 'wow-micro';
   micro.setAttribute('role', 'toolbar'); micro.setAttribute('aria-label', 'Menú');

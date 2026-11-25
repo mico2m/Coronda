@@ -598,7 +598,7 @@ Claude atiende la tienda y fabrica muebles a cambio de madera. Código: `src/sys
 
 ## HUD estilo WoW
 
-`index.html` usa un HUD inspirado en los MMO de fantasía (`css/wow.css` y `src/ui/wow-hud.js`): marcos oscuros con borde dorado y letras Cinzel. En la compu: marco del jugador con su energía arriba a la izquierda, nombre de la zona + minimapa + reloj arriba a la derecha, barra de acciones abajo al centro, micro-menú (🎒 👥 🎙️ ⚙️) abajo a la derecha y el chat abajo a la izquierda. La mochila es una bolsa con casilleros. En el celular solo cambia el aspecto (los botones quedan donde estaban). `dev.html` mantiene el HUD de siempre; para verlo en el Studio elegí `index.html` en la vista previa.
+`index.html` usa un HUD inspirado en los MMO de fantasía (`css/wow.css` y `src/ui/wow-hud.js`): marcos oscuros con borde dorado y letras Cinzel. En la compu: marco del jugador con su energía arriba a la izquierda, nombre de la zona + minimapa + reloj arriba a la derecha, barra de acciones abajo al centro, micro-menú (🎒 👥 🎙️ ⚙️) arriba al centro y el chat abajo a la izquierda. La mochila es una bolsa con casilleros. En el celular solo cambia el aspecto (los botones quedan donde estaban). `dev.html` mantiene el HUD de siempre; para verlo en el Studio elegí `index.html` en la vista previa.
 
 ## Primera persona
 

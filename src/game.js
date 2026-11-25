@@ -352,6 +352,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
       dev,
       blocked: () => dialogue?.blocked ?? false,
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
+      // En la compu la mochila es un menú al centro: el personaje se queda quieto mientras está abierta
+      onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
+      onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
     });
     // Hora del juego, día y noche y reloj (la misma hora para todos: sale del reloj de la compu)
     tiempo = createTiempo({ scene, stage, dev, getSceneData: () => sceneManager.current, getBaseShade: () => sceneManager.shade });

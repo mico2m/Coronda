@@ -3,9 +3,10 @@
 //   { "decir": "texto de Claude", "acciones": [ { "tipo": "seguir", "jugador": "Ana" }, … ] }
 // Encargos por charla: acción { tipo: 'encargar', muebles: [{ mueble, cantidad }], confirmado }. Las cuentas las hace el
 // juego (tienda.encargoIA) y vuelve con modo 'encargo' para que Claude las cuente (ver systems/claude-npc.js).
-// Acepta DOS formas de IA (usa la primera que encuentre):
-//   1) Workers AI de Cloudflare: Settings -> Bindings -> Add binding -> Workers AI, nombre de variable exactamente "AI". No necesita clave.
-//   2) Groq (plan gratis): secreto GROQ_API_KEY. Nunca está en el juego ni en GitHub.
+// Usa DOS IAs y se pasa de una a la otra (si una se queda sin cupo o falla, contesta la otra):
+//   1) Groq (plan gratis): secreto GROQ_API_KEY. Nunca está en el juego ni en GitHub. Va primero.
+//   2) Workers AI de Cloudflare: Settings -> Bindings -> Add binding -> Workers AI, nombre de variable exactamente "AI". No necesita clave.
+// Con una sola configurada, usa esa.
 // Variables opcionales: MODELO (cambia el modelo del proveedor que se use), ORIGENES (direcciones del juego, separadas por coma).
 // Pasos para publicarlo: ver servidor-ia/README.md.
 
@@ -88,6 +89,21 @@ function interpretar(args, texto) {
   if (d) { try { return { decir: JSON.parse('"' + d[1] + '"'), acciones: [] }; } catch { /* sigue */ } }
   if (/^\s*[{\[]/.test(t)) return null; // era código, no algo para decir
   return { decir: t, acciones: [] };
+}
+
+// Primero Groq, después la IA de Cloudflare: si la primera se quedó sin cupo o falla, prueba la otra.
+// Solo si las dos están sin cupo se contesta "límite" (el juego dice "Pará, pará, que me mareás").
+async function conLaQueAnde(env, mensajes) {
+  const proveedores = [env.GROQ_API_KEY && conGroq, env.AI && conWorkersAI].filter(Boolean);
+  let ultimo = null, todasSinCupo = true;
+  for (const pedir of proveedores) {
+    try { return await pedir(env, mensajes); } catch (e) {
+      ultimo = e;
+      if (!e?.limite) todasSinCupo = false;
+    }
+  }
+  if (todasSinCupo) throw { limite: true };
+  throw ultimo instanceof Error ? ultimo : new Error(String(ultimo?.message || 'sin conexión con la IA'));
 }
 
 async function conWorkersAI(env, mensajes) {
@@ -277,7 +293,7 @@ ${vistaTexto(mundo.vista)}${carpinteriaTexto(mundo.carpinteria)}`;
 
     let out = null;
     try {
-      out = env.AI ? await conWorkersAI(env, mensajes) : await conGroq(env, mensajes);
+      out = await conLaQueAnde(env, mensajes);
     } catch (e) {
       if (e?.limite) return json({ error: 'limite' }, 429, h);
       return json({ error: String(e?.message || 'sin conexión con la IA').slice(0, 120) }, 502, h);

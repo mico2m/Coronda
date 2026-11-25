@@ -15,7 +15,7 @@ Si la IA no responde o se acabó el cupo del día, Claude dice *"¡Me abrumaste 
 
 Los menús de Cloudflare pueden cambiar un poco de nombre; si algo no aparece igual, buscá algo parecido.
 
-**Más cupo (opcional):** creá una clave gratis en **console.groq.com** (API Keys) y guardala en el Worker como **Secret** llamado `GROQ_API_KEY` (**Settings** → **Variables and Secrets**). Con eso usa Groq en vez de la IA de Cloudflare.
+**Más cupo (opcional):** creá una clave gratis en **console.groq.com** (API Keys) y guardala en el Worker como **Secret** llamado `GROQ_API_KEY` (**Settings** → **Variables and Secrets**). Con las dos configuradas usa primero Groq y, si se queda sin cupo o falla, la IA de Cloudflare (el binding `AI`): las dos se suman.
 
 ## Ajustes
 

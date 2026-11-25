@@ -67,8 +67,11 @@ function mergeRooms(rooms, selfId, status, names = []) {
     selfId,
     onPeerJoin: null,
     onPeerLeave: null,
+    onPersisted: null,
     status,
     get peers() { return via.size; },
+    // Datos guardados en el broker (solo el camino MQTT los soporta)
+    persist(key, data) { rooms.forEach((r) => { try { r.persist?.(key, data); } catch { /* nada */ } }); },
     makeAction(name) {
       if (actions.has(name)) return actions.get(name);
       const parts = rooms.map((r) => r.makeAction(name));
@@ -88,6 +91,7 @@ function mergeRooms(rooms, selfId, status, names = []) {
     leave() { rooms.forEach((r) => { try { r.leave(); } catch { /* nada */ } }); },
   };
   rooms.forEach((r, i) => {
+    r.onPersisted = (key, data) => merged.onPersisted?.(key, data);
     r.onPeerJoin = (id) => {
       const set = via.get(id) ?? new Set();
       const isNew = !set.size;
@@ -158,6 +162,7 @@ export async function connectServer(roomId = 'coronda') {
   const room = await openRoom(roomId);
   const state = room.makeAction('estado');   // { s: escena, p: [x,y,z], f: giro, a: clip, m: modelo, n: nombre, … }
   const chat = room.makeAction('chat');      // { n: nombre, t: texto, s: escena }
+  const lotesAct = room.makeAction('lotes'); // lotes: { k, r } un cambio · { all: [{k, r}] } todo el estado · { ask: 1 } pedir el estado
   const peers = new Map();                    // peerId -> { last, data, avatar }
   let me = null, scene3d = null, shade = null, playing = false;
   let beatT = 0, lastSent = '';
@@ -193,6 +198,18 @@ export async function connectServer(roomId = 'coronda') {
     },
     leave() { try { room.leave(); } catch { /* nada */ } },
   };
+  // Lotes (ver systems/lotes.js). Lo que llega antes de que el juego los arme (en el menú) se guarda y se entrega después.
+  const lotesInbox = [], lotesSaved = new Map();
+  net.lotes = {
+    send(data, target) { lotesAct.send(data, target ? { target } : undefined); },
+    persist(key, data) { room.persist?.(key, data); },   // se guarda en el broker MQTT (sigue ahí aunque nadie esté conectado)
+    onMessage: null,   // (data, peerId)
+    onPersisted: null, // (clave, dato)
+    onPeer: null,      // (peerId) alguien nuevo entró
+    take() { const a = lotesInbox.splice(0), b = [...lotesSaved]; lotesSaved.clear(); return { messages: a, saved: b }; },
+  };
+  lotesAct.onMessage = (data, { peerId }) => { if (net.lotes.onMessage) net.lotes.onMessage(data, peerId); else if (lotesInbox.length < 200) lotesInbox.push({ data, peerId }); };
+  room.onPersisted = (key, data) => { if (net.lotes.onPersisted) net.lotes.onPersisted(key, data); else lotesSaved.set(key, data); };
   const emitCount = () => net.onCount?.(net.count);
   // Para revisar desde la consola (F12): corondaNet.debug()
   net.debug = () => ({ yo: room.selfId, jugando: playing, red: net.network, otros: [...peers].map(([id, p]) => ({ id, jugando: !!p.data?.playing, escena: p.data?.s, nombre: p.data?.n, hace: Math.round((performance.now() - p.last) / 100) / 10 })) });
@@ -201,6 +218,7 @@ export async function connectServer(roomId = 'coronda') {
   room.onPeerJoin = (id) => {
     peers.set(id, { last: performance.now(), data: null, avatar: null });
     if (playing) sendNow(id); // que el nuevo te vea enseguida
+    net.lotes.onPeer?.(id);
   };
   room.onPeerLeave = (id) => { drop(id); emitCount(); };
   state.onMessage = (data, { peerId }) => {

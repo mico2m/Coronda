@@ -1,0 +1,7 @@
+{
+  "maxPorJugador": 1,
+  "casas": [
+    { "id": "casa_model01", "nombre": "Casa 1", "archivo": "assets/models/objects/casa_model01.glb" },
+    { "id": "casa_model02", "nombre": "Casa 2", "archivo": "assets/models/objects/casa_model02.glb" }
+  ]
+}

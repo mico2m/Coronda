@@ -8,6 +8,7 @@ import { createSceneManager } from './systems/scene-manager.js';
 import { createUI } from './ui/ui.js';
 import { createFade } from './systems/fade.js';
 import { createDoors } from './systems/doors.js';
+import { createLotes } from './systems/lotes.js';
 import { createFollowers } from './systems/followers.js';
 import { createPlayer } from './actors/player.js';
 import { buildCollision } from './systems/collision.js';
@@ -67,6 +68,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
   const followers = createFollowers(); // objetos con la propiedad `seguir` (ver systems/followers.js)
   let dialogue = null;
   let doors = null;
+  let lotes = null; // lotes que los jugadores pueden adquirir (ver systems/lotes.js)
   let player = null;
   let world = null; // gestor de escenas (para mover el cielo)
   let mode = 'free'; // 'player' (tercera persona) o 'free' (cámara libre)
@@ -123,7 +125,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
     followers.update(focus, dt);
     dialogue?.update(focus, dt);
     doors?.tick(dt);
-    doors?.update(focus, mode === 'player' && player ? player.position.y : camera.position.y - 1.7);
+    const feetY = mode === 'player' && player ? player.position.y : camera.position.y - 1.7;
+    doors?.update(focus, feetY);
+    lotes?.update(focus, feetY); // después de las puertas: si hay una puerta cerca, la E es de ella
     renderer.render(scene, camera);
     textbox.render(); // caja de diálogo, encima del mundo
   }
@@ -163,13 +167,12 @@ export async function startGame({ dev = false, retro = null } = {}) {
     const sceneManager = createSceneManager({ scene, camera, controls, audio, ui, scenesTable });
     world = sceneManager;
 
-    // Carga una escena y deja listas sus puertas
-    async function enterScene(id, spawn, spawnName) {
-      await sceneManager.loadScene(id, { spawn, spawnName });
-      doors.setup(sceneManager.current, sceneManager.root);
-      // El jugador aparece en el punto de inicio de la escena (sp está a la altura de los ojos)
+    // Arma (o rehace) las colisiones de la escena actual. Se rehace cuando alguien adquiere o libera un lote (aparece o
+    // desaparece una casa) sin cambiar de escena.
+    function rebuildCollision() {
       // Colisiones: se leen las propiedades `colision` de los objetos del .glb (ver collision.js)
       const scol = sceneManager.current.collision ?? {};
+      sceneManager.root.getObjectByName('collision-debug')?.removeFromParent(); // la capa de depuración anterior
       const cworld = buildCollision(sceneManager.root, {
         // Por defecto NADA colisiona: solo los col_… (mallas o Empties) y lo que tenga colision = 1. Para que todo choque: "default": "solid"
         defaultSolid: scol.default === 'solid' || scol.default === true,
@@ -179,9 +182,18 @@ export async function startGame({ dev = false, retro = null } = {}) {
       if (!cworld.hasGround) console.warn('Colisiones: la escena no tiene ninguna superficie de suelo sólida; el jugador no cambia de altura.');
       console.info(`Colisiones de "${sceneManager.current.id}":`, cworld.stats);
       collisionDebug?.attach(sceneManager.root, cworld);
-      spawnDebug?.attach(sceneManager.root, sceneManager.current, doors.list); // después de las colisiones: los postes no chocan
       player.setWorld(cworld);
       npcs.setWorld(cworld); // las rutas de los NPC esquivan los objetos con colisión
+    }
+
+    // Carga una escena y deja listas sus puertas
+    async function enterScene(id, spawn, spawnName) {
+      await sceneManager.loadScene(id, { spawn, spawnName });
+      doors.setup(sceneManager.current, sceneManager.root);
+      await lotes.setup(sceneManager.current, sceneManager.root); // casas de los lotes (antes de las colisiones: pueden chocar)
+      // El jugador aparece en el punto de inicio de la escena (sp está a la altura de los ojos)
+      rebuildCollision();
+      spawnDebug?.attach(sceneManager.root, sceneManager.current, doors.list); // después de las colisiones: los postes no chocan
       // NPC: Empties npc_* del .glb + "actors" del JSON (ver src/actors/npc.js). Van después de armar las colisiones.
       const npcInfo = await npcs.setup(sceneManager.root, sceneManager.current, sceneManager.shade);
       player.setObstacles(npcs.obstacles);
@@ -206,7 +218,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     doors = createDoors({
       stage,
       dev,
-      blocked: () => dialogue?.blocked ?? false, // las charlas con NPC usan la misma tecla E
+      blocked: () => (dialogue?.blocked ?? false) || (lotes?.blocked ?? false), // las charlas con NPC y el menú de casas usan la misma tecla E
       isScene: (id) => !!scenesTable[id],
       onEnter: async (door) => {
         player.frozen = true; // no se mueve durante la animación ni el fundido
@@ -242,6 +254,21 @@ export async function startGame({ dev = false, retro = null } = {}) {
         player.frozen = false;
         if (mode === 'free') controls.setEnabled(true);
       },
+    });
+
+    // Lotes (ver systems/lotes.js): los Empties lote_* del mapa se pueden adquirir y se reemplazan por una casa
+    lotes = createLotes({
+      stage,
+      net,
+      name: choice?.name ?? 'Viajero',
+      dev,
+      blocked: () => dialogue?.blocked ?? false,
+      yieldE: () => !!doors?.near || !!doors?.busy, // si hay una puerta cerca, la E es de la puerta
+      onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
+      onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
+      onChange: () => rebuildCollision(),
+      notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
+      getShade: () => sceneManager.shade,
     });
 
     if (dev) {

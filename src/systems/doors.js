@@ -292,6 +292,8 @@ export function createDoors({ stage, onEnter, dev = false, blocked = () => false
 
     // Puertas/teleports de la escena actual (para el modo desarrollador)
     get list() { return doors; },
+    get near() { return near; },   // la puerta con E más cercana (la del aviso), o null
+    get busy() { return busy; },   // en pleno viaje
 
     // Punto pos_jugador más cercano a `p` ({x,z}), o null si la puerta no tiene
     pointFor(door, p) {

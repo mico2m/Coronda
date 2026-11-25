@@ -424,3 +424,28 @@ Los módulos y los `.glb` no cargan abriendo el `index.html` con doble clic. Us�
 npx serve
 ```
 o la extensión Live Server de VS Code. Después abrí `/` para la versión final o `/dev.html` para el modo desarrollador.
+
+
+## Lotes (terrenos que adquieren los jugadores)
+
+Los Empties `lote_01`, `lote_03`… del `.glb` del mapa son terrenos. Al entrar a uno libre aparece **E Adquirir lote**; el jugador elige
+una casa y esa casa se levanta en el centro del Empty, con su giro, y la ven todos los del servidor. Código: `src/systems/lotes.js`.
+
+**En Blender:** Empty con `Display As = Cube`, `Size = 1`, escalado al tamaño del terreno (ese cubo es la zona; la escala NO se le aplica a la casa).
+Girá el Empty para orientar la casa. Un nombre distinto sirve si le ponés la Custom Property `lote = 1`.
+
+**Casas:** `data/tables/casas.json` (`maxPorJugador` + lista `{ id, nombre, archivo }`). Los modelos van en `assets/models/objects/`
+(`casa_model01.glb`, `casa_model02.glb`). El origen del modelo es el centro del lote a nivel del suelo. Si el archivo no existe se muestra una
+caja de prueba. Los `col_…` del modelo hacen que la casa choque; un modelo con animaciones o con `puerta_casa` adentro funciona igual que en el resto del juego.
+
+**Cómo se comparte:** no hay servidor propio, así que el estado viaja por la sala (mensajes en vivo) y se guarda en el broker MQTT público
+(mensajes *retained*, `<sala>/guardado/<lote>`). Quien entra después recibe las casas aunque no haya nadie conectado. Cada lote es
+`{ o: dueño, n: nombre, m: modelo, v: versión }`; gana la versión más alta y, si dos adquieren a la vez, el id de dueño menor (el otro se entera).
+Jugando solo, se guarda en `localStorage`.
+
+**Límites:** no hay cuentas. El dueño es un id al azar guardado en el navegador (borrar los datos del sitio = perder los lotes) y los brokers públicos
+no garantizan guardar para siempre ni impiden que alguien escriba. Para algo serio (lotes que cuestan monedas, que no se puedan robar) hace falta un
+servidor propio que valide, y `lotes.js` ya está separado para eso: solo cambian `publish()` y la entrada de `receive()`.
+
+**Modo dev (`dev.html`):** cada lote muestra su zona (verde libre · celeste tuyo · rojo de otro). Para borrar el estado de prueba: `localStorage.removeItem('coronda.lotes.solo')` (solo)
+o `coronda.lotes.mios` (online).

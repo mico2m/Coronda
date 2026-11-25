@@ -26,14 +26,16 @@ function connectPacket(clientId, willTopic, willMsg) {
   const body = [...str('MQTT'), 4, flags, KEEPALIVE >> 8, KEEPALIVE & 255, ...str(clientId), ...str(willTopic), ...str(willMsg)];
   return packet(0x10, body);
 }
-const subscribePacket = (topic) => packet(0x82, [0, 1, ...str(topic), 0]);
-function publishPacket(topic, text) {
+const subscribePacket = (topic, id = 1) => packet(0x82, [0, id, ...str(topic), 0]);
+// retain = true: el broker guarda el mensaje y se lo entrega a todo el que se suscriba después (así persiste el estado
+// de los lotes aunque no haya nadie conectado)
+function publishPacket(topic, text, retain = false) {
   const payload = enc.encode(text);
   const body = new Uint8Array(2 + enc.encode(topic).length + payload.length);
   const t = str(topic);
   body.set(t, 0);
   body.set(payload, t.length);
-  return packet(0x30, [...body]);
+  return packet(retain ? 0x31 : 0x30, [...body]);
 }
 
 // Una conexión a un broker. onPublish(topic, text)
@@ -49,7 +51,7 @@ function brokerSocket(url, clientId, willTopic, willMsg, subTopic, onPublish) {
       const hdr = buf[0], type = hdr >> 4, body = buf.subarray(i, i + len);
       buf = buf.slice(i + len);
       if (type === 2) { // CONNACK
-        if (body[1] === 0) { api.ready = true; ws.send(subscribePacket(subTopic)); retry = 0; }
+        if (body[1] === 0) { api.ready = true; [].concat(subTopic).forEach((t, i) => ws.send(subscribePacket(t, i + 1))); retry = 0; }
       } else if (type === 3) { // PUBLISH
         const tl = (body[0] << 8) | body[1];
         const topic = dec.decode(body.subarray(2, 2 + tl));
@@ -82,7 +84,7 @@ function brokerSocket(url, clientId, willTopic, willMsg, subTopic, onPublish) {
     retry = Math.min(retry + 1, 6);
     setTimeout(open, 1000 * 2 ** retry);
   }
-  api.send = (topic, text) => { if (api.open) ws.send(publishPacket(topic, text)); };
+  api.send = (topic, text, retain = false) => { if (api.open) ws.send(publishPacket(topic, text, retain)); };
   api.close = () => { closed = true; clearInterval(ping); try { if (ws?.readyState === 1) ws.send(new Uint8Array([0xe0, 0])); ws?.close(); } catch { /* nada */ } };
   open();
   return api;
@@ -97,6 +99,9 @@ export function joinMqtt(appId, roomId, selfId, brokers = BROKERS) {
     selfId,
     onPeerJoin: null,
     onPeerLeave: null,
+    onPersisted: null,   // (clave, dato) para cada mensaje guardado en el broker (llegan al suscribirse y cuando cambian)
+    // Guarda un dato en el broker (retained) bajo `<sala>/guardado/<clave>`; lo recibe todo el que entre después
+    persist(key, data) { const text = JSON.stringify(data); sockets.forEach((s) => s.send(`${base}/guardado/${key}`, text, true)); },
     makeAction(name) {
       const a = { onMessage: null, send(data) { const text = JSON.stringify({ id: selfId, t: name, d: data }); sockets.forEach((s) => s.send(`${base}/${selfId}`, text)); } };
       actions.set(name, a);
@@ -108,7 +113,13 @@ export function joinMqtt(appId, roomId, selfId, brokers = BROKERS) {
     },
     sockets: () => Object.fromEntries(brokers.map((u, i) => [u, { readyState: sockets[i].open ? 1 : 0 }])),
   };
+  const keep = `${base}/guardado/`;
   const onPublish = (topic, text) => {
+    if (topic.startsWith(keep)) { // un dato guardado (no es un mensaje de un jugador)
+      let d = null; try { d = JSON.parse(text); } catch { return; }
+      room.onPersisted?.(topic.slice(keep.length), d);
+      return;
+    }
     const m = JSON.parse(text);
     if (!m?.id || m.id === selfId) return;
     if (m.t === 'bye') { if (seen.delete(m.id)) room.onPeerLeave?.(m.id); return; }
@@ -117,7 +128,7 @@ export function joinMqtt(appId, roomId, selfId, brokers = BROKERS) {
     actions.get(m.t)?.onMessage?.(m.d, { peerId: m.id });
   };
   const clientId = `coronda-${selfId}`.slice(0, 23);
-  const sockets = brokers.map((url) => brokerSocket(url, clientId, `${base}/${selfId}`, bye, `${base}/+`, onPublish));
+  const sockets = brokers.map((url) => brokerSocket(url, clientId, `${base}/${selfId}`, bye, [`${base}/+`, `${keep}+`], onPublish));
   const sweep = setInterval(() => {
     const now = performance.now();
     for (const [id, t] of seen) if (now - t > SILENCE * 1000) { seen.delete(id); room.onPeerLeave?.(id); }

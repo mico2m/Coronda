@@ -22,6 +22,12 @@ const STAY_SECS = 90;        // s que se queda en un lugar antes de volver a su 
 const FOLLOW_SECS = 240;     // s máximos siguiendo a alguien
 const REST_SECS = 10 * 60;   // s que la IA "descansa" después de agotarse
 const REST_KEY = 'coronda.claude.ia.descanso';
+const HIDE_Y = -100;         // m: así se "mete" en una casa o "se va": queda bajo el piso, sin chocar ni poder hablarle
+const INSIDE_SECS = [90, 180];  // s que se queda adentro de una casa antes de salir solo
+const AWAY_SECS = [150, 300];   // s que se queda afuera de la plaza cuando se va
+const MOVES = ['seguir', 'ir_a_casa', 'ir_a', 'entrar_casa', 'irse', 'mandado']; // acciones que lo hacen caminar: la charla se cierra para que arranque
+const ERRAND_WAIT = 45;      // s que espera la respuesta de alguien a quien fue a preguntarle algo
+const ERRAND_MAX = 150;      // s máximos para llegar (ida y vuelta, cada una)
 const CHAT_MAX = 120;        // letras por mensaje de chat (igual que net/multiplayer.js)
 const OVERLOAD = '¡Me abrumaste jajaja! ¿En un rato seguimos, querés?';
 const norm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -178,6 +184,26 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     }
     return null;
   }
+  const rand = ([a, b]) => (a + Math.random() * (b - a)) * 1000;
+  const hidden = () => (driving ? entry?.holder.position.y : remote?.y) < HIDE_Y / 2;
+  // Se mete en una casa o se va de la plaza: desaparece (queda bajo el piso) y vuelve solo después de un rato
+  function hideAway(kind, at) {
+    if (!entry) return;
+    mode = { type: kind, until: performance.now() + rand(kind === 'inside' ? INSIDE_SECS : AWAY_SECS), at: { x: at.x, z: at.z } };
+    entry.holder.position.set(at.x, HIDE_Y, at.z);
+    entry.holder.visible = false;
+    if (entry.obstacle) entry.obstacle.x = 99999;
+    npcs.play(entry, null);
+    holdRoute();
+  }
+  function reappear() {
+    const at = mode.at ?? { x: entry.holder.position.x, z: entry.holder.position.z };
+    entry.holder.position.set(at.x, 0.1, at.z);
+    entry.holder.visible = true;
+    if (entry.obstacle) { entry.obstacle.x = at.x; entry.obstacle.z = at.z; }
+    mode = { type: 'route' };
+    resumeRoute();
+  }
   // Ejecuta las acciones (solo el que maneja). Devuelve textos de error para el que habló.
   function run(actions, fromU, fromN) {
     const errs = [];
@@ -197,6 +223,25 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
         const p = placePos(a.lugar);
         if (!p) { errs.push(`no sé dónde queda ${a.lugar}`); continue; }
         mode = { type: 'go', to: p, then: 'stay' };
+      } else if (t === 'entrar_casa') {
+        const u = uidByName(a.jugador, fromU);
+        const who = a.jugador && !/^(yo|vos|mi)$/i.test(a.jugador) ? a.jugador : fromN;
+        const p = lotFront(who, u);
+        if (!p) { errs.push(`no encontré la casa de ${who}`); continue; }
+        mode = { type: 'go', to: p, then: 'inside' };
+      } else if (t === 'irse') {
+        const p = placePos('borde') ?? { x: entry.holder.position.x, z: entry.holder.position.z };
+        mode = { type: 'go', to: p, then: 'away' };
+      } else if (t === 'mandado') {
+        const tu = a.jugador && !/^(yo|vos|mi|me)$/i.test(String(a.jugador)) ? uidByName(a.jugador, null) : null;
+        if (a.jugador && !tu && !a.lugar) { errs.push(`no encontré a ${a.jugador}`); continue; }
+        const place = !tu && a.lugar ? placePos(a.lugar) : null;
+        if (!tu && !place) { errs.push(a.lugar ? `no sé dónde queda ${a.lugar}` : 'no sé a dónde mandarme'); continue; }
+        const tn = tu ? (roster().find((r) => r.u === tu)?.n ?? String(a.jugador)) : '';
+        mode = {
+          type: 'errand', stage: 'ida', who: fromU, whoName: fromN || 'che', deadline: performance.now() + ERRAND_MAX * 1000,
+          target: tu ? { u: tu, name: tn } : null, place, placeName: a.lugar ? String(a.lugar) : '', ask: String(a.mensaje ?? '').trim().slice(0, 90), respuestas: [], vista: null,
+        };
       } else if (t === 'quedarse') {
         mode = { type: 'stay', until: performance.now() + STAY_SECS * 1000 };
       } else if (t === 'volver') {
@@ -259,6 +304,55 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     return { jugadores_en_la_plaza: here, casas: owners, lugares: places, modo_actual: driving ? mode.type : (remote?.m ?? 'route'), vista: vista() };
   }
 
+  // ---------- Mandados: "andá a hablar con X y preguntale…" / "andá hasta el cartel y fijate qué hay" ----------
+  // ida -> (si es una persona) le dice por el chat lo que le mandan a preguntar y espera su respuesta -> vuelta -> cuenta lo que pasó
+  function errandStep(dt, now) {
+    const m = mode;
+    if (m.stage === 'ida') {
+      let dest = m.place;
+      if (m.target) { const p = playerPos(m.target.u); dest = p && p.s === getSceneId() ? p : null; }
+      if (!dest || now > m.deadline) { errandDone(m, 'no_llego'); return; }
+      if (moveTowards(dest.x, dest.z, 2.8, dt, m.target ? FOLLOW_NEAR : 0.6)) {
+        if (m.target) {
+          sayChat(`${m.target.name}, ${m.whoName} me manda a decirte: ${m.ask || 'que te manda saludos'}`.slice(0, CHAT_MAX));
+          m.stage = 'espera'; m.until = now + ERRAND_WAIT * 1000; m.first = 0;
+        } else { m.vista = vista(); m.stage = 'vuelta'; m.deadline = now + ERRAND_MAX * 1000; }
+      }
+    } else if (m.stage === 'espera') {
+      if (entry.current !== entry.idle) npcs.play(entry, null);
+      if (m.respuestas.length && !m.first) m.first = now;
+      if ((m.first && now - m.first > 5000) || now > m.until) { m.stage = 'vuelta'; m.deadline = now + ERRAND_MAX * 1000; }
+    } else {
+      const p = playerPos(m.who);
+      if (!p || p.s !== getSceneId() || now > m.deadline) { errandDone(m, 'sin_vuelta'); return; }
+      if (moveTowards(p.x, p.z, 3, dt, FOLLOW_NEAR)) errandDone(m, 'ok');
+    }
+  }
+  async function errandDone(m, why) {
+    mode = { type: 'stay', until: performance.now() + 20000 };
+    const quien = m.target?.name || m.placeName || 'ahí';
+    let text = why === 'no_llego' ? `No pude llegar hasta ${quien}, loco.`
+      : m.target ? (m.respuestas.length ? `${quien} me dijo: "${m.respuestas.join(' / ')}"` : `${quien} ni me dio bola.`)
+        : 'Fui, miré y no vi nada raro.';
+    if (why !== 'no_llego' && aiOn()) {
+      try {
+        const ctl = new AbortController();
+        const to = setTimeout(() => ctl.abort(), 15000);
+        const r = await fetch(cfg.endpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+          body: JSON.stringify({
+            modo: 'informe', jugador: m.whoName, texto: '', historial: [], mundo: mundoActual(),
+            informe: { pedido: m.ask, destino: quien, es_persona: !!m.target, respuestas: m.respuestas, vista: m.vista },
+          }),
+        });
+        clearTimeout(to);
+        if (r.ok) { const res = await r.json(); if (typeof res?.decir === 'string' && res.decir.trim()) text = res.decir.trim(); }
+      } catch { /* queda el texto simple */ }
+    }
+    if (!norm(text).startsWith(norm(m.whoName))) text = `${m.whoName}, ${text}`;
+    sayLong(text);
+  }
+
   // ---------- Saludo de la IA (se pide por adelantado, en la pantalla de carga, para que al hablarle no haya que esperar) ----------
   // Cada vez que alguien le habla, Claudito usa el saludo que ya tenía listo y enseguida pide otro para la próxima.
   // Si todavía no llegó (o la IA no anda), usa sus saludos de siempre (data/dialogues/claude.json).
@@ -296,6 +390,17 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   function heard(de, texto) {
     chatLog.push({ de: String(de).slice(0, 20), texto: String(texto).slice(0, CHAT_MAX) });
     while (chatLog.length > 8) chatLog.shift();
+    // Si está esperando que alguien le conteste (un mandado), se anota lo que esa persona escribe
+    if (driving && mode.type === 'errand' && mode.stage === 'espera' && norm(de) === norm(mode.target?.name)) mode.respuestas.push(String(texto).slice(0, CHAT_MAX));
+  }
+  function sayChat(t) { heard('Claudito', t); send({ say: t }); onSay?.(t); }
+  // Textos largos: se parten en mensajes de chat de hasta 120 letras
+  function sayLong(text) {
+    const parts = [];
+    let rest = String(text).replace(/\s+/g, ' ').trim();
+    while (rest.length > CHAT_MAX) { let i = rest.lastIndexOf(' ', CHAT_MAX); if (i < 40) i = CHAT_MAX; parts.push(rest.slice(0, i)); rest = rest.slice(i).trim(); }
+    if (rest) parts.push(rest);
+    parts.slice(0, 3).forEach((x, i) => setTimeout(() => sayChat(x), i * 1800));
   }
   const nextDelay = () => {
     const [a, b] = Array.isArray(cfg.comentarios_cada) ? cfg.comentarios_cada : [90, 240];
@@ -318,9 +423,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       const t = typeof res?.decir === 'string' ? res.decir.trim().slice(0, CHAT_MAX) : '';
       if (!t || t === lastSaid || !driving) return;
       lastSaid = t;
-      heard('Claudito', t);
-      send({ say: t });
-      onSay?.(t);
+      sayChat(t);
     } catch { /* sin IA por ahora: no pasa nada */ } finally { commenting = false; }
   }
 
@@ -356,8 +459,10 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     const say = res.decir.trim().slice(0, 400) || '…';
     history.push({ de: myName, texto: body.texto }, { de: 'Claude', texto: say });
     while (history.length > 12) history.shift();
-    const errs = act(Array.isArray(res.acciones) ? res.acciones : []);
-    return { text: errs.length ? `${say}\n(Uy, ${errs.join(' y ')}.)` : say };
+    const acc = Array.isArray(res.acciones) ? res.acciones : [];
+    const errs = act(acc);
+    // Si le pidió moverse, la charla se cierra después de leer la respuesta (si no, se queda quieto mientras charlan)
+    return { text: errs.length ? `${say}\n(Uy, ${errs.join(' y ')}.)` : say, cerrar: !errs.length && acc.some((a) => MOVES.includes(a?.tipo)) };
   }
   const choiceOk = (c) => (c?.needs === 'ia' ? aiOn() : true);
 
@@ -385,7 +490,8 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     entry.external = !driving; // npc.js: un NPC "externo" no corre su ruta (lo mueve la red)
     entry.keepHold = !driving || mode.type !== 'route';
     if (driving && !was && remote) { // lo tomo yo: arranco donde estaba
-      entry.holder.position.set(remote.x, remote.y, remote.z);
+      entry.holder.position.set(remote.x, remote.y < HIDE_Y / 2 ? 0.1 : remote.y, remote.z); // si estaba escondido, aparece
+      entry.holder.visible = true;
       entry.targetYaw = remote.f;
       talk = remote.w && alive(remote.w) ? { u: remote.w, n: remote.wn, keep: performance.now() } : { u: null, n: '', keep: 0 };
       entry._held = false;
@@ -412,7 +518,14 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
         else if (p.s !== getSceneId()) { mode = { type: 'stay', until: now + STAY_SECS * 1000 }; } // entró a su casa: lo espero acá
         else moveTowards(p.x, p.z, Math.hypot(p.x - entry.holder.position.x, p.z - entry.holder.position.z) > 6 ? 4.2 : 2.2, dt, FOLLOW_NEAR);
       } else if (mode.type === 'go') {
-        if (moveTowards(mode.to.x, mode.to.z, 2.4, dt, 0.4)) mode = { type: 'stay', until: now + STAY_SECS * 1000 };
+        if (moveTowards(mode.to.x, mode.to.z, 2.4, dt, 0.4)) {
+          if (mode.then === 'inside' || mode.then === 'away') hideAway(mode.then, mode.to);
+          else mode = { type: 'stay', until: now + STAY_SECS * 1000 };
+        }
+      } else if (mode.type === 'errand') {
+        errandStep(dt, now);
+      } else if (mode.type === 'inside' || mode.type === 'away') {
+        if (now > mode.until) reappear();
       } else if (mode.type === 'stay') {
         if (now > mode.until) { mode = { type: 'route' }; resumeRoute(); }
       }
@@ -431,7 +544,8 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       entry.targetYaw = remote.f;
       const cur = entry.current?.getClip?.().name ?? '';
       if (remote.a && remote.a !== cur) npcs.play(entry, remote.a === entry.idleName ? null : remote.a);
-      if (entry.obstacle) { entry.obstacle.x = h.position.x; entry.obstacle.z = h.position.z; }
+      entry.holder.visible = !hidden();
+      if (entry.obstacle) { entry.obstacle.x = hidden() ? 99999 : h.position.x; entry.obstacle.z = h.position.z; }
     }
   }
 

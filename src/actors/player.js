@@ -325,6 +325,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       cam.pitch = preset?.pitch ?? cfg.camera.pitch;
     },
     get maxDistance() { return cfg.camera.maxDistance; },
+    get minDistance() { return cfg.camera.minDistance; },
     // Nombre real del clip que se está viendo y hacia dónde mira (para el multijugador)
     get clipName() { return currentClip?.getClip?.().name ?? null; },
     get facing() { return facing; },

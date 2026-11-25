@@ -311,6 +311,11 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
     let res;
     try { res = await hooks.ask(s.entry, text); } catch (err) { res = { text: String(err?.message || err) }; }
     if (s !== my) return; // se cerró mientras pensaba
+    if (res?.cerrar) { // la respuesta pide que Claude se mueva: se lee y la charla termina (sin opciones)
+      s.script.nodes.__respuesta = { text: res?.text || '…' };
+      goto('__respuesta');
+      return;
+    }
     if (raw.continuo && !res?.choices) {
       // Solo se escribe: Claude contesta y la caja para escribir queda abierta (sin opciones). Volver / Escape cierra.
       asking = { raw };

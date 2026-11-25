@@ -22,6 +22,11 @@ const STAY_SECS = 90;        // s que se queda en un lugar antes de volver a su 
 const FOLLOW_SECS = 240;     // s máximos siguiendo a alguien
 const REST_SECS = 10 * 60;   // s que la IA "descansa" después de agotarse
 const REST_KEY = 'coronda.claude.ia.descanso';
+const HIDE_Y = -100;         // m: así se "mete" en una casa o "se va": queda bajo el piso, sin chocar ni poder hablarle
+const INSIDE_SECS = [90, 180];  // s que se queda adentro de una casa antes de salir solo
+const AWAY_SECS = [150, 300];   // s que se queda afuera de la plaza cuando se va
+const MOVES = ['seguir', 'ir_a_casa', 'ir_a', 'entrar_casa', 'irse']; // acciones que lo hacen caminar: la charla se cierra para que arranque
+const CHAT_MAX = 120;        // letras por mensaje de chat (igual que net/multiplayer.js)
 const OVERLOAD = '¡Me abrumaste jajaja! ¿En un rato seguimos, querés?';
 const norm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const PLACE_NAMES = { casa: 'mi lugar de siempre', centro: 'el centro de la plaza', este: 'el lado este', norte: 'el lado norte', oeste: 'el lado oeste', cartel: 'el cartel de bienvenida', borde: 'el borde oeste' };
@@ -30,8 +35,8 @@ const PLACE_NAMES = { casa: 'mi lugar de siempre', centro: 'el centro de la plaz
 export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId, myName = 'Viajero', notify = () => {} }) {
   const solo = !net;
   const myUid = net?.uid ?? 'yo';
-  let cfg = { endpoint: '', activa: true };
-  loadJSON('data/tables/ia.json').then((c) => { cfg = { ...cfg, ...c }; }).catch(() => {});
+  let cfg = { endpoint: '', activa: true, comentarios: true, comentarios_cada: [90, 240] };
+  const cfgReady = loadJSON('data/tables/ia.json').then((c) => { cfg = { ...cfg, ...c }; }).catch(() => {});
 
   // Estado compartido (lo decide el que maneja)
   const st = { x: 0, y: 0, z: 0, f: 0, a: '', m: 'route', w: null, wn: '', scene: null };
@@ -64,6 +69,11 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   function send(d) { if (net) net.claude.send(d); }
   function onMsg(d) {
     if (!d || typeof d !== 'object') return;
+    if (typeof d.say === 'string') { // comentario de Claude en el chat (lo dijo el que lo maneja)
+      const t = d.say.trim().slice(0, CHAT_MAX);
+      if (t) { heard('Claudito', t); onSay?.(t); }
+      return;
+    }
     if (d.st && typeof d.st === 'object') { // estado de Claude (del que lo maneja)
       if (driving && d.from !== myUid && String(d.from) < myUid) driving = false; // otro con id menor ya lo maneja
       const s2 = d.st;
@@ -172,6 +182,26 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     }
     return null;
   }
+  const rand = ([a, b]) => (a + Math.random() * (b - a)) * 1000;
+  const hidden = () => (driving ? entry?.holder.position.y : remote?.y) < HIDE_Y / 2;
+  // Se mete en una casa o se va de la plaza: desaparece (queda bajo el piso) y vuelve solo después de un rato
+  function hideAway(kind, at) {
+    if (!entry) return;
+    mode = { type: kind, until: performance.now() + rand(kind === 'inside' ? INSIDE_SECS : AWAY_SECS), at: { x: at.x, z: at.z } };
+    entry.holder.position.set(at.x, HIDE_Y, at.z);
+    entry.holder.visible = false;
+    if (entry.obstacle) entry.obstacle.x = 99999;
+    npcs.play(entry, null);
+    holdRoute();
+  }
+  function reappear() {
+    const at = mode.at ?? { x: entry.holder.position.x, z: entry.holder.position.z };
+    entry.holder.position.set(at.x, 0.1, at.z);
+    entry.holder.visible = true;
+    if (entry.obstacle) { entry.obstacle.x = at.x; entry.obstacle.z = at.z; }
+    mode = { type: 'route' };
+    resumeRoute();
+  }
   // Ejecuta las acciones (solo el que maneja). Devuelve textos de error para el que habló.
   function run(actions, fromU, fromN) {
     const errs = [];
@@ -191,6 +221,15 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
         const p = placePos(a.lugar);
         if (!p) { errs.push(`no sé dónde queda ${a.lugar}`); continue; }
         mode = { type: 'go', to: p, then: 'stay' };
+      } else if (t === 'entrar_casa') {
+        const u = uidByName(a.jugador, fromU);
+        const who = a.jugador && !/^(yo|vos|mi)$/i.test(a.jugador) ? a.jugador : fromN;
+        const p = lotFront(who, u);
+        if (!p) { errs.push(`no encontré la casa de ${who}`); continue; }
+        mode = { type: 'go', to: p, then: 'inside' };
+      } else if (t === 'irse') {
+        const p = placePos('borde') ?? { x: entry.holder.position.x, z: entry.holder.position.z };
+        mode = { type: 'go', to: p, then: 'away' };
       } else if (t === 'quedarse') {
         mode = { type: 'stay', until: performance.now() + STAY_SECS * 1000 };
       } else if (t === 'volver') {
@@ -215,7 +254,9 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   // ---------- Lo que ve Claude (se lo cuenta a la IA para que sepa dónde está y qué tiene alrededor) ----------
   // Devuelve textos cortos: "Ana (4 m, enfrente)". Dirección desde donde mira Claude: enfrente / a mi derecha / a mi izquierda / a mi espalda.
   function vista() {
-    if (!entry) return null;
+    const h = new Date().getHours();
+    const momento = h < 6 ? 'madrugada' : h < 12 ? 'mañana' : h < 14 ? 'mediodía' : h < 19 ? 'tarde' : h < 21 ? 'atardecer' : 'noche';
+    if (!entry) return { momento };
     const me = entry.holder.position;
     const yaw = (driving ? entry.targetYaw : (remote?.f ?? entry.targetYaw)) - (entry.yawOffset || 0);
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
@@ -241,9 +282,79 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     const nodes = entry.route?.data?.nodes ?? routeData?.nodes ?? {};
     const lugares = top(Object.entries(nodes).map(([id, n]) => (Array.isArray(n.position) ? item(PLACE_NAMES[id] ?? id, n.position[0], n.position[2], 15) : null)), 3);
     const otros = top((npcs.list ?? []).filter((n) => n.id !== ID && n.holder).map((n) => item(n.talk?.speaker ?? n.id, n.holder.position.x, n.holder.position.z, 30)), 4);
-    const h = new Date().getHours();
-    const momento = h < 6 ? 'madrugada' : h < 12 ? 'mañana' : h < 14 ? 'mediodía' : h < 19 ? 'tarde' : h < 21 ? 'atardecer' : 'noche';
     return { momento, jugadores, casas, lugares, otros_npc: otros };
+  }
+
+  function mundoActual() {
+    const here = roster().filter((r) => r.s === getSceneId()).map((r) => r.n).slice(0, 12);
+    const owners = (lotes.list ?? []).map((sp) => ({ lote: sp.label, dueno: lotes.record(sp.key)?.n || null })).filter((x) => x.dueno);
+    const places = Object.keys(routeData?.nodes ?? {}).map((id) => ({ id, nombre: PLACE_NAMES[id] ?? id }));
+    return { jugadores_en_la_plaza: here, casas: owners, lugares: places, modo_actual: driving ? mode.type : (remote?.m ?? 'route'), vista: vista() };
+  }
+
+  // ---------- Saludo de la IA (se pide por adelantado, en la pantalla de carga, para que al hablarle no haya que esperar) ----------
+  // Cada vez que alguien le habla, Claudito usa el saludo que ya tenía listo y enseguida pide otro para la próxima.
+  // Si todavía no llegó (o la IA no anda), usa sus saludos de siempre (data/dialogues/claude.json).
+  let saludo = null, saludoBusy = false;
+  async function precargarSaludo() {
+    if (saludo || saludoBusy) return;
+    saludoBusy = true;
+    try {
+      await cfgReady;
+      if (!aiOn()) return;
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 15000);
+      const r = await fetch(cfg.endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+        body: JSON.stringify({ modo: 'saludo', jugador: myName, texto: '', historial: [], mundo: mundoActual() }),
+      });
+      clearTimeout(to);
+      if (!r.ok) return;
+      const res = await r.json();
+      const t = typeof res?.decir === 'string' ? res.decir.trim().slice(0, 200) : '';
+      if (t) saludo = t;
+    } catch { /* sin IA por ahora: usa los saludos de siempre */ } finally { saludoBusy = false; }
+  }
+  function greeting(e) {
+    if (e?.id !== ID) return null;
+    const g = saludo;
+    saludo = null;
+    setTimeout(precargarSaludo, 1500); // el de la próxima vez
+    return g;
+  }
+
+  // ---------- Comentarios por el chat (los tira la IA de vez en cuando; solo los pide el que maneja a Claude) ----------
+  let onSay = null;                 // (texto) => mostrarlo en el chat (lo conecta game.js)
+  const chatLog = [];               // últimos mensajes del chat { de, texto }
+  function heard(de, texto) {
+    chatLog.push({ de: String(de).slice(0, 20), texto: String(texto).slice(0, CHAT_MAX) });
+    while (chatLog.length > 8) chatLog.shift();
+  }
+  const nextDelay = () => {
+    const [a, b] = Array.isArray(cfg.comentarios_cada) ? cfg.comentarios_cada : [90, 240];
+    const lo = Math.max(30, Number(a) || 90), hi = Math.max(lo, Number(b) || 240);
+    return lo + Math.random() * (hi - lo);
+  };
+  let commentT = 60, commenting = false, lastSaid = '';
+  async function comentar() {
+    commenting = true;
+    try {
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 15000);
+      const r = await fetch(cfg.endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+        body: JSON.stringify({ modo: 'comentario', jugador: myName, texto: '', historial: [], chat_reciente: chatLog.slice(-6), mundo: mundoActual() }),
+      });
+      clearTimeout(to);
+      if (!r.ok) return;
+      const res = await r.json();
+      const t = typeof res?.decir === 'string' ? res.decir.trim().slice(0, CHAT_MAX) : '';
+      if (!t || t === lastSaid || !driving) return;
+      lastSaid = t;
+      heard('Claudito', t);
+      send({ say: t });
+      onSay?.(t);
+    } catch { /* sin IA por ahora: no pasa nada */ } finally { commenting = false; }
   }
 
   // ---------- IA ----------
@@ -261,12 +372,9 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     if (!aiOn()) { rest(); return overload(); }
     if (performance.now() - lastAsk < 2500) await new Promise((r) => setTimeout(r, 2500 - (performance.now() - lastAsk)));
     lastAsk = performance.now();
-    const here = roster().filter((r) => r.s === getSceneId()).map((r) => r.n).slice(0, 12);
-    const owners = (lotes.list ?? []).map((sp) => ({ lote: sp.label, dueno: lotes.record(sp.key)?.n || null })).filter((x) => x.dueno);
-    const places = Object.keys(routeData?.nodes ?? {}).map((id) => ({ id, nombre: PLACE_NAMES[id] ?? id }));
     const body = {
       jugador: myName, texto: String(text).slice(0, 200), historial: history.slice(-6),
-      mundo: { jugadores_en_la_plaza: here, casas: owners, lugares: places, modo_actual: driving ? mode.type : (remote?.m ?? 'route'), vista: vista() },
+      mundo: mundoActual(),
     };
     let res;
     try {
@@ -281,8 +389,10 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     const say = res.decir.trim().slice(0, 400) || '…';
     history.push({ de: myName, texto: body.texto }, { de: 'Claude', texto: say });
     while (history.length > 12) history.shift();
-    const errs = act(Array.isArray(res.acciones) ? res.acciones : []);
-    return { text: errs.length ? `${say}\n(Uy, ${errs.join(' y ')}.)` : say };
+    const acc = Array.isArray(res.acciones) ? res.acciones : [];
+    const errs = act(acc);
+    // Si le pidió moverse, la charla se cierra después de leer la respuesta (si no, se queda quieto mientras charlan)
+    return { text: errs.length ? `${say}\n(Uy, ${errs.join(' y ')}.)` : say, cerrar: !errs.length && acc.some((a) => MOVES.includes(a?.tipo)) };
   }
   const choiceOk = (c) => (c?.needs === 'ia' ? aiOn() : true);
 
@@ -310,7 +420,8 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     entry.external = !driving; // npc.js: un NPC "externo" no corre su ruta (lo mueve la red)
     entry.keepHold = !driving || mode.type !== 'route';
     if (driving && !was && remote) { // lo tomo yo: arranco donde estaba
-      entry.holder.position.set(remote.x, remote.y, remote.z);
+      entry.holder.position.set(remote.x, remote.y < HIDE_Y / 2 ? 0.1 : remote.y, remote.z); // si estaba escondido, aparece
+      entry.holder.visible = true;
       entry.targetYaw = remote.f;
       talk = remote.w && alive(remote.w) ? { u: remote.w, n: remote.wn, keep: performance.now() } : { u: null, n: '', keep: 0 };
       entry._held = false;
@@ -337,12 +448,22 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
         else if (p.s !== getSceneId()) { mode = { type: 'stay', until: now + STAY_SECS * 1000 }; } // entró a su casa: lo espero acá
         else moveTowards(p.x, p.z, Math.hypot(p.x - entry.holder.position.x, p.z - entry.holder.position.z) > 6 ? 4.2 : 2.2, dt, FOLLOW_NEAR);
       } else if (mode.type === 'go') {
-        if (moveTowards(mode.to.x, mode.to.z, 2.4, dt, 0.4)) mode = { type: 'stay', until: now + STAY_SECS * 1000 };
+        if (moveTowards(mode.to.x, mode.to.z, 2.4, dt, 0.4)) {
+          if (mode.then === 'inside' || mode.then === 'away') hideAway(mode.then, mode.to);
+          else mode = { type: 'stay', until: now + STAY_SECS * 1000 };
+        }
+      } else if (mode.type === 'inside' || mode.type === 'away') {
+        if (now > mode.until) reappear();
       } else if (mode.type === 'stay') {
         if (now > mode.until) { mode = { type: 'route' }; resumeRoute(); }
       }
       sendT += dt;
       if (sendT >= SEND_EVERY) { sendT = 0; broadcast(); }
+      commentT -= dt;
+      if (commentT <= 0) {
+        commentT = nextDelay();
+        if (!solo && cfg.comentarios !== false && aiOn() && !talk.u && !myTalking && !commenting) comentar();
+      }
     } else if (remote) { // lo dibujo como me dicen
       const h = entry.holder;
       const k = Math.min(1, dt / INTERP);
@@ -351,12 +472,14 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       entry.targetYaw = remote.f;
       const cur = entry.current?.getClip?.().name ?? '';
       if (remote.a && remote.a !== cur) npcs.play(entry, remote.a === entry.idleName ? null : remote.a);
-      if (entry.obstacle) { entry.obstacle.x = h.position.x; entry.obstacle.z = h.position.z; }
+      entry.holder.visible = !hidden();
+      if (entry.obstacle) { entry.obstacle.x = hidden() ? 99999 : h.position.x; entry.obstacle.z = h.position.z; }
     }
   }
 
   return {
-    update, gate, ended, ask, choiceOk, act,
+    update, gate, ended, ask, choiceOk, act, heard, greeting, precargarSaludo,
+    set onSay(fn) { onSay = fn; },
     get driving() { return driving; },
     get state() { return { driving, mode: driving ? mode.type : remote?.m, talkingWith: driving ? talk.n : remote?.wn, ai: aiOn() }; },
   };

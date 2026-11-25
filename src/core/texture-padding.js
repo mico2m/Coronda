@@ -40,10 +40,13 @@ function padTexture(tex, geometries) {
   const W = img?.width, H = img?.height;
   if (!W || !H) return;
 
-  // Máscara: qué píxeles cubre el UV
+  // Máscara: qué píxeles cubre el UV. Se pinta de a tandas de triángulos: un solo camino con decenas de miles
+  // de triángulos superpuestos hace que el navegador tarde muchísimo en rellenarlo (con 85.000 eran 10 s).
   const maskCanvas = makeCanvas(W, H);
   const mctx = maskCanvas.getContext('2d');
   mctx.fillStyle = '#fff';
+  const BATCH = 200;
+  let inPath = 0;
   mctx.beginPath();
   for (const g of geometries) {
     const uv = g.attributes.uv;
@@ -51,15 +54,20 @@ function padTexture(tex, geometries) {
     const n = idx ? idx.count : uv.count;
     for (let i = 0; i < n; i += 3) {
       const a = idx ? idx.getX(i) : i, b = idx ? idx.getX(i + 1) : i + 1, c = idx ? idx.getX(i + 2) : i + 2;
-      const pts = [a, b, c].map((k) => [uv.getX(k), uv.getY(k)]);
+      const u0 = uv.getX(a), v0 = uv.getY(a), u1 = uv.getX(b), v1 = uv.getY(b), u2 = uv.getX(c), v2 = uv.getY(c);
       // Texturas que se repiten (pasto, piso): el UV se sale de 0..1 y no necesitan relleno
-      if (pts.some(([u, v]) => u < -0.001 || u > 1.001 || v < -0.001 || v > 1.001)) return;
+      if (u0 < -0.001 || u0 > 1.001 || v0 < -0.001 || v0 > 1.001 || u1 < -0.001 || u1 > 1.001 || v1 < -0.001 || v1 > 1.001
+        || u2 < -0.001 || u2 > 1.001 || v2 < -0.001 || v2 > 1.001) return;
       // glTF: el origen del UV está arriba a la izquierda (flipY = false), igual que el canvas
-      const P = pts.map(([u, v]) => [u * W, (tex.flipY ? 1 - v : v) * H]);
-      mctx.moveTo(P[0][0], P[0][1]); mctx.lineTo(P[1][0], P[1][1]); mctx.lineTo(P[2][0], P[2][1]); mctx.closePath();
+      const f = tex.flipY;
+      mctx.moveTo(u0 * W, (f ? 1 - v0 : v0) * H);
+      mctx.lineTo(u1 * W, (f ? 1 - v1 : v1) * H);
+      mctx.lineTo(u2 * W, (f ? 1 - v2 : v2) * H);
+      mctx.closePath();
+      if (++inPath >= BATCH) { mctx.fill(); mctx.beginPath(); inPath = 0; }
     }
   }
-  mctx.fill();
+  if (inPath) mctx.fill();
   const mask = mctx.getImageData(0, 0, W, H).data;
 
   // Píxeles de la textura

@@ -21,11 +21,12 @@ export function forgetJSON(url) { jsonCache.delete(url); }
 let freshTag = '';
 export function freshModels() { freshTag = `v=${Date.now()}`; }
 
-export function loadGLB(url, onProgress) {
+// opts.pad = false: no rellena los bordes de UV (más rápido; lo usa la vista previa del menú)
+export function loadGLB(url, onProgress, { pad = true } = {}) {
   return new Promise((resolve, reject) => {
     gltfLoader.load(
       freshTag ? `${url}${url.includes('?') ? '&' : '?'}${freshTag}` : url,
-      (gltf) => { padUVTextures(gltf.scene); resolve(gltf); },
+      (gltf) => { if (pad) padUVTextures(gltf.scene); resolve(gltf); },
       (e) => onProgress?.(e.total ? e.loaded / e.total : 0),
       (err) => reject(new Error(`No se pudo cargar ${url}${err?.message ? ` (${err.message})` : ''}`))
     );

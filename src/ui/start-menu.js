@@ -102,7 +102,7 @@ function createPreview(canvas) {
   async function show(ch) {
     const my = ++token;
     holder.clear(); mixer = null;
-    if (!cache.has(ch.model)) cache.set(ch.model, loadGLB(ch.model).then((g) => { makeUnlit(g.scene); return g; }).catch(() => null));
+    if (!cache.has(ch.model)) cache.set(ch.model, loadGLB(ch.model, null, { pad: false }).then((g) => { makeUnlit(g.scene); return g; }).catch(() => null));
     const g = await cache.get(ch.model);
     if (my !== token || !alive) return;
     if (!g) return;

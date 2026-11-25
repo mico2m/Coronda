@@ -442,6 +442,22 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     },
     get list() { return spots; },
     get uid() { return uid; },
+    // Tus lotes en esta escena (para "¿Dónde querés aparecer?"): los que el estado dice que son tuyos y, si el estado
+    // todavía no llegó del servidor, los que este navegador recuerda como tuyos
+    myLots() {
+      return spots.map((sp) => sp.key).filter((k) => {
+        const r = state.get(k);
+        return r ? r.o === uid : mine.has(k);
+      });
+    },
+    // Antes de entrar a tu casa: espera un poco a que llegue el registro del lote; si no llega, se repone el que recordás
+    async ensureMine(key, ms = 3000) {
+      await ready;
+      const t0 = performance.now();
+      while (!state.get(key) && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 150));
+      if (!state.get(key) && mine.has(key)) { const rec = clean(key, mine.get(key)); if (rec) { accept(key, rec); publish(key, rec); } }
+      return state.get(key)?.o === uid;
+    },
     claim, release,
 
     // `focus`: punto del jugador (o de la cámara libre). Cada cuadro.

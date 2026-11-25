@@ -319,6 +319,8 @@ Al exportar el `.glb` tildá **Include > Custom Properties**.
 
 `index.html` arranca con un menú: elegís **personaje** y entrás **solo** (*Entrar al mundo*) o **al servidor** (*Jugar en el servidor*, con la cantidad de gente que está jugando). En `dev.html` no aparece (agregá `?menu` a la dirección para verlo).
 
+Si tenés casa, al entrar te pregunta **¿Dónde querés aparecer?**: **Mi casa** (aparecés adentro; al salir quedás delante de tu lote) o la **Plaza** (teclas **1**/**2**). Si no tenés casa, aparecés en la plaza como siempre.
+
 - **Personajes:** el de siempre (`data/tables/player.json`) y **todos los NPC del juego**. Se buscan solos en los `.glb` de todas las escenas (los Empties `npc_…`, con su `npc_nombre`, `npc_modelo`, `npc_escala`, `npc_giro` y `npc_anim`) y en los `actors` del JSON de cada escena. Si el NPC no tiene animación de caminar, camina con su idle.
 - **Servidor:** no hay servidor propio. Los mensajes van por varios caminos a la vez: brokers públicos de **MQTT** (`src/net/mqtt.js`, anda en cualquier red y navegador) y conexión directa entre navegadores (WebRTC) con [Trystero](https://github.com/dmotz/trystero) (`src/vendor/trystero.js`), que se encuentran por Nostr y BitTorrent. Encontrar a los demás tarda unos segundos. Va bien para grupos chicos. Para revisar: F12 > `corondaNet.debug()`. Para probar un solo camino: `?mp=mqtt` o `?mp=p2p`.
 - **Qué se comparte:** posición, hacia dónde mirás, la animación, el personaje, el nombre y la escena. Ves a los que están en tu misma escena, con su nombre arriba. Los diálogos, los flags y los NPC son de cada uno.

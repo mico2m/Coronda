@@ -412,6 +412,22 @@ export async function startGame({ dev = false, retro = null } = {}) {
     await enterScene(startId, kept ? { position: kept.pos, yaw: kept.yaw } : undefined);
     setMode(kept?.mode ?? (dev ? 'free' : 'player'));
     if (kept && mode === 'free') controls.setLook(kept.yaw, kept.pitch ?? 0);
+    // Si tenés casa: "¿Dónde querés aparecer?" → tu casa o la plaza (ver ui/spawn-choice.js)
+    if (choice && !kept && mode === 'player') {
+      const houses = lotes.myLots().map((key) => ({ key, label: lotes.spotInfo(key)?.label ?? 'Lote' }));
+      if (houses.length) {
+        const { askSpawn } = await import('./ui/spawn-choice.js');
+        const key = await askSpawn({ houses, plazaName: scenesTable[startId]?.name || 'Plaza' });
+        if (key && await lotes.ensureMine(key)) {
+          boot.show('Entrando a tu casa…');
+          try {
+            const entry = await casas.sceneEntry(key, lotes.spotInfo(key));
+            scenesTable[entry.id] = entry;
+            await enterScene(entry.id);
+          } catch (err) { console.error(err); await enterScene(startId); }
+        }
+      }
+    }
     // El mundo ya está: se saca la pantalla de carga después de dibujarlo una vez
     requestAnimationFrame(() => requestAnimationFrame(() => boot.hide()));
     // Servidor: desde ahora los demás te ven (y vos a ellos)

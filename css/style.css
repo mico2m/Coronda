@@ -390,3 +390,17 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .cm-url { grid-column: 1 / -1; font: 500 13px var(--font-body); padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.92); color: #12212b; }
 .cm-set button, .cm-edit { padding: 7px 10px; border-radius: 8px; cursor: pointer; font: 600 13px var(--font-body); }
 .cm-set button[type="submit"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+/* ---------- ¿Dónde querés aparecer? (src/ui/spawn-choice.js): sobre la pantalla de carga ---------- */
+.spawn-choice { position: fixed; inset: 0; z-index: 65; display: grid; place-items: center; padding: 16px; background: rgba(5, 10, 14, 0.65); font-family: var(--font-body); color: #f6f9fa; }
+.sc-card { width: min(380px, 100%); display: grid; gap: 14px; padding: 22px; border-radius: 16px; background: rgba(12, 20, 26, 0.94); border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4); }
+.sc-title { font: 600 24px var(--font-display); text-align: center; }
+.sc-opts { display: grid; gap: 8px; }
+.sc-opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border-radius: 12px; cursor: pointer; text-align: left;
+  background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.34); color: #f6f9fa; font: 500 14px var(--font-body); }
+.sc-opt:hover, .sc-opt:focus-visible { background: rgba(94, 234, 212, 0.18); border-color: #5eead4; outline: none; }
+.sc-icon { font-size: 26px; line-height: 1; }
+.sc-txt { display: grid; flex: 1; gap: 2px; }
+.sc-txt b { font-size: 16px; }
+.sc-txt small { color: #c9d4d8; font-size: 12px; }
+.sc-opt kbd { font: 600 11px var(--font-body); color: #f6f9fa; background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.34); border-radius: 4px; padding: 1px 6px; }

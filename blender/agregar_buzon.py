@@ -2,7 +2,7 @@
 
 Uso:  blender -b -P blender/agregar_buzon.py
 - buzon.glb: el buzón solo (el juego lo pone delante de las casas que no traen el suyo).
-- casa_model01.glb (y las demás de data/tables/casas.json que existan): se les agrega un Empty "buzon" con el buzón
+- casa_model01.glb (y las demás de data/casas.json que existan): se les agrega un Empty "buzon" con el buzón
   adentro, al frente a la derecha (el frente de la casa es -Y de Blender). Guarda también blender/casa_modelXX_buzon.blend.
 Para tu propio modelo: alcanza con un objeto (malla o Empty) llamado "buzon" en la casa. El juego lo renombra
 lote_<número>_buzon y Claude se para enfrente para dejar la nota.
@@ -51,7 +51,7 @@ buzon()
 export(os.path.join(ROOT, 'assets/models/objects/buzon.glb'))
 
 # 2) cada casa que exista
-casas = json.load(open(os.path.join(ROOT, 'data/tables/casas.json')))['casas']
+casas = json.load(open(os.path.join(ROOT, 'data/casas.json')))['casas']
 for c in casas:
     path = os.path.join(ROOT, c['archivo'])
     if not os.path.exists(path):

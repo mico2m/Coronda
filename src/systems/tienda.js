@@ -538,6 +538,8 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
     update, point, slots, dynamic, idle,
     pedidos: () => pedidos().map((o) => ({ id: o.id, jugador: o.n, uid: o.u, mueble: o.m, nombre: nombre(o.m), slot: o.s, pedido: o.t, empieza: o.start, termina: o.end, progreso: o.progreso, listo: o.listo, fabricando: o.fabricando, aviso: o.aviso })),
     borrar: (id) => drop(id), // (Studio) saca un pedido
+    setConfig(c) { if (c && typeof c === 'object') cfg = { ...cfg, ...c }; },                 // (Studio) en vivo
+    setCatalog(list) { for (const m of list ?? []) if (m?.id) catalog.set(m.id, { ...catalog.get(m.id), ...m }); }, // (Studio) precios
     get catalogo() { return [...catalog.values()]; },
     get claudeHace() { return doing; },
     get root() { return find(); },

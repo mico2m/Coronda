@@ -595,3 +595,14 @@ Claude atiende la tienda y fabrica muebles a cambio de madera. Código: `src/sys
 Cada casa tiene un buzón: `blender -b -P blender/agregar_buzon.py` le agrega uno a los `.glb` de `data/tables/casas.json` que existan (un Empty `buzon` con el buzón adentro, al frente a la derecha; deja `blender/<casa>_buzon.blend`) y crea `assets/models/objects/buzon.glb`. Las casas que no traen buzón reciben `buzon.glb` al frente. El juego lo renombra `lote_<número>_buzon` y ahí Claude deja la nota de los pedidos listos (ver *La Carpintería*).
 
 Para tu propio modelo de casa alcanza con un objeto (malla o Empty) llamado `buzon`.
+
+## Studio: panel Mundo
+
+En el Coronda Studio, la pestaña **Mundo** (al lado de NPC):
+
+- **En vivo:** hora del juego y momento del día, si la tienda está abierta, qué está haciendo Claude (y con quién habla) y el stock del taller (listos sin retirar, fabricándose, en fila, slots libres).
+- **Pedidos:** tabla en tiempo real (slot, jugador, mueble, progreso con hora de fin, nota dejada) con ✕ para sacar uno.
+- **Configuración** (se aplica al toque en la vista previa y se guarda en su JSON): día/noche y horario de la tienda (`tiempo.json`, con botones para saltar a una hora), talar (`bosque.json`), Carpintería (`tienda.json`) y precio/tiempo de cada mueble (`muebles.json`).
+- **Mochila de la vista previa:** lo que tenés, **+10 madera** y **Vaciar** para probar.
+
+La vista en vivo necesita `dev.html` en la vista previa. Código: `studio/mundo-panel.js`.

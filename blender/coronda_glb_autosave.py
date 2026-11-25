@@ -11,7 +11,7 @@ Usar:     en la vista 3D apretá N > pestaña "Coronda" > activá "GLB autosave"
 bl_info = {
     "name": "Coronda · GLB autosave",
     "author": "Coronda",
-    "version": (1, 2, 0),
+    "version": (1, 2, 1),
     "blender": (3, 6, 0),
     "location": "Vista 3D > N > Coronda",
     "description": "Exporta el .glb solo al guardar (o al cambiar algo)",
@@ -125,7 +125,7 @@ def export_now():
         state["warning"] = ""
         try:
             run(opts)
-        except RuntimeError as e:
+        except Exception as e:  # noqa: BLE001
             if not opts.get("export_animations"):
                 raise
             # Bug del exportador de glTF (Blender 5.x): KeyError en get_sk_drivers al exportar un esqueleto
@@ -134,7 +134,7 @@ def export_now():
             try:
                 run(dict(opts, export_morph_animation=False))
                 state["warning"] = "SHAPEKEYS"
-            except RuntimeError:
+            except Exception:  # noqa: BLE001
                 run(dict(opts, export_animations=False))
                 state["warning"] = "SINANIM"
         os.makedirs(os.path.dirname(dst), exist_ok=True)

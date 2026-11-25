@@ -509,6 +509,13 @@ body:has(.talking) .reloj { opacity: 0.4; }
 .casa-cat button small { opacity: 0.8; font-weight: 600; }
 .casa-hint { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
 
+/* ---------- Primera persona: cruceta (game.js) ---------- */
+.fp-mira { position: absolute; left: 50%; top: 50%; z-index: 2; width: 22px; height: 22px; transform: translate(-50%, -50%); pointer-events: none; }
+.fp-mira[hidden] { display: none; }
+.fp-mira::before, .fp-mira::after { content: ""; position: absolute; background: rgba(255, 255, 255, 0.92); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); border-radius: 1px; }
+.fp-mira::before { left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); }
+.fp-mira::after { top: 50%; left: 0; right: 0; height: 2px; transform: translateY(-50%); }
+
 /* ---------- Chat de voz (systems/voz.js) y menú de Esc (ui/menu.js) ---------- */
 .voz-btn, .menu-btn { position: absolute; z-index: 3; width: 44px; height: 44px; padding: 0; font-size: 20px; line-height: 1; border-radius: 50%;
   background: var(--panel); border: 1px solid var(--line); cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); touch-action: none; user-select: none; -webkit-user-select: none; }

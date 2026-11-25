@@ -211,6 +211,11 @@ export async function startGame({ dev = false, retro = null } = {}) {
       net = choice.online ? choice.net : null;
     }
     player = await createPlayer({ scene, camera, stage, pad: document.getElementById('pad'), touch, config: playerConfig });
+    // Primera persona (acercar la cámara al máximo con la rueda): cruceta en el centro de la pantalla
+    const mira = document.createElement('div');
+    mira.className = 'fp-mira'; mira.hidden = true; mira.setAttribute('aria-hidden', 'true');
+    stage.append(mira);
+    player.onFirstPerson((on) => { mira.hidden = !on; });
     const audio = createAudio(musicTable);
     const sceneManager = createSceneManager({ scene, camera, controls, audio, ui, scenesTable });
     if (!dev || /[?&]minimapa/.test(location.search)) { // en dev.html el inspector ocupa ese lugar (con ?minimapa aparece igual)

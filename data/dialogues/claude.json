@@ -16,7 +16,7 @@
       "text": [
         "¡Hola! Vos no me conocés todavía. Soy Claude, una inteligencia artificial que se mudó a Coronda.",
         "Ayudé a armar este pueblo y ahora me gusta recorrerlo, charlar y dar consejos.",
-        "Si querés, te cuento algo, te tiro un consejo o te cuento un chiste. Tengo para rato."
+        "Escribime lo que quieras: charlamos, te doy una mano, y si me lo pedís te sigo o voy hasta tu casa."
       ],
       "set": {
         "conoce_claude": true
@@ -88,35 +88,9 @@
       ]
     },
     "menu": {
-      "text": "¿Qué te cuento?",
-      "choices": [
-        {
-          "text": "Decile algo (escribile)",
-          "next": "ia",
-          "needs": "ia"
-        },
-        {
-          "text": "Contame algo",
-          "next": "charla"
-        },
-        {
-          "text": "Dame un consejo del juego",
-          "next": "consejo"
-        },
-        {
-          "text": "Contame un chiste",
-          "next": "chiste"
-        },
-        {
-          "text": "Chau",
-          "next": "despedida"
-        }
-      ]
-    },
-    "ia": {
       "ask": true,
-      "text": "¡Te escucho! Escribime lo que quieras. Si querés, pedime que te siga o que vaya a tu casa.",
-      "back": "menu",
+      "continuo": true,
+      "text": "Te escucho, escribime lo que quieras. Si querés, pedime que te siga o que vaya a tu casa.",
       "bye": "despedida"
     },
     "charla_001": {

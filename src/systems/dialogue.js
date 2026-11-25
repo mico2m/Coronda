@@ -298,14 +298,28 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
     const raw = asking.raw;
     closeAsk();
     const back = raw.back ?? null; // a qué nodo vuelve si el jugador no quiere seguir
-    s.node = normalize({ text: '…' });
-    s.pages = [{ ...textbox.paginate('…', 0)[0] }];
+    s.node = normalize({ text: 'Pensando...' });
+    s.pages = [{ ...textbox.paginate('Pensando...', 0)[0] }];
     s.page = 0;
     showPage();
     const my = s;
     let res;
     try { res = await hooks.ask(s.entry, text); } catch (err) { res = { text: String(err?.message || err) }; }
     if (s !== my) return; // se cerró mientras pensaba
+    if (raw.continuo && !res?.choices) {
+      // Solo se escribe: Claude contesta y la caja para escribir queda abierta (sin opciones). Volver / Escape cierra.
+      asking = { raw };
+      s.node = normalize({ text: res?.text || '…' });
+      s.pages = [];
+      s.node.pages.forEach((t) => textbox.paginate(t, 0).forEach((b) => s.pages.push({ ...b })));
+      if (!s.pages.length) s.pages = [{ ...textbox.paginate('…', 0)[0] }];
+      s.page = 0;
+      showPage();
+      askBox.hidden = false;
+      askIn.value = '';
+      setTimeout(() => askIn.focus(), 30);
+      return;
+    }
     const id = '__respuesta';
     const choices = res?.choices ?? [
       { text: 'Decile otra cosa', next: '__ask' },
@@ -330,7 +344,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
     if (!s) return;
     if (s.shown < s.count) { s.shown = s.count; pageDone(); return; } // completa la página
     if (s.choices.length && !s.picking) { s.choiceShown = s.choiceTotal; s.picking = true; paint(); return; } // completa las opciones
-    if (asking) return;
+    if (asking && s.page >= s.pages.length - 1) return;
     if (s.picking) { choose(s.sel); return; }
     if (s.page < s.pages.length - 1) { s.page++; showPage(); return; }
     if (s.node.next) goto(s.node.next); else end();
@@ -398,6 +412,9 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
     update(p, dt) {
       focus.x = p.x; focus.y = p.y; focus.z = p.z;
       if (s) {
+        // Si el NPC se va (o el jugador se aleja) lo suficiente, la charla se corta sola
+        const hp = s.entry.holder.position;
+        if (Math.hypot(p.x - hp.x, p.z - hp.z) > Math.max(s.entry.talk.radius * 2, 6)) { end(); return; }
         textbox.update(dt);
         if (s.shown < s.count) {
           const before = Math.floor(s.shown);

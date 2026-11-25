@@ -22,13 +22,14 @@ export async function projectIndex(app) {
       let doc;
       try { doc = await app.api.readJSON(entry.file); } catch { continue; }
       if (doc.music) { if (!music.has(doc.music)) music.set(doc.music, []); music.get(doc.music).push(id); }
-      const visit = (o) => {
+      const visit = (o, roomFile) => {
         const name = o.name;
         if (!name) return;
         const u = o.userData ?? {};
         const p = o.getWorldPosition(new THREE.Vector3());
         const nid = npcIdOf(name);
-        if (nid) npcs.push({ scene: id, name, id: nid, model: modelUrl(u.npc_modelo, nid), dialogue: u.npc_dialogo ? String(u.npc_dialogo).replace(/\.json$/i, '') : null, route: u.npc_ruta ? String(u.npc_ruta) : null });
+        const model = modelUrl(u.npc_modelo, nid);
+        if (nid) npcs.push({ scene: id, sceneFile: roomFile, name, id: nid, model, modelFile: model?.split('/').pop() ?? null, dialogue: u.npc_dialogo ? String(u.npc_dialogo).replace(/\.json$/i, '') : null, route: u.npc_ruta ? String(u.npc_ruta) : null });
         if (!o.isMesh && !o.getObjectByProperty('isMesh', true)) points.push({ scene: id, name, x: p.x, y: p.y, z: p.z });
       };
       // salas .glb exportadas de Blender
@@ -37,7 +38,7 @@ export async function projectIndex(app) {
         try {
           const g = await loadGLB(`/${room.model}`);
           g.scene.updateMatrixWorld(true);
-          g.scene.traverse((o) => { if (o !== g.scene) visit(o); });
+          g.scene.traverse((o) => { if (o !== g.scene) visit(o, String(room.model).split('/').pop()); });
         } catch { /* sala sin exportar */ }
       }
     }

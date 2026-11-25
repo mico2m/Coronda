@@ -498,7 +498,7 @@ function refreshNpc(force) {
   npcListRef = g.npcs.list;
   const keep = npcSel && g.npcs.list.includes(npcSel) ? npcSel : null;
   const sel = $('#npcSel'); sel.replaceChildren();
-  g.npcs.list.forEach((n, i) => sel.append(new Option(n.id + (g.npcs.list.filter((o) => o.id === n.id).length > 1 ? ` #${i + 1}` : ''), String(i))));
+  g.npcs.list.forEach((n, i) => sel.append(new Option(n.id + (g.npcs.list.filter((o) => o.id === n.id).length > 1 ? ` #${i + 1}` : '') + (n.path ? ` · ${String(n.path).split('/').pop()}` : ''), String(i))));
   npcSel = keep ?? g.npcs.list[0] ?? null;
   if (npcSel) sel.value = String(g.npcs.list.indexOf(npcSel));
   drawNpc();
@@ -511,7 +511,8 @@ function drawNpc() {
   if (!g?.npcs || !npcSel) { info.appendChild(tag('div', 'No hay NPC en esta escena (empties npc_… en el .glb o "actors" en el JSON).', 'note')); return; }
   const n = npcSel;
   const src = { npc: 'fijado en este NPC (npc_anim): pisa la tabla', modelo: 'definido para el modelo', auto: 'detectado solo' }[n.idleSource] ?? '';
-  line(info, 'Modelo', tag('code', n.modelKey));
+  const glb = n.path ? String(n.path).split('/').pop() : null; // el archivo del modelo, al lado del nombre
+  const lm = line(info, 'Modelo', tag('code', glb ?? n.modelKey)); if (n.path) { lm.title = n.path; lm.appendChild(tag('span', ' · ' + String(n.path).replace(/[^/]+$/, ''), 'm')); }
   line(info, 'Idle', tag('b', n.idleName ?? '(ninguno)'), tag('span', n.idleName ? ' · ' + src : '', 'm'));
   const d = line(info, 'Diálogo');
   if (n.talk?.dialogue) {

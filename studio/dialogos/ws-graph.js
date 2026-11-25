@@ -64,14 +64,14 @@ export async function createGraphWorkspace(app, el, mode) {
     pane.set(files().map((p) => {
       const n = baseName(p), us = users(n), d = docs.get(p);
       return { id: p, label: n, icon: isDlg ? 'chat' : 'route', color: isDlg ? '#0e9aa7' : '#8b5cf6', dirty: d?.dirty,
-        sub: us.length ? us.map((u) => `${u.name} · ${u.scene}`).join(', ') : `Ningún NPC lo usa`,
+        sub: us.length ? us.map((u) => `${u.name}${u.modelFile ? ` (${u.modelFile})` : ''} · ${u.scene}${u.sceneFile ? ` (${u.sceneFile})` : ''}`).join(', ') : `Ningún NPC lo usa`,
         warn: us.length ? '' : `Para usarlo, poné ${isDlg ? 'npc_dialogo' : 'npc_ruta'} = ${n} en un NPC (componente NPC del inspector)` };
     }), cur?.path);
   }
   function header() {
     el.querySelector('.wst').textContent = curName ?? '';
     const us = curName ? users(curName) : [];
-    el.querySelector('.wsu').innerHTML = curName ? (us.length ? `Lo usa ${us.map((u) => `<b>${esc(u.name)}</b> en ${esc(u.scene)}`).join(', ')}` : `<span class="muted">Ningún NPC lo usa todavía</span>`) : '';
+    el.querySelector('.wsu').innerHTML = curName ? (us.length ? `Lo usa ${us.map((u) => `<b>${esc(u.name)}</b>${u.modelFile ? ` <span class="muted">(${esc(u.modelFile)})</span>` : ''} en ${esc(u.scene)}${u.sceneFile ? ` <span class="muted">(${esc(u.sceneFile)})</span>` : ''}`).join(', ')}` : `<span class="muted">Ningún NPC lo usa todavía</span>`) : '';
   }
 
   async function prepare(name) { // animaciones reales del NPC que lo usa

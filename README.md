@@ -603,6 +603,7 @@ Claude atiende la tienda y fabrica muebles a cambio de madera. Código: `src/sys
 - Se escucha a los jugadores de la misma escena que estén a menos de **15 m**: al volumen completo hasta 3 m y cada vez más bajo hasta 15 m, del lado donde está cada uno. Arriba del que habla aparece 🔊.
 - El audio va directo entre navegadores (WebRTC); las señales para armar cada llamada viajan por el canal `voz` del multijugador. Código: `src/systems/voz.js` y `src/ui/menu.js`. Para revisar desde la consola: `corondaVoz.debug()`.
 - En algunas redes (datos móviles, redes de facultad) la conexión directa no se arma. Para eso hace falta un servidor de relevo (TURN): se agrega en `ICE_SERVERS` de `voz.js`.
+
 ## Buzones
 
 Cada casa tiene un buzón: `blender -b -P blender/agregar_buzon.py` le agrega uno a los `.glb` de `data/tables/casas.json` que existan (un Empty `buzon` con el buzón adentro, al frente a la derecha; deja `blender/<casa>_buzon.blend`) y crea `assets/models/objects/buzon.glb`. Las casas que no traen buzón reciben `buzon.glb` al frente. El juego lo renombra `lote_<número>_buzon` y ahí Claude deja la nota de los pedidos listos (ver *La Carpintería*).

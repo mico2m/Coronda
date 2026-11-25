@@ -55,7 +55,6 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     const min = Math.max(1, Math.round(ms / 60000));
     return `a las 00:00 del juego (en ${min} minuto${min > 1 ? 's' : ''})`;
   }
-  }
 
   // ---------- Árboles de la escena ----------
   let root = null, trees = [], rescan = 0; // trees: { id, key, obj, pos, parts, hits, tandas, shake }

@@ -110,7 +110,8 @@ Qué objetos son sólidos se decide **en Blender**, con propiedades personalizad
 
 | Propiedad | Valor | Qué hace |
 |---|---|---|
-| `colision` | `1` | Sólido: no se atraviesa y se camina sobre sus superficies |
+| `colision` | `1` o `malla` | Sólido con **su propia malla**, triángulo por triángulo: chocás con su forma real y caminás sobre sus superficies (rampas, escaleras, techos) |
+| `colision` | `caja` / `cilindro` | Sólido, pero con su caja envolvente o un cilindro (atajo de `colision = 1` + `colision_forma`) |
 | `colision` | `0` | Sin colisión: se ve pero se atraviesa (pasto, carteles, humo) |
 | `colision_forma` | `caja` | Usa la caja envolvente en vez de la malla exacta (por defecto `malla`). Ideal para objetos complicados o cóncavos |
 | `colision_invisible` | `1` | El objeto no se dibuja pero sí colisiona (paredes invisibles) |

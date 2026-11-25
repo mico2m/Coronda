@@ -2,6 +2,8 @@
 //
 // En Blender: seleccioná el objeto > Object Properties > Custom Properties, agregá
 //   colision           = 1   sólido (el jugador no lo atraviesa y puede caminar sobre sus superficies)
+//   colision           = "malla"     sólido usando su propia malla, triángulo por triángulo (lo mismo que 1)
+//   colision           = "caja" / "cilindro"   sólido con esa forma (atajo de colision = 1 + colision_forma)
 //   colision           = 0   sin colisión (se ve, pero se atraviesa; ej. pasto, carteles, humo)
 //   colision_forma     = "caja"   usa la caja envolvente en vez de la malla exacta (más simple y rápido).
 //                                 Por defecto es "malla" (los triángulos reales).
@@ -66,18 +68,30 @@ function proxyTargets(name) {
   return out;
 }
 
+function shapeWord(v) {
+  const s = String(v).trim().toLowerCase();
+  if (/^(?:caja|box|aabb)$/.test(s)) return 'caja';
+  if (/^(?:cilindro|cylinder|cil)$/.test(s)) return 'cilindro';
+  if (/^(?:malla|mesh|exacta|exacto)$/.test(s)) return 'malla';
+  return null;
+}
+
 function ownFlags(node) {
   const u = node.userData ?? {};
   const f = {};
-  const solid = parseFlag(u.colision);
+  // colision = "malla" / "caja" / "cilindro": sólido con esa forma (atajo de colision = 1 + colision_forma)
+  const word = typeof u.colision === 'string' ? shapeWord(u.colision) : null;
+  if (word) { f.solid = true; f.shape = word; }
+  const solid = word ? true : parseFlag(u.colision);
   if (solid !== undefined) f.solid = solid;
+  else if (u.colision !== undefined && String(u.colision).trim()) {
+    console.warn(`Objeto "${node.name}": colision = "${u.colision}" no se entiende (usá 1, 0, "malla", "caja" o "cilindro").`);
+  }
   const hidden = parseFlag(u.colision_invisible);
   if (hidden !== undefined) f.hidden = hidden;
   if (typeof u.colision_forma === 'string') {
-    const s = u.colision_forma.trim().toLowerCase();
-    if (/^(?:caja|box|aabb)$/.test(s)) f.shape = 'caja';
-    else if (/^(?:cilindro|cylinder|cil)$/.test(s)) f.shape = 'cilindro';
-    else if (/^(?:malla|mesh|exacta)$/.test(s)) f.shape = 'malla';
+    const w = shapeWord(u.colision_forma);
+    if (w) f.shape = w;
     else console.warn(`Objeto "${node.name}": colision_forma = "${u.colision_forma}" no es válida (usá "malla", "caja" o "cilindro").`);
   }
   if (PROXY_NAME.test(node.name ?? '')) { f.solid ??= true; f.hidden ??= true; }

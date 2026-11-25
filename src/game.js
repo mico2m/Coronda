@@ -370,6 +370,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
         net, npcs, lotes, getPlayer: () => (mode === 'player' ? player : null), getSceneId: () => sceneManager.current?.id ?? null,
         myName: choice?.name ?? 'Viajero', notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
         abrirCharla: (e, nodes, start) => dialogue.startCustom(e, nodes, start),
+        getTienda: () => tienda, // la IA sabe tus pedidos de la Carpintería (la tienda se crea después: por eso es una función)
       });
       claudeNpc.precargarSaludo(); // el saludo de la IA se pide ya, mientras carga el juego
       window.corondaClaude = claudeNpc; // para revisar desde la consola: corondaClaude.state

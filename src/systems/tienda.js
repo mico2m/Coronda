@@ -534,8 +534,31 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
     notePrompt.hidden = !myNote;
   }
 
+  // Para la IA de Claude (systems/claude-npc.js): los pedidos del que le habla y el estado de la Carpintería, en datos
+  // cortos, para que pueda contestar "¿para cuándo están mis cosas?" sin inventar. Solo los tuyos: nunca los de otros.
+  function resumenIA(now = Date.now()) {
+    const todos = pedidos(now);
+    const pendientes = todos.filter((o) => !o.listo);
+    const mis = todos.filter((o) => o.u === myUid).map((o) => ({
+      mueble: nombre(o.m),
+      estado: o.listo ? 'listo' : o.fabricando ? 'fabricandose' : 'en_fila',
+      progreso: Math.round(o.progreso * 100),
+      antes_en_fila: o.listo || o.fabricando ? 0 : pendientes.filter((x) => x.start < o.start).length,
+      listo_a_las: o.listo ? '' : horaFin(o),                          // hora del juego
+      faltan_min: o.listo ? 0 : Math.max(1, Math.ceil((o.end - now) / 60000)), // minutos reales
+    }));
+    const t = tiempo?.config?.tienda;
+    return {
+      abierta: tiempo ? tiempo.abierta() : true,
+      abre: t ? `${String(t.abre).padStart(2, '0')}:00` : '', cierra: t ? `${String(t.cierra).padStart(2, '0')}:00` : '',
+      hora: tiempo ? tiempo.texto() : '',
+      pedidos_en_fila: pendientes.length,
+      mis_pedidos: mis.slice(0, cfg.max_pedidos_por_jugador || 5),
+    };
+  }
+
   return {
-    update, point, slots, dynamic, idle,
+    update, point, slots, dynamic, idle, resumenIA,
     pedidos: () => pedidos().map((o) => ({ id: o.id, jugador: o.n, uid: o.u, mueble: o.m, nombre: nombre(o.m), slot: o.s, pedido: o.t, empieza: o.start, termina: o.end, progreso: o.progreso, listo: o.listo, fabricando: o.fabricando, aviso: o.aviso })),
     borrar: (id) => drop(id), // (Studio) saca un pedido
     setConfig(c) { if (c && typeof c === 'object') cfg = { ...cfg, ...c }; },                 // (Studio) en vivo

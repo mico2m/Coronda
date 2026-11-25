@@ -34,7 +34,7 @@ const norm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const PLACE_NAMES = { mostrador: 'el mostrador de mi tienda', taller: 'el taller de mi tienda', casa: 'el lado este de la plaza, cerca de mi tienda', centro: 'el centro de la plaza', este: 'el lado este', norte: 'el lado norte', oeste: 'el lado oeste', cartel: 'el cartel de bienvenida', borde: 'el borde oeste' };
 
 // opts: net (o null), npcs, lotes, getPlayer(), getSceneId(), myName, notify(msg)
-export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId, myName = 'Viajero', notify = () => {} }) {
+export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId, myName = 'Viajero', notify = () => {}, getTienda = () => null }) {
   const solo = !net;
   const myUid = net?.uid ?? 'yo';
   let cfg = { endpoint: '', activa: true, comentarios: true, comentarios_cada: [90, 240] };
@@ -302,6 +302,9 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     return { momento, jugadores, casas, lugares, otros_npc: otros };
   }
 
+  // Tus pedidos en la Carpintería (ver tienda.resumenIA): van solo cuando le hablás vos (charla y saludo), nunca en los
+  // comentarios del chat, que los ven todos.
+  function carpinteria() { try { return getTienda()?.resumenIA?.() ?? null; } catch { return null; } }
   function mundoActual() {
     const here = roster().filter((r) => r.s === getSceneId()).map((r) => r.n).slice(0, 12);
     const owners = (lotes.list ?? []).map((sp) => ({ lote: sp.label, dueno: lotes.record(sp.key)?.n || null })).filter((x) => x.dueno);
@@ -372,7 +375,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       const to = setTimeout(() => ctl.abort(), 15000);
       const r = await fetch(cfg.endpoint, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
-        body: JSON.stringify({ modo: 'saludo', jugador: myName, texto: '', historial: [], mundo: mundoActual() }),
+        body: JSON.stringify({ modo: 'saludo', jugador: myName, texto: '', historial: [], mundo: { ...mundoActual(), carpinteria: carpinteria() } }),
       });
       clearTimeout(to);
       if (!r.ok) return;
@@ -453,7 +456,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     lastAsk = performance.now();
     const body = {
       jugador: myName, texto: String(text).slice(0, 200), historial: history.slice(-6),
-      mundo: mundoActual(),
+      mundo: { ...mundoActual(), carpinteria: carpinteria() },
     };
     let res;
     try {

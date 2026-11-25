@@ -15,6 +15,7 @@ import { createNpcs } from './actors/npc.js';
 import { createDialogue } from './systems/dialogue.js';
 import { createTextbox } from './ui/textbox.js';
 import { isSkyName } from './systems/shading.js';
+import { boot } from './ui/boot.js';
 
 const _focus = new THREE.Vector3();
 
@@ -141,8 +142,12 @@ export async function startGame({ dev = false, retro = null } = {}) {
     if (!dev || params.has('menu')) {
       const { findCharacters, showStartMenu } = await import('./ui/start-menu.js');
       const { connectServer } = await import('./net/multiplayer.js');
+      boot.text('Buscando personajes…');
       const characters = await findCharacters(playerConfig);
-      choice = await showStartMenu({ characters, connect: () => connectServer(params.get('sala') || 'coronda') });
+      const menu = showStartMenu({ characters, connect: () => connectServer(params.get('sala') || 'coronda') });
+      boot.hide(); // el menú ya está a la vista
+      choice = await menu;
+      boot.show(choice.online ? 'Entrando al servidor…' : 'Entrando al mundo…');
       const ch = choice.character;
       if (ch.id !== 'personaje') { // un NPC: su modelo, su escala y su idle (las acciones y clips de player.json son del personaje)
         playerConfig.model = ch.model;
@@ -314,6 +319,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
     await enterScene(startId, kept ? { position: kept.pos, yaw: kept.yaw } : undefined);
     setMode(kept?.mode ?? (dev ? 'free' : 'player'));
     if (kept && mode === 'free') controls.setLook(kept.yaw, kept.pitch ?? 0);
+    // El mundo ya está: se saca la pantalla de carga después de dibujarlo una vez
+    requestAnimationFrame(() => requestAnimationFrame(() => boot.hide()));
     // Servidor: desde ahora los demás te ven (y vos a ellos)
     if (net) {
       const r = (v) => Math.round(v * 100) / 100;
@@ -343,6 +350,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     if (notice) ui.setStatus(notice);
   } catch (err) {
     console.error(err);
+    boot.hide();
     ui.setStatus(String(err.message || err));
   }
   // Para las herramientas del modo desarrollador (panel de NPC, etc.)

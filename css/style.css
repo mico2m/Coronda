@@ -222,3 +222,19 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
   .chat-open { display: block; }
 }
 .talking .chat-form { display: none; }
+
+/* ---------- Pantalla de carga (src/ui/boot.js) ---------- */
+.boot {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; color: #f4f8fa; font-family: var(--font-body);
+  background: radial-gradient(120% 90% at 50% 0%, #9fc6e8 0%, #5d8fb5 45%, #1d3247 100%); transition: opacity .45s ease;
+}
+.boot[hidden] { display: none; }
+.boot.boot-out { opacity: 0; pointer-events: none; }
+.boot-card { display: grid; gap: 14px; justify-items: center; width: min(320px, 80vw); text-align: center; }
+.boot-title { font: 600 44px/1 var(--font-display); letter-spacing: 0.02em; }
+.boot-bar { width: 100%; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+.boot-bar i { display: block; height: 100%; width: 8%; border-radius: inherit; background: #f4f8fa; transition: width .3s ease; animation: boot-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes boot-pulse { from { opacity: 0.6; } to { opacity: 1; } }
+.boot-text { font: 500 15px var(--font-body); }
+.boot-tip { font-size: 12px; color: rgba(244, 248, 250, 0.6); }
+@media (prefers-reduced-motion: reduce) { .boot-bar i { animation: none; } }

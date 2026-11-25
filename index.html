@@ -21,6 +21,17 @@
 
   <div class="loading" id="loading" aria-live="polite" hidden></div>
 
+  <!-- Pantalla de carga: se ve apenas abre la página (ver src/ui/boot.js) -->
+  <div class="boot" id="boot" role="status" aria-live="polite">
+    <div class="boot-card">
+      <div class="boot-title">Coronda</div>
+      <div class="boot-bar"><i></i></div>
+      <div class="boot-text">Cargando…</div>
+      <div class="boot-tip">La primera vez puede tardar unos segundos.</div>
+    </div>
+  </div>
+  <noscript><div class="boot">Coronda necesita JavaScript activado.</div></noscript>
+
 
   <!-- Solo en celular/tablet (css: pointer coarse) -->
   <div class="pad" id="pad" aria-label="Controles táctiles">

@@ -139,7 +139,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
         // sin botón: las marcadas "hidden" en player.json y la de abrir puertas (la usa doors.js)
         if (o.hidden ?? DOOR_CLIP_RE.test(clip.name)) return;
         const i = shown++;
-        actions.push({ id, label: o.label ?? humanize(id), key: o.key ?? (i < 9 ? `Digit${i + 1}` : null), hold: o.hold ?? mode !== 'vuelve' });
+        actions.push({ id, label: o.label ?? humanize(id), key: o.key ?? (i < 9 ? `Shift+Digit${i + 1}` : null), hold: o.hold ?? mode !== 'vuelve' }); // los números solos abren el menú (ui/atajos.js)
       });
       mixer.addEventListener('finished', (e) => {
         const cur = actions.find((a) => a.id === doing);
@@ -230,7 +230,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
     b.type = 'button';
     if (a.key) {
       const k = document.createElement('kbd');
-      k.textContent = a.key.replace(/^(?:Digit|Key)/, '');
+      k.textContent = a.key.replace(/^Shift\+/, '⇧').replace(/(?:Digit|Key)/, '');
       b.append(k, ' ');
     }
     b.append(a.label); // textContent-style: el nombre viene de un archivo externo
@@ -250,7 +250,8 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     if (e.code === 'KeyZ' && active && !frozen) { centerCamera(); return; }
-    const a = actions.find((x) => x.key === e.code);
+    const tecla = `${e.shiftKey ? 'Shift+' : ''}${e.code}`;
+    const a = actions.find((x) => x.key === tecla);
     if (a) triggerAction(a.id);
   });
 

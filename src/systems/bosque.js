@@ -14,7 +14,11 @@
 //   energia_correr_por_seg      cuánta energía gasta correr, por segundo (1; 0 = correr no gasta). Sin energía solo se camina.
 //   recupera_quieto_por_seg     cuánta se recupera por segundo con el personaje quieto (2)
 //   recupera_caminando_por_seg  y caminando (más lento: 0.5). Corriendo o talando no se recupera.
-// Los árboles caídos son los mismos para todo el servidor (se guardan como los lotes: bosque~<escena>.<árbol>).
+// En el servidor (index.html) cada hachazo se le pide al SERVIDOR (net.rpc('bosque.hachazo')): él comprueba que estés en
+// esa escena, que el árbol esté en pie, que no talés más rápido de lo posible y que te quede energía; él suma la madera
+// a tu mochila y la XP, y voltea el árbol para todos. La energía para talar también la lleva el servidor (se recupera
+// sola con el tiempo); la de correr es solo de tu pantalla.
+// Los árboles caídos son los mismos para todo el servidor (bosque~<escena>.<árbol>).
 import * as THREE from 'three';
 import { loadJSON } from '../core/assets.js';
 
@@ -43,7 +47,17 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
   // ---------- Resistencia: hachazos por día del juego ----------
   const hoy = () => (tiempo ? tiempo.dia() : Math.floor(Date.now() / 864e5));
   let res = { dia: hoy(), usados: 0 };
-  try { const g = JSON.parse(localStorage.getItem(RES_KEY)); if (g && Number.isFinite(g.dia)) res = { dia: g.dia, usados: Math.max(0, Number(g.usados) || 0) }; } catch { /* nada */ }
+  if (!net) { try { const g = JSON.parse(localStorage.getItem(RES_KEY)); if (g && Number.isFinite(g.dia)) res = { dia: g.dia, usados: Math.max(0, Number(g.usados) || 0) }; } catch { /* nada */ } }
+  // Energía del servidor: cada vez que cambia allá (un hachazo, el admin te la recarga) la de tu pantalla se iguala
+  let ultimaT = 0;
+  const desdeServidor = (e) => {
+    if (!e || !Number.isFinite(e.usados) || e.t === ultimaT) return;
+    ultimaT = e.t;
+    const rate = Math.max(0, Number(cfg.recupera_quieto_por_seg) || 0);
+    const usados = Math.max(0, e.usados - (rate * Math.max(0, (net?.ahora?.() ?? Date.now()) - (e.t ?? 0))) / 1000);
+    res.usados = usados;
+  };
+  if (net) net.onYo?.((yo) => desdeServidor(yo.energia));
   const maxE = () => cfg.resistencia_por_dia + Math.max(0, Number(extraEnergia()) || 0); // la del día + la aptitud Energía
   function quedan() {
     if (!cfg.resistencia_por_dia) return Infinity;
@@ -52,7 +66,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
   function gastar() {
     if (!cfg.resistencia_por_dia) return;
     quedan(); res.usados++;
-    try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ }
+    if (!net) { try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }
   }
   // Correr gasta energía de a poco (dt en segundos). Devuelve false si no queda: el personaje camina.
   let guardarT = 0, avisado = false;
@@ -65,7 +79,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     avisado = false;
     res.usados = Math.min(maxE(), res.usados + cfg.energia_correr_por_seg * dt);
     guardarT += dt;
-    if (guardarT > 1) { guardarT = 0; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }
+    if (guardarT > 1) { guardarT = 0; if (!net) { try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } } }
     return true;
   }
   // Cómo se recupera: quieto rápido, caminando más lento (ver recuperar)
@@ -77,7 +91,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     if (!(v > 0)) return;
     res.usados = Math.max(0, res.usados - v * dt);
     guardarT += dt;
-    if (guardarT > 1 || !res.usados) { guardarT = 0; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }
+    if (guardarT > 1 || !res.usados) { guardarT = 0; if (!net) { try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } } }
   }
 
   // ---------- Árboles de la escena ----------
@@ -101,7 +115,8 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     });
     for (const t of trees) show(t);
   }
-  const isDown = (t) => (fallen.get(t.key) ?? 0) > Date.now();
+  const now = () => (net?.ahora ? net.ahora() : Date.now());
+  const isDown = (t) => (fallen.get(t.key) ?? 0) > now();
   function show(t) { const v = !isDown(t); for (const p of t.parts) p.visible = v; }
 
   // ---------- Red ----------
@@ -110,7 +125,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     const { messages, saved } = C.take();
     const accept = (key, d) => {
       const hasta = Number(d?.hasta) || 0;
-      if (hasta > Date.now()) fallen.set(key, hasta); else fallen.delete(key);
+      if (hasta > now()) fallen.set(key, hasta); else fallen.delete(key);
       const t = trees.find((x) => x.key === key); if (t) { if (!isDown(t)) { t.tandas = 0; t.hits = 0; } show(t); }
     };
     C.onMessage = (d) => { if (d?.k) accept(String(d.k), d); };
@@ -119,6 +134,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     saved.forEach(([k, d]) => accept(k, d));
   }
   function fell(t) {
+    if (net) return; // lo voltea el servidor (llega por onPersisted)
     const hasta = Date.now() + cfg.rebrote_minutos * 60000;
     fallen.set(t.key, hasta);
     t.hits = 0; t.tandas = 0;
@@ -159,26 +175,41 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     const player = getPlayer?.();
     if (!t || busy || !player || isDown(t)) return;
     if (quedan() <= 0) { toast('😮‍💨 Sin fuerzas'); notify(`Estás agotado: no podés talar. ${recupera()}`); return; }
-    gastar();
-    onXp('hachazo');
     busy = true; // el botón sigue a la vista, atenuado, mientras da el hachazo
+    // Con servidor: el hachazo se pide ya (mientras se ve la animación); él decide si vale
+    const pedido = net ? net.rpc('bosque.hachazo', { k: t.key }).catch((e) => ({ error: e.message })) : null;
+    if (!net) { gastar(); onXp('hachazo'); }
     const face = { x: t.pos.x, z: t.pos.z };
     let ok = false;
     try { ok = await player.interact(cfg.animacion, { face, wait: 0.55 }); } catch { ok = false; }
     if (!ok) await new Promise((r) => setTimeout(r, 450)); // personaje sin "talar": igual cuenta el golpe
     player.endInteract?.();
     t.shake = 0.35;
-    t.hits++;
-    if (t.hits >= cfg.golpes_por_tanda) {
-      t.hits = 0; t.tandas++;
-      inventario?.add('recursos', cfg.recurso, cfg.madera_por_tanda);
-      toast(`+${cfg.madera_por_tanda} 🪵 ${cfg.recurso === 'madera' ? 'madera' : cfg.recurso}`);
-      if (t.tandas >= cfg.tandas_por_arbol) { fell(t); toast(`¡Cayó el árbol! +${cfg.madera_por_tanda} 🪵`); onXp('arbol'); }
-    } else toast(`${'●'.repeat(t.hits)}${'○'.repeat(cfg.golpes_por_tanda - t.hits)}`);
+    if (net) {
+      const r = await pedido;
+      busy = false;
+      if (r?.error) { toast('✋'); notify(r.error); return; }
+      if (r?.agotado) { desdeServidor(r.energia); toast('😮‍💨 Sin fuerzas'); notify(`Estás agotado: no podés talar. ${recupera()}`); return; }
+      desdeServidor(r.energia);
+      onXp('hachazo');
+      t.hits = r.golpes; t.tandas = r.tandas;
+      if (r.cayo) { toast(`¡Cayó el árbol! +${r.madera} 🪵`); onXp('arbol'); show(t); }
+      else if (r.madera) toast(`+${r.madera} 🪵 ${cfg.recurso === 'madera' ? 'madera' : cfg.recurso}`);
+      else if (r.golpes === 0 && !r.madera) toast('🎒 Mochila llena');
+      else toast(`${'●'.repeat(t.hits)}${'○'.repeat(cfg.golpes_por_tanda - t.hits)}`);
+    } else {
+      t.hits++;
+      if (t.hits >= cfg.golpes_por_tanda) {
+        t.hits = 0; t.tandas++;
+        inventario?.add('recursos', cfg.recurso, cfg.madera_por_tanda);
+        toast(`+${cfg.madera_por_tanda} 🪵 ${cfg.recurso === 'madera' ? 'madera' : cfg.recurso}`);
+        if (t.tandas >= cfg.tandas_por_arbol) { fell(t); toast(`¡Cayó el árbol! +${cfg.madera_por_tanda} 🪵`); onXp('arbol'); }
+      } else toast(`${'●'.repeat(t.hits)}${'○'.repeat(cfg.golpes_por_tanda - t.hits)}`);
+      busy = false;
+    }
     const q = Math.ceil(quedan() - 1e-6);
     if (q === 0) setTimeout(() => notify(`Te quedaste sin fuerzas. ${recupera()}`), 900);
     else if (q === 5) setTimeout(() => notify('Te queda poca energía ⚡ (descansá para recuperarla)'), 900);
-    busy = false;
   }
 
   function update(focus, dt) {
@@ -215,7 +246,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     update, setConfig,
     get config() { return { ...cfg }; },
     get near() { return !!near; },
-    recargar() { res = { dia: hoy(), usados: 0 }; try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }, // (admin)
+    recargar() { res = { dia: hoy(), usados: 0 }; if (!net) { try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } } }, // (admin)
     correr,
     // quedan: entero (redondeado hacia arriba) para mostrar · exacto: con decimales (correr gasta de a poco)
     get resistencia() { const q = quedan(); return { quedan: Number.isFinite(q) ? Math.ceil(q - 1e-6) : null, exacto: Number.isFinite(q) ? q : null, max: cfg.resistencia_por_dia ? maxE() : 0, dia: res.dia }; },

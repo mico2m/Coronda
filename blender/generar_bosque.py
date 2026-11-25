@@ -157,6 +157,10 @@ def cartel(parent_name, x, y, rot):
     root.rotation_euler.z = rot
     return root
 cartel('cartel_volver', 3.2, 44.5, math.radians(180))
+# Empty del teleport de vuelta (el cartel es solo el adorno): al acercarte, "E Volver a la plaza"
+tp = empty('volver_plaza', (3.2, 44.5, 1.0), kind='CUBE', size=1)
+tp.rotation_euler.z = math.radians(180); tp.scale = (1.4, 0.6, 1.0)
+tp['teleport'] = 'coronda_plaza'; tp['teleport_modo'] = 'E'; tp['teleport_radio'] = 1.2; tp['teleport_texto'] = 'Volver a la plaza'
 
 # ---------- Guardar y exportar ----------
 os.makedirs(os.path.join(ROOT, 'assets/models/worlds'), exist_ok=True)

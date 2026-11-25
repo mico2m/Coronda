@@ -1,6 +1,10 @@
 {
-  "_ayuda": "Recursos que se juntan en el mundo (id -> nombre, icono y tope por jugador). Los muebles no van acá: están en data/muebles.json. Agregá un recurso nuevo y ya aparece en la mochila.",
+  "_ayuda": "Recursos que se juntan en el mundo (id -> nombre, icono y tope por jugador). icono = imagen en assets/icons/ (se ve igual en todas las compus; un emoji puede verse como un cuadrado en Windows viejos). Los muebles no van acá: están en data/muebles.json. Agregá un recurso nuevo y ya aparece en la mochila.",
   "recursos": {
-    "madera": { "nombre": "Madera", "icono": "🪵", "max": 999 }
+    "madera": {
+      "nombre": "Madera",
+      "icono": "assets/icons/madera.svg",
+      "max": 999
+    }
   }
 }

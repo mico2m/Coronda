@@ -7,7 +7,7 @@
 // (304) no se baja de nuevo; si cambió, se baja solo ese. Además, cada archivo se reconfirma como mucho cada 6 horas.
 // Nunca se guarda: version.json, lo pedido con cache "no-store", audio/video (se piden por partes), y nada de otros
 // sitios salvo three.js y las fuentes (lotes, casas, chat, pósters y YouTube vienen siempre de internet).
-const CACHE = 'coronda-archivos-v1';
+const CACHE = 'coronda-archivos-v2'; // v2: servidor propio (cambió todo el código de red)
 const META = '__coronda_version__';
 const MAX_AGE = 6 * 3600 * 1000;
 const LOCAL = /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/.test(self.location.hostname);
@@ -82,6 +82,8 @@ self.addEventListener('fetch', (e) => {
   if (!url.startsWith(BASE)) return; // otros sitios: siempre de internet
   const path = url.slice(BASE.length).split(/[?#]/)[0];
   if (path === 'version.json' || path === 'sw.js' || path.startsWith('dev.html') || path.startsWith('studio/') || path.startsWith('api/')) return;
+  // lo del servidor del juego (estado, fotos de perfil) siempre fresco: nunca se guarda
+  if (path.startsWith('__coronda/') || path.startsWith('fotos/') || path === 'ws') return;
   if (req.mode === 'navigate') { e.respondWith(refreshVersion().then(() => handle(req, false))); return; }
   e.respondWith((async () => {
     // lo que pide dev.html no se guarda (por si alguien lo abre publicado)

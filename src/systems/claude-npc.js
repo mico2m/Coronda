@@ -477,7 +477,7 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     acc = acc.filter((a) => a?.tipo !== 'encargar');
     const tienda = getTienda();
     if (enc && tienda?.encargoIA) {
-      const r = tienda.encargoIA(enc.muebles, !!enc.confirmado);
+      const r = await tienda.encargoIA(enc.muebles, !!enc.confirmado);
       say = (await contarEncargo(r, text)) || r.texto;
       history.push({ de: myName, texto: body.texto }, { de: 'Claude', texto: say });
       while (history.length > 12) history.shift();

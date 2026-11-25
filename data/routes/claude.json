@@ -10,14 +10,8 @@
         0.08,
         -17.6
       ],
-      "wait": 25,
-      "waitMax": 50,
-      "next": [
-        {
-          "to": "taller",
-          "weight": 1
-        }
-      ]
+      "wait": 5,
+      "waitMax": 10
     },
     "taller": {
       "position": [

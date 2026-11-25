@@ -26,9 +26,12 @@
 // Música: el dueño pega un enlace de YouTube (🎵 arriba a la izquierda) y suena para todos los que entren.
 //   Pausarla, cambiarla o quitarla: solo el dueño, para todos. Volumen y silencio: cada uno el suyo (src/ui/house-music.js).
 //
-// Cómo se comparte (igual que los lotes): cada cambio se manda en vivo y se guarda en el broker MQTT (retained)
-// bajo casa~<lote>. Registro: { c: id de la casa, o: dueño, v: versión, items: [{ i, m, p: [x, z], y: grados }], mu: { v: video, l: lista } }.
-// Jugando solo se guarda en el navegador (localStorage).
+// Cómo se comparte: lo guarda el SERVIDOR (net.rpc('casa.guardar')) y lo manda a todos bajo casa~<lote>.
+// Registro: { c: id de la casa, o: dueño, v: versión, items: [{ i, m, p: [x, z], y: grados }], mu: { v: video, l: lista } }.
+// El servidor compara los muebles de antes y de después: los que aparecen salen de tu mochila y los que sacás vuelven
+// (si no los tenés, no se pueden poner). Así nadie duplica muebles editando el navegador.
+// Cofres (mueble "cofre" de data/muebles.json): adentro de tu casa, cerca de un cofre, "E Abrir el cofre" (ver ui/cofre.js).
+// Jugando solo (dev.html) se guarda en el navegador (localStorage).
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { loadJSON, loadGLB } from '../core/assets.js';
@@ -115,9 +118,10 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     if (!lot?.o || !lot.c || !r || r.c !== lot.c) return { c: lot?.c ?? null, o: lot?.o ?? null, v: r?.v ?? 0, items: [], mu: null };
     return r;
   }
-  function accept(key, rec) {
+  const delServidor = new Map(); // lo último que confirmó el servidor (para volver atrás si rechaza un cambio)
+  function accept(key, rec, force = false) {
     const cur = records.get(key);
-    if (cur && !beats(rec, cur)) return false;
+    if (!force && cur && !beats(rec, cur)) return false;
     records.set(key, rec);
     if (solo) writeJSON(SOLO_STORE, Object.fromEntries(records));
     if (inside?.key === key && !carry) renderItems();
@@ -126,8 +130,10 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   }
   async function receive(key, r) {
     await ready;
+    if (!r && net) { records.delete(key); delServidor.delete(key); if (inside?.key === key) renderItems(); return; }
     const rec = clean(r);
-    if (rec && /^[a-z0-9_.-]{1,80}$/i.test(key)) accept(key, rec);
+    if (!rec || !/^[a-z0-9_.-]{1,80}$/i.test(key)) return;
+    if (net) { delServidor.set(key, rec); accept(key, rec, true); } else accept(key, rec);
   }
   function publish(key, rec) {
     if (solo) return;
@@ -139,7 +145,17 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     if (lot?.o !== uid) return;
     const cur = records.get(key);
     const rec = { c: lot.c, o: uid, v: (cur?.v ?? 0) + 1, items, mu };
-    accept(key, rec);
+    accept(key, rec); // se ve enseguida; si el servidor no lo acepta, vuelve a como estaba
+    if (net) {
+      net.rpc('casa.guardar', { k: key, items, mu }).catch((e) => {
+        notify(e.message);
+        const ok = delServidor.get(key) ?? { c: lot.c, o: uid, v: 0, items: [], mu: null };
+        accept(key, ok, true);
+        if (inside?.key === key && !carry) renderItems();
+        onChange?.();
+      });
+      return;
+    }
     publish(key, rec);
   }
 
@@ -397,6 +413,14 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   stage.parentElement.appendChild(exitPrompt);
   let onExit = null;
   exitPrompt.addEventListener('click', () => onExit?.());
+  // Cofre cerca (solo el dueño, fuera del modo diseño): "E Abrir el cofre"
+  const cofrePrompt = document.createElement('button');
+  cofrePrompt.type = 'button'; cofrePrompt.className = 'door-prompt cofre-prompt'; cofrePrompt.hidden = true;
+  cofrePrompt.innerHTML = '<kbd>E</kbd> Abrir el cofre';
+  stage.parentElement.appendChild(cofrePrompt);
+  let cofreCerca = null, onCofre = null;
+  const abrirCofre = () => { if (cofreCerca && inside) onCofre?.(inside.key, cofreCerca); };
+  cofrePrompt.addEventListener('click', abrirCofre);
 
   // ---------- Música (enlace de YouTube que pone el dueño; ver src/ui/house-music.js) ----------
   const music = createHouseMusic({
@@ -564,7 +588,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   }
   function drop() {
     if (!carry) return;
-    if (carry.isNew && carry.item.m !== 'poster' && inventario && !inventario.remove('muebles', carry.item.m, 1)) { // sale de la mochila
+    const sacar = () => (inventario?.remoto ? inventario.count('muebles', carry.item.m) >= 1 : inventario.remove('muebles', carry.item.m, 1)); // (con servidor lo saca él)
+    if (carry.isNew && carry.item.m !== 'poster' && inventario && !sacar()) { // sale de la mochila
       notify('Ya no tenés ese mueble en la mochila'); cancelCarry(); return;
     }
     const items = current(inside.key).items.filter((x) => x.i !== carry.item.i);
@@ -584,7 +609,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     carry = null;
     if (!wasNew) {
       save(inside.key, items); onChange?.();
-      if (m !== 'poster' && inventario) { inventario.add('muebles', m, 1); notify('El mueble volvió a tu mochila 🎒'); }
+      if (m !== 'poster' && inventario) { if (!inventario.remoto) inventario.add('muebles', m, 1); notify('El mueble volvió a tu mochila 🎒'); }
     }
     drawUI();
   }
@@ -612,6 +637,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
 
   addEventListener('keydown', (e) => {
     if (!inside || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === 'KeyE' && !e.repeat && !design && !cofrePrompt.hidden && !blocked()) { abrirCofre(); e.preventDefault(); return; }
     if (e.code === 'KeyE' && !e.repeat && !design && !exitPrompt.hidden && !blocked()) { onExit?.(); e.preventDefault(); return; }
     if (e.code === 'KeyB' && !e.repeat && !blocked()) { setDesign(!design); e.preventDefault(); return; }
     if (design && !e.repeat && e.code === 'KeyV') { setTopView(!topView); e.preventDefault(); return; }
@@ -632,10 +658,11 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     // Después de cargar cualquier escena: si no es un interior, se apaga todo lo de las casas
     afterScene(sceneId) {
       if (inside && inside.id !== sceneId) inside = null;
-      if (!inside) { design = false; carry = null; topView = false; camera.up.set(0, 1, 0); grid = null; ui.hidden = true; exitPrompt.hidden = true; music.leave(); }
+      if (!inside) { design = false; carry = null; topView = false; camera.up.set(0, 1, 0); grid = null; ui.hidden = true; exitPrompt.hidden = true; cofrePrompt.hidden = true; music.leave(); }
       else { drawUI(); music.enter(isOwner()); syncMusic(); }
     },
     setOnExit(fn) { onExit = fn; },
+    setOnCofre(fn) { onCofre = fn; }, // (clave del lote, id del cofre) -> abre la ventana del cofre (ui/cofre.js)
     get inside() { return inside; },
     get designing() { return design; },
     get music() { return music.state; },
@@ -643,6 +670,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     modelo(m) { return makeItem({ m, i: `tienda_${m}` }); },
     // Se destruyó la casa (lotes.js): se borra su interior para todos
     clear(key) {
+      if (net) return; // lo borra el servidor al destruir o ceder el lote
       const cur = records.get(key);
       const rec = { c: null, o: null, v: (cur?.v ?? 0) + 1, items: [], mu: null };
       records.set(key, rec);
@@ -679,6 +707,18 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
       }
       const nearExit = !design && Math.hypot(focus.x - inside.exit.x, focus.z - inside.exit.z) < EXIT_RADIUS;
       if (exitPrompt.hidden === nearExit) exitPrompt.hidden = !nearExit;
+      // ¿un cofre cerca? (el más cercano a menos de 1,8 m)
+      cofreCerca = null;
+      if (!design && isOwner()) {
+        let bd = 1.8;
+        for (const it of current(inside.key).items) {
+          if (it.m !== 'cofre') continue;
+          const d = Math.hypot(focus.x - it.p[0], focus.z - it.p[1]);
+          if (d < bd) { bd = d; cofreCerca = it.i; }
+        }
+      }
+      const verCofre = !!cofreCerca && !nearExit;
+      if (cofrePrompt.hidden === verCofre) cofrePrompt.hidden = !verCofre;
     },
     get nearExit() { return !!inside && !exitPrompt.hidden; },
   };

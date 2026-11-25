@@ -1,9 +1,12 @@
-// Menú de inicio (solo index.html): elegir personaje y entrar solo o al servidor.
+// Menú de inicio (solo index.html): elegir personaje, entrar con tu cuenta (o crear una) y jugar en el servidor.
 //   - Personajes: el de siempre (data/tables/player.json) y TODOS los NPC del juego: se buscan solos en los
 //     .glb de todas las escenas (Empties npc_…, con su npc_modelo / npc_nombre / npc_escala / npc_giro / npc_anim)
 //     y en los "actors" de cada escena. No hay que anotarlos en ningún lado.
-//   - "Jugar en el servidor" muestra cuántas personas están jugando (ver src/net/multiplayer.js).
-// Devuelve una promesa con { online, name, character: { id, name, model, scale, yawOffset, idle } }.
+//   - Cuenta: nombre + contraseña. Cada jugador tiene su id en el servidor: su nombre, mochila, casa y progreso son
+//     suyos y nadie más puede usarlos (el nombre no se puede repetir). La sesión queda abierta en este navegador
+//     (solo un token: el servidor lo verifica) hasta que toques "Cambiar de cuenta".
+//   - Si el servidor está apagado, se avisa y no se puede entrar (ver src/net/servidor.js).
+// Devuelve una promesa con { online: true, net, name, character: { id, name, model, scale, yawOffset, idle } }.
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { loadGLB, loadJSON } from '../core/assets.js';
@@ -163,26 +166,37 @@ export function showStartMenu({ characters, connect }) {
           <div class="sm-list" role="listbox" aria-label="Personajes"></div>
         </div>
         <div class="sm-actions">
-          <label class="sm-field">Tu nombre
-            <input class="sm-input" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Vacío = uno automático">
-          </label>
+          <p class="sm-server"><i class="sm-dot"></i><span class="sm-count-text">Buscando el servidor…</span></p>
+          <div class="sm-cuenta" hidden>
+            <p class="sm-yo">Entraste como <b class="sm-yo-n"></b></p>
+            <button type="button" class="sm-link sm-cambiar">Cambiar de cuenta</button>
+          </div>
+          <form class="sm-login" hidden autocomplete="on">
+            <div class="sm-tabs" role="tablist">
+              <button type="button" role="tab" class="sm-tab" data-modo="login" aria-selected="true">Entrar</button>
+              <button type="button" role="tab" class="sm-tab" data-modo="registro" aria-selected="false">Crear cuenta</button>
+            </div>
+            <label class="sm-field">Nombre
+              <input class="sm-input sm-nombre" name="username" maxlength="20" autocomplete="username" spellcheck="false" required>
+            </label>
+            <label class="sm-field">Contraseña
+              <input class="sm-input sm-clave" name="password" type="password" maxlength="72" autocomplete="current-password" required>
+            </label>
+            <label class="sm-field sm-repetir" hidden>Repetí la contraseña
+              <input class="sm-input sm-clave2" type="password" maxlength="72" autocomplete="new-password">
+            </label>
+            <p class="sm-hint sm-hint-reg" hidden>3 a 20 letras o números. El nombre es tuyo para siempre: nadie más puede usarlo. La contraseña, de 6 letras o más.</p>
+          </form>
           <p class="sm-err" aria-live="assertive"></p>
-          <button type="button" class="sm-btn sm-primary" data-go="solo">Entrar al mundo</button>
-          <button type="button" class="sm-btn" data-go="online">
-            <span>Jugar en el servidor</span>
-            <span class="sm-count"><i class="sm-dot"></i><span class="sm-count-text">Conectando…</span></span>
-          </button>
-          <p class="sm-net" aria-live="polite"></p>
-          <p class="sm-note">En el servidor ves a los demás jugadores y ellos te ven a vos, con el personaje que elijas.</p>
+          <button type="button" class="sm-btn sm-primary sm-go" disabled>Entrar al mundo</button>
+          <p class="sm-note">Ves a los demás jugadores y ellos te ven a vos, con el personaje que elijas. Tu mochila, tu casa y tu progreso se guardan en el servidor.</p>
         </div>
       </div>
     </div>`;
   document.body.append(el);
 
-  const $ = (s) => el.querySelector(s);
+  const $ = (q) => el.querySelector(q);
   const listEl = $('.sm-list');
-  const nameIn = $('.sm-input');
-  nameIn.value = saved.name ?? '';
   characters.forEach((c, i) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -192,7 +206,6 @@ export function showStartMenu({ characters, connect }) {
     b.onclick = () => select(i);
     listEl.append(b);
   });
-
   const preview = createPreview($('.sm-preview'));
   function select(i) {
     index = (i + characters.length) % characters.length;
@@ -205,75 +218,85 @@ export function showStartMenu({ characters, connect }) {
   el.querySelectorAll('.sm-arrow').forEach((b) => { b.onclick = () => select(index + Number(b.dataset.d)); });
   select(index);
 
-  // Servidor: contar cuántos juegan (mientras el menú está abierto)
-  let net = null;
-  const countText = $('.sm-count-text');
-  const dot = $('.sm-dot');
-  const setCount = (n) => { countText.textContent = n === 1 ? '1 jugando' : `${n} jugando`; dot.classList.toggle('on', n > 0); };
-  const netReady = connect().then((n) => {
+  const errEl = $('.sm-err'), go = $('.sm-go'), form = $('.sm-login'), cuentaEl = $('.sm-cuenta');
+  const nombreIn = $('.sm-nombre'), claveIn = $('.sm-clave'), clave2In = $('.sm-clave2');
+  nombreIn.value = saved.name ?? '';
+  let modo = 'login', net = null, sesion = null, busy = false;
+  function setModo(m) {
+    modo = m;
+    el.querySelectorAll('.sm-tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.modo === m)));
+    $('.sm-repetir').hidden = m !== 'registro';
+    $('.sm-hint-reg').hidden = m !== 'registro';
+    claveIn.autocomplete = m === 'registro' ? 'new-password' : 'current-password';
+    go.textContent = m === 'registro' ? 'Crear cuenta y entrar' : 'Entrar al mundo';
+    errEl.textContent = '';
+  }
+  el.querySelectorAll('.sm-tab').forEach((b) => { b.onclick = () => setModo(b.dataset.modo); });
+  function mostrarSesion(s) {
+    sesion = s;
+    cuentaEl.hidden = !s; form.hidden = !!s;
+    if (s) { $('.sm-yo-n').textContent = s.nombre; go.textContent = 'Entrar al mundo'; }
+    else setModo(modo);
+  }
+  $('.sm-cambiar').onclick = () => { net?.salirCuenta(); location.reload(); };
+
+  // Servidor: cuántos juegan; si hay una sesión guardada, se usa sola
+  const countText = $('.sm-count-text'), dot = $('.sm-dot');
+  const setCount = (n) => { countText.textContent = `Servidor encendido · ${n === 1 ? '1 jugando' : `${n} jugando`}`; dot.classList.add('on'); };
+  connect().then(async (n) => {
     net = n;
-    // Encontrar a los demás tarda unos segundos: hasta entonces "Buscando…" (salvo que ya aparezca alguien)
-    let searching = true;
-    setTimeout(() => { searching = false; setCount(n.count); }, 4000);
-    countText.textContent = 'Buscando…';
-    n.onCount = (c) => { if (!searching || c > 0) { searching = false; setCount(c); } };
-    // Estado de la red (para saber si el problema es la conexión)
-    const netEl = $('.sm-net');
-    const tick = () => {
-      if (!el.isConnected) return;
-      const s = n.network;
-      netEl.textContent = s.open ? `Red: ${s.open} de ${s.total} puntos de encuentro · ${s.peers} conectado(s) con vos` : 'Red: conectando a los puntos de encuentro…';
-      setTimeout(tick, 1000);
-    };
-    tick();
-    return n;
-  }).catch((err) => {
-    console.warn('Multijugador:', err);
-    countText.textContent = 'Sin conexión';
-    $('[data-go="online"]').disabled = true;
-    return null;
+    setCount(n.count);
+    n.onCount = (c) => { if (el.isConnected) setCount(c); };
+    if (!n.registroAbierto) { el.querySelector('[data-modo="registro"]').hidden = true; }
+    if (n.tokenGuardado()) {
+      countText.textContent = 'Recuperando tu sesión…';
+      const r = await n.conToken();
+      setCount(n.count);
+      if (r.ok) mostrarSesion({ nombre: r.nombre }); else mostrarSesion(null);
+    } else mostrarSesion(null);
+    go.disabled = false;
+  }).catch(() => {
+    countText.textContent = 'El servidor está apagado. Probá más tarde.';
+    dot.classList.add('off');
+    errEl.textContent = 'No se puede jugar mientras el servidor esté apagado.';
+    go.disabled = true;
+    setTimeout(() => location.reload(), 30000); // vuelve a probar solo
   });
 
   return new Promise((resolve) => {
     const keyNav = (e) => {
-      if (e.target === nameIn) { if (e.key === 'Enter') go('solo'); else $('.sm-err').textContent = ''; return; }
-      if (e.target?.tagName === 'BUTTON' && e.key === 'Enter') return; // el botón ya hace lo suyo
+      if (e.target?.tagName === 'INPUT') { if (e.key === 'Enter') { e.preventDefault(); entrar(); } else errEl.textContent = ''; return; }
+      if (e.target?.tagName === 'BUTTON' && e.key === 'Enter') return;
       if (e.key === 'ArrowLeft') select(index - 1);
       else if (e.key === 'ArrowRight') select(index + 1);
-      else if (e.key === 'Enter') go('solo');
+      else if (e.key === 'Enter') entrar();
     };
     addEventListener('keydown', keyNav);
-    let busy = false;
-    const errEl = $('.sm-err');
-    async function go(mode) {
-      if (busy) return;
-      const online = mode === 'online';
-      let name = nameIn.value.trim().replace(/\s+/g, ' ').slice(0, 20);
+    form.addEventListener('submit', (e) => { e.preventDefault(); entrar(); });
+    async function entrar() {
+      if (busy || !net || go.disabled) return;
       const character = characters[index];
-      const n = online ? await netReady : null;
-      // En el servidor cada nombre es de un solo jugador (ver checkName en net/multiplayer.js)
-      if (online && n) {
-        busy = true;
-        errEl.textContent = 'Comprobando el nombre…';
-        const t0 = performance.now();
-        while (!n.namesReady() && performance.now() - t0 < 6000) await new Promise((r) => setTimeout(r, 150));
-        busy = false;
-        if (!name) { name = n.freeName(); nameIn.value = name; }
-        const st = n.checkName(name);
-        if (st === 'invalido') { errEl.textContent = 'El nombre tiene que tener al menos una letra o número.'; nameIn.focus(); return; }
-        if (st === 'ocupado') { errEl.textContent = `"${name}" ya es de otro jugador. Elegí otro nombre.`; nameIn.focus(); nameIn.select(); return; }
-        n.claimName(name);
-        errEl.textContent = '';
+      if (!sesion) {
+        const nombre = nombreIn.value.trim().replace(/\s+/g, ' '), clave = claveIn.value;
+        if (nombre.length < 3) { errEl.textContent = 'Escribí tu nombre (3 letras o más).'; nombreIn.focus(); return; }
+        if (clave.length < 6) { errEl.textContent = 'La contraseña tiene que tener 6 letras o más.'; claveIn.focus(); return; }
+        if (modo === 'registro' && clave !== clave2In.value) { errEl.textContent = 'Las dos contraseñas no son iguales.'; clave2In.focus(); return; }
+        busy = true; go.disabled = true;
+        errEl.textContent = modo === 'registro' ? 'Creando tu cuenta…' : 'Entrando…';
+        const r = modo === 'registro' ? await net.registrar(nombre, clave) : await net.entrar(nombre, clave);
+        busy = false; go.disabled = false;
+        if (!r.ok) { errEl.textContent = r.error || 'No se pudo entrar.'; (r.ocupado ? nombreIn : claveIn).focus(); if (r.ocupado) nombreIn.select(); return; }
+        sesion = { nombre: r.nombre };
+        claveIn.value = ''; clave2In.value = '';
       }
-      name = name || 'Viajero';
-      try { localStorage.setItem(STORE, JSON.stringify({ model: character.model, name })); } catch { /* nada */ }
+      errEl.textContent = '';
+      try { localStorage.setItem(STORE, JSON.stringify({ model: character.model, name: sesion.nombre })); } catch { /* nada */ }
       removeEventListener('keydown', keyNav);
-      if (!online) netReady.then((x) => x?.leave());
       preview.dispose();
       el.classList.add('sm-out');
       setTimeout(() => el.remove(), 300);
-      resolve({ online: !!(online && n), net: online ? n : null, name, character });
+      resolve({ online: true, net, name: sesion.nombre, character });
     }
-    el.querySelectorAll('[data-go]').forEach((b) => { b.onclick = () => go(b.dataset.go); });
+    go.onclick = entrar;
   });
 }

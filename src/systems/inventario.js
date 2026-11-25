@@ -14,9 +14,13 @@
 //                                              en el celular, la lista al costado de siempre
 //   inv.snapshot()                             copia { recursos, muebles } (para el Studio y para depurar)
 //
-// Se guarda en el navegador (localStorage 'coronda.inventario'), igual que los flags y los lotes.
-// OJO: no hay cuentas ni servidor que valide, así que un jugador tramposo puede editar sus datos. Cuando haya servidor propio
-// (ver README, "Lotes"), solo cambian load() y save(): el resto del juego usa esta misma API.
+// En el servidor (index.html) la mochila la guarda y la decide el SERVIDOR: acá solo se muestra lo que él manda
+// (net.onYo). add/remove/pay no hacen nada en ese modo: talar, encargar, retirar o poner muebles se le piden al
+// servidor (net.rpc) y él cambia la mochila. Así editar el navegador (F12) no sirve para nada.
+// Sin servidor (dev.html, para probar) se guarda en el navegador como antes (localStorage 'coronda.inventario').
+//
+// Íconos: "icono" de data/tables/recursos.json y data/muebles.json es una imagen (assets/icons/…svg). Con imágenes
+// todos ven lo mismo: un emoji nuevo (🪵, 🪑) en un Windows viejo se ve como un cuadrado vacío. iconoHtml() lo dibuja.
 import { loadJSON } from '../core/assets.js';
 
 const STORE = 'coronda.inventario';
@@ -25,11 +29,17 @@ const ID_RE = /^[a-z0-9_.-]{1,60}$/i;
 const DEFAULT_MAX = 999;
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ICONO_RE = /^assets\/[\w/.-]+\.(svg|png|webp)$/i;
+// Ícono de un objeto: imagen si "icono" es un archivo, si no el texto (emoji). Si la imagen no carga: un "?" gris.
+export function iconoHtml(icono, nombre = '') {
+  if (ICONO_RE.test(String(icono ?? ''))) return `<img class="inv-img" src="${esc(icono)}" alt="${esc(nombre)}" draggable="false" onerror="this.onerror=null;this.src='assets/icons/desconocido.svg'">`;
+  return `<span class="inv-emoji">${esc(icono || '•')}</span>`;
+}
 
 // opts: stage (donde se dibuja), dev, notify(msg), blocked() (true si algo más usa el teclado: una charla),
 //       onOpen() / onClose() (el menú del centro frena al personaje, como una charla)
 const FILAS = 9; // casilleros por fila, como el inventario de Minecraft
-export function createInventario({ stage = null, dev = false, notify = () => {}, blocked = () => false, onOpen = () => {}, onClose = () => {} } = {}) {
+export function createInventario({ stage = null, dev = false, net = null, notify = () => {}, blocked = () => false, onOpen = () => {}, onClose = () => {} } = {}) {
   const app = stage ?? document.querySelector('.app') ?? document.body;
   let data = { recursos: {}, muebles: {} };
   let defs = { recursos: new Map(), muebles: new Map() }; // id -> { nombre, icono, max }
@@ -46,8 +56,8 @@ export function createInventario({ stage = null, dev = false, notify = () => {},
     }
     return out;
   }
-  function load() { try { data = clean(JSON.parse(localStorage.getItem(STORE) || '{}')); } catch { data = clean({}); } }
-  function save() { try { localStorage.setItem(STORE, JSON.stringify(data)); } catch { /* modo privado: queda en memoria */ } }
+  function load() { if (net) return; try { data = clean(JSON.parse(localStorage.getItem(STORE) || '{}')); } catch { data = clean({}); } }
+  function save() { if (net) return; try { localStorage.setItem(STORE, JSON.stringify(data)); } catch { /* modo privado: queda en memoria */ } }
   const limit = (kind, id) => (kind === 'recursos' ? (defs.recursos.get(id)?.max ?? DEFAULT_MAX) : DEFAULT_MAX);
 
   const ready = Promise.all([
@@ -55,7 +65,7 @@ export function createInventario({ stage = null, dev = false, notify = () => {},
     loadJSON('data/muebles.json').catch(() => ({ muebles: [] })),
   ]).then(([r, m]) => {
     defs.recursos = new Map(Object.entries(r.recursos ?? {}).map(([id, x]) => [id, { nombre: x.nombre ?? id, icono: x.icono ?? '•', max: Math.max(1, Number(x.max) || DEFAULT_MAX) }]));
-    defs.muebles = new Map((m.muebles ?? []).map((x) => [x.id, { nombre: x.nombre ?? x.id, icono: x.icono ?? '🪑', max: DEFAULT_MAX }]));
+    defs.muebles = new Map((m.muebles ?? []).map((x) => [x.id, { nombre: x.nombre ?? x.id, icono: x.icono ?? 'assets/icons/desconocido.svg', max: DEFAULT_MAX }]));
     load();
     redraw();
   });
@@ -66,7 +76,24 @@ export function createInventario({ stage = null, dev = false, notify = () => {},
   const count = (kind, id) => (kindOk(kind) ? data[kind][id] ?? 0 : 0);
   function emit(kind, id, delta) { listeners.forEach((f) => { try { f(kind, id, delta, count(kind, id)); } catch (e) { console.error(e); } }); }
 
+  // Mochila del servidor: llega entera cada vez que cambia. Se avisan las diferencias (+2 Madera, etc.)
+  function desdeServidor(inv) {
+    const antes = data;
+    data = clean(inv ?? {});
+    for (const kind of KINDS) {
+      for (const id of new Set([...Object.keys(antes[kind]), ...Object.keys(data[kind])])) {
+        const d = (data[kind][id] ?? 0) - (antes[kind][id] ?? 0);
+        if (d) { emit(kind, id, d); if (d > 0 && primeraVez) notify(`+${d} ${nameOf(kind, id)}`); }
+      }
+    }
+    primeraVez = true;
+    redraw();
+  }
+  let primeraVez = false;
+  if (net) net.onYo((yo) => ready.then(() => desdeServidor(yo.inv)));
+
   function add(kind, id, n = 1) {
+    if (net) { console.warn('Inventario: la mochila la cambia el servidor.'); return 0; }
     n = Math.floor(Number(n));
     if (!kindOk(kind) || !ID_RE.test(String(id)) || !(n > 0)) return 0;
     const have = count(kind, id);
@@ -78,6 +105,7 @@ export function createInventario({ stage = null, dev = false, notify = () => {},
     return put;
   }
   function remove(kind, id, n = 1) {
+    if (net) { console.warn('Inventario: la mochila la cambia el servidor.'); return false; }
     n = Math.floor(Number(n));
     if (!kindOk(kind) || !(n > 0) || count(kind, id) < n) return false;
     const left = count(kind, id) - n;
@@ -87,13 +115,13 @@ export function createInventario({ stage = null, dev = false, notify = () => {},
   }
   const has = (costo) => Object.entries(costo ?? {}).every(([id, n]) => count('recursos', id) >= Math.floor(Number(n) || 0));
   function pay(costo) {
-    if (!has(costo)) return false;
+    if (net || !has(costo)) return false;
     for (const [id, n] of Object.entries(costo ?? {})) if (Math.floor(Number(n)) > 0) remove('recursos', id, n);
     return true;
   }
   const nameOf = (kind, id) => defs[kind]?.get(id)?.nombre ?? id;
   const snapshot = () => structuredClone(data);
-  function reset() { data = clean({}); save(); redraw(); KINDS.forEach((k) => emit(k, null, 0)); }
+  function reset() { if (net) return; data = clean({}); save(); redraw(); KINDS.forEach((k) => emit(k, null, 0)); }
 
   // ---------- Panel ----------
   const btn = document.createElement('button');
@@ -110,7 +138,7 @@ export function createInventario({ stage = null, dev = false, notify = () => {},
     if (!list.length) return '<li class="inv-empty">Nada por ahora</li>';
     return list.map((id) => {
       const d = defs[kind].get(id);
-      return `<li><span class="inv-ico">${esc(d?.icono ?? '•')}</span><span class="inv-name">${esc(d?.nombre ?? id)}</span><b class="inv-n">${count(kind, id)}</b></li>`;
+      return `<li><span class="inv-ico">${iconoHtml(d?.icono, d?.nombre ?? id)}</span><span class="inv-name">${esc(d?.nombre ?? id)}</span><b class="inv-n">${count(kind, id)}</b></li>`;
     }).join('');
   }
   // Casilleros estilo Minecraft: solo lo que tenés, y el resto de la fila vacía (mínimo `filas` filas)
@@ -123,7 +151,7 @@ export function createInventario({ stage = null, dev = false, notify = () => {},
       if (!id) { html += '<div class="inv-slot"></div>'; continue; }
       const d = defs[kind].get(id);
       const n = count(kind, id);
-      html += `<div class="inv-slot lleno" data-nombre="${esc(d?.nombre ?? id)}" data-n="${n}"><span class="inv-ico">${esc(d?.icono ?? '•')}</span>${n > 1 ? `<b class="inv-n">${n}</b>` : ''}</div>`;
+      html += `<div class="inv-slot lleno" data-nombre="${esc(d?.nombre ?? id)}" data-n="${n}"><span class="inv-ico">${iconoHtml(d?.icono, d?.nombre ?? id)}</span>${n > 1 ? `<b class="inv-n">${n}</b>` : ''}</div>`;
     }
     return html;
   }
@@ -197,11 +225,12 @@ export function createInventario({ stage = null, dev = false, notify = () => {},
     if (e.code === 'Escape' && isOpen()) close();
     else if (e.code === 'KeyI' && !dev) toggle(); // en dev.html la I es del inspector: ahí se usa el botón 🎒
   });
-  addEventListener('storage', (e) => { if (e.key === STORE) { load(); redraw(); KINDS.forEach((k) => emit(k, null, 0)); } }); // otra pestaña
+  if (!net) addEventListener('storage', (e) => { if (e.key === STORE) { load(); redraw(); KINDS.forEach((k) => emit(k, null, 0)); } }); // otra pestaña
 
   const api = {
     ready, count, add, remove, has, pay, snapshot, reset, open, close, toggle, isOpen,
-    nameOf, defs: () => defs,
+    nameOf, defs: () => defs, icono: (kind, id) => iconoHtml(defs[kind]?.get(id)?.icono, nameOf(kind, id)),
+    get remoto() { return !!net; },
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   };
   if (dev && typeof window !== 'undefined') window.inventario = api; // para probar: inventario.add('recursos', 'madera', 20)

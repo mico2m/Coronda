@@ -10,16 +10,23 @@
 //    entra a la fila (se fabrica por orden de pedido, uno por vez) y ocupa un lugar de la grilla del taller (slot_01…50),
 //    donde se ve una caja con tu nombre, el mueble y una barra de progreso. El que se está fabricando se ve en el banco
 //    de trabajo (banco_obra), creciendo, y Claude martillando al lado (si nadie lo espera en el mostrador).
-//  - Los pedidos son de todo el servidor (se guardan como los lotes: tienda~<id>) y el tiempo sale del reloj de la
-//    compu, así todos ven lo mismo sin que nadie "maneje" la fabricación.
+//  - Los pedidos los guarda y los decide el SERVIDOR (net.rpc('tienda.encargar')): cobra la madera de TU mochila del
+//    servidor, controla el máximo de pedidos y los lugares del taller, y calcula cuándo empieza y termina cada uno con
+//    SU reloj. Todos reciben el mismo inicio y fin (tienda~<id>) y el progreso se dibuja con el reloj del servidor
+//    (tiempo.ahora()), así dos jugadores nunca ven porcentajes distintos.
+//  - Cantidad: al encargar elegís cuántos (1, 2, 5, 10 u otra cantidad hasta max_cantidad): es UN pedido con N muebles.
 //  - Horario: el taller fabrica solo con la Carpintería abierta (tiempo.json > tienda). Un pedido de 10 min pedido a las
 //    19:59 sale mañana a las 08:09; la hora de entrega = todo lo que ya está en la fila + lo nuevo, saltando la noche.
 //  - Encargar hablando: la IA de Claude entiende "necesito 7 mesas y 4 sillas" y la tienda hace las cuentas (encargoIA):
 //    nombres, límite de max_pedidos_por_jugador, lugar en el taller, madera y hora de entrega. Se confirma diciéndole
 //    "dale" o con el botón "✅ Confirmar".
 //  - Retirar: "Retirar mis pedidos" → uno o "todos", parado en la zona de entrega (Empty zona_entrega, frente al
-//    mostrador). Claude va al slot de cada uno, lo trae al mostrador y te lo da (pasa a tu mochila). Si no estás en la
-//    zona, te espera un minuto y lo devuelve a su lugar. Mientras tanto nadie más le puede hablar.
+//    mostrador). Claude va al slot de cada uno y lo deja en el mostrador: desde ese momento corre un contador
+//    (tienda.json > entrega_caduca_seg). Si estás en la zona lo recogés (pasa a tu mochila, lo hace el servidor); si no
+//    lo recogés a tiempo, el servidor cancela la entrega, Claude lo vuelve a guardar y queda libre para otros.
+//    Mientras tanto nadie más le puede hablar.
+//  - Claude se queda en el mostrador: solo camina para traer un pedido o para dejar las notas en los buzones (no va
+//    al taller a "hacer que trabaja").
 //  - Caminos: adentro de la tienda Claude esquiva paredes, mostrador y muebles (A* sobre las col_…, ver ruta()).
 //    Si le hablás mientras trabaja en el taller, te contesta desde ahí.
 //  - Al cerrar (data/tables/tiempo.json > tienda.cierra), Claude sale a dejar una nota en el buzón de cada dueño con
@@ -43,7 +50,8 @@ const norm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 
 export function createTienda({ stage = null, getRoot, net = null, claude = null, inventario = null, tiempo = null, lotes = null, casas = null,
   myName = 'Viajero', myUid = 'yo', getPlayer = () => null, getSceneId = () => null, notify = () => {}, onEntrega = () => {} } = {}) {
-  let cfg = { id: 'tienda', zona: [5, 10], techo: 'techo', inactividad_seg: 20, espera_seg: 5, reparto_horas: 3, max_pedidos_por_jugador: 5 };
+  let cfg = { id: 'tienda', zona: [5, 10], techo: 'techo', inactividad_seg: 20, espera_seg: 5, reparto_horas: 3, max_pedidos_por_jugador: 5, max_cantidad: 20, entrega_caduca_seg: 60 };
+  const ahora = () => tiempo?.ahora?.() ?? Date.now(); // con servidor: SU reloj
   loadJSON('data/tables/tienda.json').then((c) => { cfg = { ...cfg, ...c }; }).catch(() => {});
   const catalog = new Map(); // id -> { id, nombre, costo, tiempo_min, caja, archivo }
   loadJSON('data/muebles.json').then((d) => { for (const m of d?.muebles ?? []) if (m?.id) catalog.set(m.id, m); }).catch(() => {});
@@ -192,7 +200,8 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
   if (claude) claude.nav = (de, a) => { try { return ruta(de, a); } catch { return null; } };
 
   // ---------- Pedidos ----------
-  // { id, u, n (nombre), m (mueble), t (cuándo se pidió, ms), d (duración ms), s (slot 1..50), aviso (nota dejada) }
+  // { id, u, n (nombre), m (mueble), q (cantidad), t (cuándo se pidió, ms), d (duración ms), s (slot 1..50), aviso (nota dejada),
+  //   start / end / pos (los calcula el servidor), est ('mostrador' = Claude lo dejó en el mostrador), hasta (vence la entrega) }
   const orders = new Map();
   const SOLO_KEY = 'coronda.tienda.solo';
   let plan = [], planAt = 0; // la fila calculada (ver schedule)
@@ -203,28 +212,26 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
     if (!r || typeof r !== 'object' || !ID_RE.test(String(r.m ?? ''))) return null;
     const t = Number(r.t), d = Number(r.d), s = Math.round(Number(r.s));
     if (!Number.isFinite(t) || !(d > 0) || !(s >= 1 && s <= 99)) return null;
-    return { id, u: String(r.u ?? '').slice(0, 40), n: String(r.n ?? 'alguien').slice(0, 24), m: String(r.m), t, d: Math.min(d, 24 * 3600e3), s, aviso: !!r.aviso, ...(r.h ? { h: 1 } : {}) };
+    const q = Math.max(1, Math.min(99, Math.round(Number(r.q) || 1)));
+    const extra = net && Number.isFinite(r.start) && Number.isFinite(r.end) ? { start: r.start, end: r.end, pos: Number(r.pos) || 0, est: r.est === 'mostrador' ? 'mostrador' : null, hasta: Number(r.hasta) || 0 } : {};
+    return { id, u: String(r.u ?? '').slice(0, 40), n: String(r.n ?? 'alguien').slice(0, 24), m: String(r.m), q, t, d: Math.min(d, 30 * 24 * 3600e3), s, aviso: !!r.aviso, ...(r.h ? { h: 1 } : {}), ...extra };
   }
   function accept(id, r) {
     const o = r ? cleanOrder(id, r) : null;
     if (o) orders.set(id, o); else orders.delete(id);
     changed();
   }
-  function save(o) {
-    if (net?.tienda) { net.tienda.send({ k: o.id, r: o }); net.tienda.persist(o.id, o); }
-    else saveSolo();
-  }
+  function save() { if (!net) saveSolo(); } // con servidor, los pedidos los guarda él
   function drop(id) {
+    if (net) { net.rpc('admin', { cmd: `/borrarpedido ${id}` }).catch((e) => notify(e.message)); return; } // (Studio, admin)
     orders.delete(id);
-    if (net?.tienda) { net.tienda.send({ k: id, r: null }); net.tienda.persist(id, null); }
-    else saveSolo();
+    saveSolo();
     changed();
   }
   function saveSolo() { try { localStorage.setItem(SOLO_KEY, JSON.stringify([...orders.values()])); } catch { /* nada */ } }
   if (net?.tienda) {
     const C = net.tienda;
     const { messages, saved } = C.take();
-    C.onMessage = (d) => { if (d?.k) accept(String(d.k), d.r); };
     C.onPersisted = (k, d) => accept(k, d);
     messages.forEach(({ data }) => data?.k && accept(String(data.k), data.r));
     saved.forEach(([k, d]) => accept(k, d));
@@ -266,6 +273,11 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
 
   // Fila: por orden de pedido, uno por vez. Cada uno empieza cuando termina el anterior (o cuando se pidió).
   function schedule() {
+    if (net) { // el inicio y el fin los calculó el servidor
+      plan = [...orders.values()].filter((o) => Number.isFinite(o.start)).sort((a, b) => a.pos - b.pos || a.t - b.t);
+      planAt = ahora();
+      return;
+    }
     const list = [...orders.values()].sort((a, b) => a.t - b.t || (a.id < b.id ? -1 : 1));
     let end = 0;
     plan = list.map((o, i) => {
@@ -274,33 +286,34 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
       end = o.h ? sumarTrabajo(start, o.d) : start + o.d;
       return { ...o, start, end, pos: i + 1 };
     });
-    planAt = Date.now();
+    planAt = ahora();
   }
   function changed() { schedule(); }
-  function info(o, now = Date.now()) {
+  function info(o, now = ahora()) {
     const hecho = o.h ? trabajoEntre(o.start, Math.min(now, o.end)) : now - o.start;
     const p = Math.min(1, Math.max(0, hecho / o.d));
     return { ...o, progreso: p, listo: now >= o.end, fabricando: now >= o.start && now < o.end };
   }
   // Cuándo estarían listos muebles nuevos (lista de { m, d }) si se piden ahora: después de toda la fila
-  function estimar(lista, now = Date.now()) {
+  function estimar(lista, now = ahora()) {
     if (now - planAt > 1000) schedule();
     let end = plan.reduce((x, o) => Math.max(x, o.end), now);
     return lista.map((x) => { end = sumarTrabajo(Math.max(now, end), x.d); return { ...x, end }; });
   }
-  function pedidos(now = Date.now()) { if (now - planAt > 1000) schedule(); return plan.map((o) => info(o, now)); }
+  function pedidos(now = ahora()) { if (now - planAt > 1000 || !net) schedule(); return plan.map((o) => info(o, now)); }
   const mine = () => pedidos().filter((o) => o.u === myUid);
   const nombre = (m) => catalog.get(m)?.nombre ?? m;
   const costoTxt = (c) => Object.entries(c ?? {}).map(([k, v]) => `${v} ${k}`).join(' + ') || 'nada';
   // "a las 15:30" / "mañana a las 08:09" / "pasado mañana a las 10:00" (hora del juego)
-  function cuando(t, now = Date.now()) {
+  function cuando(t, now = ahora()) {
     if (!tiempo) return '';
     const dd = tiempo.dia(t) - tiempo.dia(now), hh = tiempo.texto(tiempo.hora(t));
     return dd <= 0 ? `a las ${hh}` : dd === 1 ? `mañana a las ${hh}` : dd === 2 ? `pasado mañana a las ${hh}` : `en ${dd} días, a las ${hh}`;
   }
   const horaFin = (o) => cuando(o.end);
   // Hora de un pedido nuevo: siempre después del último (dos en el mismo milisegundo no se cruzan en la fila)
-  function nuevaHora() { let t = Date.now(); for (const o of orders.values()) if (o.t >= t) t = o.t + 1; return t; }
+  function nuevaHora() { let t = ahora(); for (const o of orders.values()) if (o.t >= t) t = o.t + 1; return t; }
+  const cantidadTxt = (o) => (o.q > 1 ? `${o.q} × ` : '');
   function freeSlot() {
     const used = new Set(pedidos().map((o) => o.s));
     const n = Math.max(1, slots().length || 50);
@@ -361,7 +374,7 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
     x.fillStyle = '#f6f9fa'; x.font = '600 26px system-ui, sans-serif'; x.textAlign = 'center';
     x.fillText(o.n.slice(0, 16), 128, 32);
     x.fillStyle = '#c9d4d8'; x.font = '500 20px system-ui, sans-serif';
-    x.fillText(`${nombre(o.m)}${o.listo ? ' · listo' : o.fabricando ? ` · ${Math.round(o.progreso * 100)}%` : ` · en fila (#${o.pos})`}`, 128, 58);
+    x.fillText(`${cantidadTxt(o)}${nombre(o.m)}${o.listo ? ' · listo' : o.fabricando ? ` · ${Math.round(o.progreso * 100)}%` : ` · en fila (#${o.pos})`}`, 128, 58);
     x.fillStyle = 'rgba(255,255,255,0.18)'; roundRect(x, 24, 68, 208, 14, 7); x.fill();
     x.fillStyle = o.listo ? '#5eead4' : '#ffd36e'; roundRect(x, 24, 68, Math.max(14, 208 * o.progreso), 14, 7); x.fill();
     sp.material.map.needsUpdate = true;
@@ -395,7 +408,7 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
         if (kind === 'caja') { v.body = crate(); v.g.add(v.body); }
         else model(o.m).then((m) => { if (v.kind === 'mueble' && !v.body) { v.body = m; v.g.add(m); } });
       }
-      const key = `${o.n}|${o.listo}|${o.fabricando}|${Math.round(o.progreso * 50)}|${o.pos}`;
+      const key = `${o.n}|${o.q}|${o.listo}|${o.fabricando}|${Math.round(o.progreso * 50)}|${o.pos}`;
       if (key !== v.key) { v.key = key; drawLabel(v.label, o); }
     }
     for (const [id, v] of vis) if (!live.has(id)) { group.remove(v.g); v.label.material.map.dispose(); vis.delete(id); }
@@ -489,26 +502,52 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
   function attachPrompt() { if (!stageEl) { stageEl = stage ?? document.getElementById('stage') ?? document.body; stageEl.appendChild(notePrompt); } }
 
   // ---------- Claude: qué hace (solo el juego que lo maneja) ----------
-  const jobs = []; // { u, n, ids: [] }
+  // Con servidor, los trabajos ("buscar el pedido de X") los anota el SERVIDOR (claude~trabajo) cuando alguien pide
+  // retirar: el que maneja a Claude los hace (caminar, traer) y le avisa al servidor cuando lo deja en el mostrador.
+  // Desde ahí corre la caducidad de la entrega (la cuenta el servidor): si el dueño no lo recoge, se cancela sola.
+  let jobs = []; // sin servidor: { u, n, ids }; con servidor: la lista del servidor { id, u, n, ids }
   let doing = null; // 'buscar' | 'reparto' | null
   let at = '';      // dónde lo mandé por última vez (para no repetir)
   let repartoDia = -1;
+  if (net?.claude) {
+    const C = net.claude;
+    const prev = C.onPersisted;
+    const recibirTrabajos = (k, d) => { if (k === 'trabajo') jobs = Array.isArray(d) ? d.filter((j) => j?.id && Array.isArray(j.ids)) : []; else prev?.(k, d); };
+    C.onPersisted = recibirTrabajos;
+    for (const [k, d] of C.take().saved) recibirTrabajos(k, d);
+  }
   if (claude) {
-    claude.onTienda = (d) => {
+    claude.onTienda = (d) => { // sin servidor (jugando solo)
       if (d.tipo === 'buscar' && Array.isArray(d.ids)) {
         const ids = d.ids.map(String).filter((id) => orders.get(id)?.u === d.u).slice(0, 20);
         if (ids.length && !jobs.some((j) => j.u === d.u)) { jobs.push({ u: String(d.u), n: String(d.n ?? ''), ids }); claude.holdTalk(String(d.u), d.n); }
       }
     };
-    claude.onTiendaMsg = (d) => {
-      if (d?.tipo === 'entregado' && d.u === myUid && orders.has(d.id)) {
-        const o = orders.get(d.id);
-        inventario?.add('muebles', o.m, 1);
-        drop(d.id);
-        notify(`Claude te dio: ${nombre(o.m)} (ya está en tu mochila 🎒)`);
-        try { onEntrega(o); } catch { /* nada */ } // XP por retirar un mueble (ver systems/niveles.js)
-      }
+    claude.onTiendaMsg = (d) => { // sin servidor: "te entregué la mesa"
+      if (net || d?.tipo !== 'entregado' || d.u !== myUid || !orders.has(d.id)) return;
+      const o = orders.get(d.id);
+      inventario?.add('muebles', o.m, o.q || 1);
+      drop(d.id);
+      notify(`Claude te dio: ${cantidadTxt(o)}${nombre(o.m)} (ya está en tu mochila 🎒)`);
+      try { onEntrega(o); } catch { /* nada */ }
     };
+  }
+  // Mis pedidos que Claude dejó en el mostrador: si estoy en la zona de entrega, los recojo (lo confirma el servidor)
+  const recogiendo = new Set(), avisados = new Set();
+  function recogerMios() {
+    if (!net) return;
+    for (const o of orders.values()) {
+      if (o.u !== myUid || o.est !== 'mostrador' || recogiendo.has(o.id)) continue;
+      if (!enMostrador(getPlayer()?.position)) {
+        if (!avisados.has(o.id)) { avisados.add(o.id); notify(`Claude dejó ${cantidadTxt(o)}${nombre(o.m)} en el mostrador: acercate a la zona de entrega antes de ${Math.max(5, Math.round(((o.hasta || 0) - ahora()) / 1000))} s.`); }
+        continue;
+      }
+      recogiendo.add(o.id);
+      net.rpc('tienda.recoger', { id: o.id }).then((r) => {
+        notify(`Claude te dio: ${r.q > 1 ? `${r.q} × ` : ''}${nombre(r.m)} (ya está en tu mochila 🎒)`);
+        try { onEntrega({ m: r.m, q: r.q }); } catch { /* nada */ }
+      }).catch((e) => notify(e.message)).finally(() => setTimeout(() => recogiendo.delete(o.id), 1500));
+    }
   }
   const walk = (p, opts) => claude.walkTo(p.x, p.z, opts);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -522,38 +561,61 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
     await walk(p, { face: t ? Math.atan2(t.x - p.x, t.z - p.z) : null, ...opts });
     return true;
   }
+  // ¿El trabajo sigue en la lista del servidor? (si venció o se canceló, Claude larga todo)
+  const sigue = (job) => !net || jobs.some((j) => j.id === job.id);
   async function runJob(job) {
     doing = 'buscar';
-    for (const id of job.ids) {
-      const o = orders.get(id);
-      if (!o) continue;
-      const sp = point(`slot_${String(o.s).padStart(2, '0')}`);
-      if (!sp) continue;
-      if (at !== 'pos_taller') await goPoint('pos_taller');
-      at = 'slot';
-      await walk(sp, { near: 0.7 });
-      claude.play('talk'); await wait(700);
-      claude.setCarry(o.m);
-      await goPoint('pos_taller');
-      await goPoint('pos_mostrador');
-      // Lo da solo si el cliente está en la zona de entrega: lo espera hasta 60 s; si no vuelve, lo deja en su lugar
-      let espera = 0;
-      while (!enMostrador(posDe(job.u)) && espera < 60000) { await wait(500); espera += 500; }
-      if (!enMostrador(posDe(job.u))) {
-        claude.play(null);
-        await goPoint('pos_taller'); at = 'slot';
+    claude.holdTalk(job.u, job.n);
+    try {
+      for (const id of job.ids) {
+        const o = orders.get(id);
+        if (!o || !sigue(job)) break;
+        const sp = point(`slot_${String(o.s).padStart(2, '0')}`);
+        if (!sp) continue;
+        if (at !== 'pos_taller') await goPoint('pos_taller');
+        at = 'slot';
         await walk(sp, { near: 0.7 });
-        claude.setCarry('');
+        claude.play('talk'); await wait(700);
+        claude.setCarry(o.m);
         await goPoint('pos_taller');
-        break; // el resto queda listo para la próxima
+        await goPoint('pos_mostrador');
+        if (net) {
+          // Lo deja en el mostrador: el servidor empieza a contar. Se espera a que lo recojan o a que venza.
+          try { await net.rpc('tienda.enMostrador', { id }); } catch { break; }
+          claude.play('talk');
+          const limite = performance.now() + ((Number(cfg.entrega_caduca_seg) || 60) + 10) * 1000;
+          while (orders.has(id) && orders.get(id).est === 'mostrador' && sigue(job) && performance.now() < limite) await wait(300);
+          if (!orders.has(id)) { claude.setCarry(''); claude.play('talk'); await wait(900); continue; } // ¡lo recogió!
+          // venció (o se canceló): lo vuelve a guardar en su lugar y queda libre
+          claude.play(null);
+          await goPoint('pos_taller'); at = 'slot';
+          await walk(sp, { near: 0.7 });
+          claude.setCarry('');
+          await goPoint('pos_taller');
+          break;
+        }
+        // Sin servidor: lo da solo si el cliente está en la zona de entrega (lo espera hasta 60 s)
+        let espera = 0;
+        while (!enMostrador(posDe(job.u)) && espera < 60000) { await wait(500); espera += 500; }
+        if (!enMostrador(posDe(job.u))) {
+          claude.play(null);
+          await goPoint('pos_taller'); at = 'slot';
+          await walk(sp, { near: 0.7 });
+          claude.setCarry('');
+          await goPoint('pos_taller');
+          break; // el resto queda listo para la próxima
+        }
+        claude.setCarry('');
+        claude.play('talk');
+        claude.tiendaMsg({ tipo: 'entregado', id, u: job.u });
+        await wait(900);
       }
+    } finally {
       claude.setCarry('');
-      claude.play('talk');
-      claude.tiendaMsg({ tipo: 'entregado', id, u: job.u });
-      await wait(900);
+      claude.releaseTalk(job.u);
+      if (net && sigue(job)) net.rpc('tienda.finTrabajo', { id: job.id }).catch(() => {});
+      doing = null;
     }
-    claude.releaseTalk(job.u);
-    doing = null;
   }
   async function runReparto() {
     doing = 'reparto';
@@ -568,7 +630,8 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
         at = 'buzon';
         await walk(b, { near: 0.9, speed: 2.6 });
         claude.play('talk'); await wait(1200);
-        for (const o of list) { const r = orders.get(o.id); if (r) { r.aviso = true; save(r); } }
+        if (net) await net.rpc('tienda.aviso', { ids: list.map((o) => o.id) }).catch(() => {});
+        else { for (const o of list) { const r = orders.get(o.id); if (r) { r.aviso = true; save(r); } } }
         changed();
       }
       await goPoint('pos_afuera', { speed: 2.6 }); await goPoint('pos_entrada');
@@ -587,7 +650,7 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
     if (!claude?.driving || !claude.entry || claude.busyByAI || !ready()) return;
     if ((thinkT -= dt) > 0 || doing) return;
     thinkT = 0.5;
-    if (jobs.length) { runJob(jobs.shift()).catch(() => { doing = null; }); return; }
+    if (jobs.length) { const job = net ? jobs[0] : jobs.shift(); runJob(job).catch(() => { doing = null; }); return; }
     const abierta = tiempo ? tiempo.abierta() : true;
     const talking = claude.talkingWith;
     if (!abierta && enReparto() && repartoDia !== tiempo.dia() && !talking) { runReparto().catch(() => { doing = null; }); return; }
@@ -599,12 +662,9 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
       const pos = r.me ? getPlayer()?.position : r.p && { x: r.p[0], z: r.p[2] };
       return pos && Math.hypot(pos.x - pc.x, pos.z - pc.z) < 3.5;
     }));
-    const working = abierta && pedidos().some((o) => o.fabricando);
-    if (waiting || !working) {
-      if (at !== 'pos_mostrador') { doing = 'ir'; goPoint('pos_mostrador').then(() => { doing = null; claude.play(null); }); }
-    } else if (at !== 'pos_taller') {
-      doing = 'ir'; goPoint('pos_taller').then(() => { doing = null; claude.play('work'); });
-    } else if (claude.entry.current?.getClip?.().name !== 'work') claude.play('work');
+    // Se queda en el mostrador: no camina al taller para "hacer que trabaja" (solo va a buscar pedidos o a los buzones)
+    void waiting;
+    if (at !== 'pos_mostrador') { doing = 'ir'; goPoint('pos_mostrador').then(() => { doing = null; claude.play(null); }); }
   }
 
   // ---------- Charla: nodos armados en el momento (ver dialogue.js > hooks.dynamic) ----------
@@ -612,7 +672,7 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
   function textNode(text, choices = back) { return { nodes: { __t: { text, choices } }, start: '__t' }; }
   async function dynamic(entry, name) {
     if (entry?.id !== 'claude') return null;
-    const [cmd, arg] = name.split(':');
+    const [cmd, arg, arg2] = name.split(':');
     const abierta = tiempo ? tiempo.abierta() : true;
     if (cmd === 'tienda_menu') {
       if (!abierta) {
@@ -634,9 +694,16 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
       const list = [...catalog.values()].filter((m) => m.costo);
       const nodes = {};
       const choices = list.slice(0, 7).map((m) => {
-        nodes[`__c_${m.id}`] = { text: `${m.nombre}: te sale ${costoTxt(m.costo)} y tardo unos ${m.tiempo_min ?? '?'} minutos. ¿Te la hago?`,
-          choices: [{ text: '¡Sí, hacémela!', next: `__p_${m.id}` }, { text: 'Mejor otra cosa', next: '__cat' }] };
-        nodes[`__p_${m.id}`] = { dinamico: `pedir:${m.id}` };
+        // ¿Cuántos? (1, 2, 5, 10, el máximo u otra cantidad): es un solo pedido con todos
+        const max = Math.max(1, Number(cfg.max_cantidad) || 20);
+        const madera = inventario?.count?.('recursos', 'madera') ?? 0;
+        const alcanzaPara = Math.max(0, Math.min(max, ...Object.entries(m.costo).map(([k, v]) => Math.floor((inventario?.count?.('recursos', k) ?? 0) / Math.max(1, v)))));
+        const opciones = [...new Set([1, 2, 5, 10, alcanzaPara].filter((n) => n >= 1 && n <= max))].sort((a, b) => a - b);
+        nodes[`__c_${m.id}`] = { text: `${m.nombre}: cada una te sale ${costoTxt(m.costo)} y tardo unos ${m.tiempo_min ?? '?'} minutos. Tenés ${madera} de madera${alcanzaPara ? ` (te alcanza para ${alcanzaPara})` : ''}. ¿Cuántas querés?`,
+          choices: [...opciones.slice(0, 5).map((n) => ({ text: `${n} (${costoTxt(Object.fromEntries(Object.entries(m.costo).map(([k, v]) => [k, v * n])))})`, next: `__p_${m.id}_${n}` })),
+            { text: 'Otra cantidad…', next: `__q_${m.id}` }, { text: 'Mejor otra cosa', next: '__cat' }] };
+        for (const n of opciones) nodes[`__p_${m.id}_${n}`] = { dinamico: `pedir:${m.id}:${n}` };
+        nodes[`__q_${m.id}`] = { ask: true, text: `¿Cuántas ${m.nombre.toLowerCase()}s? (de 1 a ${max})`, cantidad: { min: 1, max, valor: Math.max(1, alcanzaPara || 1), dinamico: `pedir:${m.id}` }, back: '__cat' };
         return { text: `${m.nombre} · ${costoTxt(m.costo)} · ${m.tiempo_min ?? '?'} min`, next: `__c_${m.id}` };
       });
       choices.push({ text: 'Volver', next: 'tienda' });
@@ -646,35 +713,46 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
     }
     if (cmd === 'pedir') {
       const m = catalog.get(arg);
+      const q = Math.max(1, Math.min(Number(cfg.max_cantidad) || 20, Math.round(Number(arg2) || 1)));
       if (!m) return textNode('Uy, ese mueble no lo conozco.');
       if (!abierta) return textNode('Justo cerré. Volvé cuando abra y te lo hago.');
+      const casa = hasLot(myUid) ? 'Cuando esté, te dejo una nota en tu buzón.' : 'Como todavía no tenés casa, pasá por acá a preguntar.';
+      const que = q > 1 ? `tus ${q} ${m.nombre.toLowerCase()}s` : `tu ${m.nombre.toLowerCase()}`;
+      if (net) { // lo decide el servidor: cobra, controla el límite y anota
+        try {
+          const r = await net.rpc('tienda.encargar', { items: [{ m: m.id, q }] });
+          const p = r.pedidos?.[0];
+          const fila = p ? p.pos - pedidos().filter((x) => x.listo).length : 1;
+          return textNode(`¡Hecho! ${que.charAt(0).toUpperCase() + que.slice(1)} entra${q > 1 ? 'n' : ''} a la fila${fila > 1 ? ` (hay ${fila - 1} antes)` : ''}. Pagaste ${costoTxt(r.pago)}. Va a estar ${p ? cuando(p.end) : 'pronto'}. ${casa}`);
+        } catch (e) { return textNode(e.message); }
+      }
       if (mine().length >= cfg.max_pedidos_por_jugador) return textNode(`Ya tenés ${mine().length} pedidos conmigo. Retirá alguno y te hago otro.`);
       const slot = freeSlot();
       if (!slot) return textNode('No me entra nada más en el taller. Volvé en un rato, cuando retiren algo.');
-      if (!inventario?.has(m.costo)) {
-        const falta = Object.entries(m.costo).map(([k, v]) => `${Math.max(0, v - (inventario?.count?.('recursos', k) ?? 0))} de ${k}`).join(' y ');
+      const costo = Object.fromEntries(Object.entries(m.costo).map(([k, v]) => [k, v * q]));
+      if (!inventario?.has(costo)) {
+        const falta = Object.entries(costo).map(([k, v]) => `${Math.max(0, v - (inventario?.count?.('recursos', k) ?? 0))} de ${k}`).join(' y ');
         return textNode(`Te faltan ${falta}. Andá al Bosque de Coronda (el cartel del oeste de la plaza) y talá unos árboles.`);
       }
-      inventario.pay(m.costo);
-      const o = { id: `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, u: myUid, n: myName, m: m.id, t: nuevaHora(), d: Math.max(0.1, Number(m.tiempo_min) || 3) * 60000, s: slot, aviso: false, h: 1 };
+      inventario.pay(costo);
+      const o = { id: `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, u: myUid, n: myName, m: m.id, q, t: nuevaHora(), d: Math.max(0.1, Number(m.tiempo_min) || 3) * 60000 * q, s: slot, aviso: false, h: 1 };
       orders.set(o.id, o); changed(); save(o);
       const p = pedidos().find((x) => x.id === o.id);
       const fila = p.pos - pedidos().filter((x) => x.listo).length;
-      const casa = hasLot(myUid) ? 'Cuando esté, te dejo una nota en tu buzón.' : 'Como todavía no tenés casa, pasá por acá a preguntar.';
-      return textNode(`¡Hecho! Tu ${m.nombre.toLowerCase()} entra a la fila${fila > 1 ? ` (hay ${fila - 1} antes)` : ''}. Va a estar ${horaFin(p)}${abiertaEn(Date.now()) ? '' : ' (el taller trabaja de día)'}. ${casa}`);
+      return textNode(`¡Hecho! ${que.charAt(0).toUpperCase() + que.slice(1)} entra${q > 1 ? 'n' : ''} a la fila${fila > 1 ? ` (hay ${fila - 1} antes)` : ''}. Va a estar ${horaFin(p)}${abiertaEn(ahora()) ? '' : ' (el taller trabaja de día)'}. ${casa}`);
     }
     if (cmd === 'ia_encargar') { // botón "✅ Confirmar" después de una cotización de la IA
       const p = pendienteIA;
       const otra = [{ text: 'Decile otra cosa', next: 'menu' }, { text: 'Chau', next: 'despedida' }];
       if (!p || Date.now() - p.t > 10 * 60000) return textNode('Uy, se me borró la cuenta. Decime de nuevo qué necesitás.', otra);
       const g = new Map(); for (const u of p.us) g.set(u.m, (g.get(u.m) ?? 0) + 1);
-      const r = encargoIA([...g].map(([m, n]) => ({ mueble: m, cantidad: n })), true);
+      const r = await encargoIA([...g].map(([m, n]) => ({ mueble: m, cantidad: n })), true);
       return textNode(r.hecho ? r.texto : `No pude anotarlo: ${r.texto}`, otra);
     }
     if (cmd === 'mis') {
       const mis = mine();
       if (!mis.length) return textNode('No tenés pedidos conmigo.');
-      const lines = mis.map((o) => `${nombre(o.m)}: ${o.listo ? 'listo ✓' : o.fabricando ? `${Math.round(o.progreso * 100)}% (sale ${horaFin(o)})` : `en la fila (sale ${horaFin(o)})`}`);
+      const lines = mis.map((o) => `${cantidadTxt(o)}${nombre(o.m)}: ${o.est === 'mostrador' ? 'en el mostrador, ¡recogelo!' : o.listo ? 'listo ✓' : o.fabricando ? `${Math.round(o.progreso * 100)}% (sale ${horaFin(o)})` : `en la fila (sale ${horaFin(o)})`}`);
       return textNode(lines.join('\n'));
     }
     if (cmd === 'retirar') {
@@ -682,18 +760,19 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
       if (listos.length && !enMostrador(getPlayer()?.position)) return textNode('Para retirar tenés que estar en el mostrador: parate enfrente mío, del lado de los clientes, y pedímelo de nuevo.');
       if (!listos.length) return textNode('Todavía no hay nada listo. ¡Paciencia, que estoy en eso!');
       const nodes = {};
-      const choices = listos.slice(0, 6).map((o) => { nodes[`__l_${o.id}`] = { dinamico: `llevar:${o.id}` }; return { text: `Retirar ${nombre(o.m)}`, next: `__l_${o.id}` }; });
+      const choices = listos.slice(0, 6).map((o) => { nodes[`__l_${o.id}`] = { dinamico: `llevar:${o.id}` }; return { text: `Retirar ${cantidadTxt(o)}${nombre(o.m)}`, next: `__l_${o.id}` }; });
       if (listos.length > 1) { nodes.__l_todos = { dinamico: 'llevar:todos' }; choices.unshift({ text: `Retirar TODOS (${listos.length})`, next: '__l_todos' }); }
       choices.push({ text: 'Volver', next: 'tienda' });
       nodes.__rl = { text: '¿Qué venís a buscar?', choices };
       return { nodes, start: '__rl' };
     }
     if (cmd === 'llevar') {
-      const listos = mine().filter((o) => o.listo);
+      const listos = mine().filter((o) => o.listo && !o.est);
       const ids = arg === 'todos' ? listos.map((o) => o.id) : listos.filter((o) => o.id === arg).map((o) => o.id);
       if (!ids.length) return textNode('Mmm, no lo encuentro. ¿Ya lo retiraste?');
       if (!enMostrador(getPlayer()?.position)) return textNode('Parate en el mostrador, del lado de los clientes, y te lo alcanzo.');
-      claude?.tiendaReq({ tipo: 'buscar', ids, u: myUid, n: myName });
+      if (net) { try { await net.rpc('tienda.retirar', { ids }); } catch (e) { return textNode(e.message); } }
+      else claude?.tiendaReq({ tipo: 'buscar', ids, u: myUid, n: myName });
       return { nodes: { __ll: { text: ids.length > 1 ? `¡Ya te los traigo! Voy uno por uno, esperame acá en el mostrador.` : '¡Ya te lo traigo! Esperame acá en el mostrador.' } }, start: '__ll' };
     }
     return null;
@@ -723,7 +802,7 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
 
   // Calcula (y si hacer = true, encarga) lo que pidió. Devuelve { resumen (texto exacto para la IA), texto (lo mismo
   // dicho por Claude, por si la IA no contesta), pendiente (se puede confirmar), hecho, boton }
-  function encargoIA(items, hacer = false) {
+  async function encargoIA(items, hacer = false) {
     const { ok, raros } = resolver(items);
     const pidio = ok.flatMap((x) => Array.from({ length: x.cantidad }, () => ({ m: x.m })));
     const abierta = tiempo ? tiempo.abierta() : true;
@@ -731,7 +810,15 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
     const tiene = mine().length;
     const libres = Math.max(0, (slots().length || 50) - pedidos().length);
     const entran = Math.max(0, Math.min(max - tiene, libres));
-    const us = pidio.slice(0, entran), afuera = pidio.slice(entran);
+    // Con servidor cada tipo de mueble es UN pedido (con su cantidad): el límite cuenta tipos, no unidades
+    let us, afuera;
+    if (net) {
+      const tipos = [...new Set(pidio.map((x) => x.m))].slice(0, entran);
+      const tope = Number(cfg.max_cantidad) || 20;
+      const cuenta = new Map();
+      us = []; afuera = [];
+      for (const x of pidio) { const c = cuenta.get(x.m) ?? 0; if (tipos.includes(x.m) && c < tope) { us.push(x); cuenta.set(x.m, c + 1); } else afuera.push(x); }
+    } else { us = pidio.slice(0, entran); afuera = pidio.slice(entran); }
     const costo = costoDe(us), alcanza = tieneDe(costo);
     const madera = inventario?.count?.('recursos', 'madera') ?? 0;
     const partes = [];
@@ -767,6 +854,16 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
     }
     // Encargar de verdad
     pendienteIA = null;
+    if (net) { // un pedido por mueble, con su cantidad: lo decide el servidor
+      const g = new Map(); for (const u of quizas) g.set(u.m, (g.get(u.m) ?? 0) + 1);
+      try {
+        const r = await net.rpc('tienda.encargar', { items: [...g].map(([m, q]) => ({ m, q })) });
+        const fin = (r.pedidos ?? []).reduce((a, x) => Math.max(a, x.end ?? 0), 0);
+        const casa = hasLot(myUid) ? 'Cuando esté, le dejás una nota en el buzón.' : 'Como no tiene casa, que pase a preguntar.';
+        const hecho = `Pedido anotado (ya está hecho): ${agrupar(quizas)}, pagó ${costoTxt(r.pago)}. Todo listo ${cuando(fin)}. ${casa}${afuera.length ? ` ${agrupar(afuera)} no entraron por el límite de ${max} pedidos.` : ''}`;
+        return { resumen: hecho, texto: `¡Listo! Te anoté ${agrupar(quizas)}. Va a estar todo ${cuando(fin)}.`, pendiente: false, hecho: true };
+      } catch (e) { return { resumen: `No se pudo anotar: ${e.message}`, texto: `Uy, no pude anotarlo: ${e.message}`, pendiente: false, hecho: false }; }
+    }
     inventario.pay(costo);
     const hechos = [];
     for (const u of quizas) {
@@ -797,6 +894,7 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
     }
     drawVisuals(dt);
     think(dt);
+    recogerMios();
     // Nota en mi buzón
     attachPrompt();
     const want = drawNotes();
@@ -811,11 +909,11 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
 
   // Para la IA de Claude (systems/claude-npc.js): los pedidos del que le habla y el estado de la Carpintería, en datos
   // cortos, para que pueda contestar "¿para cuándo están mis cosas?" sin inventar. Solo los tuyos: nunca los de otros.
-  function resumenIA(now = Date.now()) {
+  function resumenIA(now = ahora()) {
     const todos = pedidos(now);
     const pendientes = todos.filter((o) => !o.listo);
     const mis = todos.filter((o) => o.u === myUid).map((o) => ({
-      mueble: nombre(o.m),
+      mueble: nombre(o.m), cantidad: o.q || 1,
       estado: o.listo ? 'listo' : o.fabricando ? 'fabricandose' : 'en_fila',
       progreso: Math.round(o.progreso * 100),
       antes_en_fila: o.listo || o.fabricando ? 0 : pendientes.filter((x) => x.start < o.start).length,
@@ -838,7 +936,7 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
 
   return {
     update, point, slots, dynamic, idle, resumenIA, encargoIA, enMostrador,
-    pedidos: () => pedidos().map((o) => ({ id: o.id, jugador: o.n, uid: o.u, mueble: o.m, nombre: nombre(o.m), slot: o.s, pedido: o.t, empieza: o.start, termina: o.end, progreso: o.progreso, listo: o.listo, fabricando: o.fabricando, aviso: o.aviso })),
+    pedidos: () => pedidos().map((o) => ({ id: o.id, jugador: o.n, uid: o.u, mueble: o.m, cantidad: o.q || 1, nombre: nombre(o.m), slot: o.s, pedido: o.t, empieza: o.start, termina: o.end, progreso: o.progreso, listo: o.listo, fabricando: o.fabricando, aviso: o.aviso })),
     borrar: (id) => drop(id), // (Studio) saca un pedido
     setConfig(c) { if (c && typeof c === 'object') cfg = { ...cfg, ...c }; },                 // (Studio) en vivo
     setCatalog(list) { for (const m of list ?? []) if (m?.id) catalog.set(m.id, { ...catalog.get(m.id), ...m }); }, // (Studio) precios

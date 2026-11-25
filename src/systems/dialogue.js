@@ -318,6 +318,8 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
   askBox.innerHTML = '<input class="dlg-ask-in" maxlength="200" autocomplete="off" spellcheck="true" placeholder="Escribile algo…" aria-label="Escribile algo"><button type="submit">Decir</button><button type="button" class="dlg-ask-x">Volver</button>';
   const askIn = askBox.querySelector('.dlg-ask-in');
   let asking = null; // { raw }
+  // Nodo { "ask": true, "cantidad": { "min": 1, "max": 20, "dinamico": "pedir:mesa" } }: en vez de texto se escribe un
+  // número, y se sigue con el nodo dinámico "pedir:mesa:<número>" (lo usa la Carpintería para encargar varios de una vez)
   function openAsk(raw) {
     asking = { raw };
     s.node = normalize({ text: raw.text ?? 'Te escucho…' });
@@ -325,7 +327,13 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
     s.page = 0;
     showPage();
     askBox.hidden = false;
-    askIn.value = '';
+    const q = raw.cantidad;
+    askIn.type = q ? 'number' : 'text';
+    if (q) { askIn.min = String(q.min ?? 1); askIn.max = String(q.max ?? 99); askIn.step = '1'; askIn.inputMode = 'numeric'; }
+    else { askIn.removeAttribute('min'); askIn.removeAttribute('max'); askIn.removeAttribute('step'); askIn.inputMode = 'text'; }
+    askIn.placeholder = q ? `Cantidad (de ${q.min ?? 1} a ${q.max ?? 99})` : 'Escribile algo…';
+    askBox.querySelector('[type=submit]').textContent = q ? 'Listo' : 'Decir';
+    askIn.value = q ? String(q.valor ?? q.min ?? 1) : '';
     setTimeout(() => askIn.focus(), 30);
   }
   function closeAsk() { asking = null; askBox.hidden = true; askIn.blur(); }
@@ -333,6 +341,14 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, 
     const text = askIn.value.trim();
     if (!s || !asking || !text) return;
     const raw = asking.raw;
+    if (raw.cantidad) {
+      const q = raw.cantidad, n = Math.floor(Number(text));
+      const min = q.min ?? 1, max = q.max ?? 99;
+      if (!Number.isFinite(n) || n < min || n > max) { askIn.setCustomValidity(`Un número de ${min} a ${max}`); askIn.reportValidity(); setTimeout(() => askIn.setCustomValidity(''), 1500); return; }
+      closeAsk();
+      runDynamic(`${q.dinamico}:${n}`);
+      return;
+    }
     closeAsk();
     const back = raw.back ?? null; // a qué nodo vuelve si el jugador no quiere seguir
     s.node = normalize({ text: 'Pensando...' });

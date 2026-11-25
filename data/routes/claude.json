@@ -1,0 +1,182 @@
+{
+  "speed": 1.2,
+  "walk": "walk",
+  "blockWait": 2,
+  "avoid": false,
+  "start": "casa",
+  "nodes": {
+    "casa": {
+      "position": [
+        12,
+        0.1,
+        3
+      ],
+      "wait": 6,
+      "waitMax": 12,
+      "next": [
+        {
+          "to": "centro",
+          "weight": 2
+        },
+        {
+          "to": "este"
+        },
+        {
+          "to": "cartel"
+        }
+      ]
+    },
+    "centro": {
+      "position": [
+        2,
+        0.1,
+        -4
+      ],
+      "wait": 4,
+      "waitMax": 9,
+      "next": [
+        {
+          "to": "oeste"
+        },
+        {
+          "to": "casa"
+        },
+        {
+          "to": "norte"
+        },
+        {
+          "to": "cartel"
+        }
+      ]
+    },
+    "este": {
+      "position": [
+        24,
+        0.1,
+        -6
+      ],
+      "wait": 5,
+      "waitMax": 10,
+      "next": [
+        {
+          "to": "casa"
+        },
+        {
+          "to": "norte"
+        },
+        {
+          "to": "centro"
+        }
+      ]
+    },
+    "norte": {
+      "position": [
+        0,
+        0.1,
+        -28
+      ],
+      "wait": 6,
+      "waitMax": 12,
+      "next": [
+        {
+          "to": "centro"
+        },
+        {
+          "to": "oeste"
+        },
+        {
+          "to": "este"
+        }
+      ]
+    },
+    "oeste": {
+      "position": [
+        -20,
+        0.1,
+        -8
+      ],
+      "wait": 5,
+      "waitMax": 10,
+      "next": [
+        {
+          "to": "borde"
+        },
+        {
+          "to": "centro"
+        },
+        {
+          "to": "norte"
+        }
+      ]
+    },
+    "cartel": {
+      "position": [
+        -6,
+        0.1,
+        7
+      ],
+      "wait": 8,
+      "waitMax": 14,
+      "next": [
+        {
+          "to": "borde"
+        },
+        {
+          "to": "casa"
+        },
+        {
+          "to": "centro"
+        }
+      ]
+    },
+    "borde": {
+      "position": [
+        -24,
+        0.1,
+        10
+      ],
+      "wait": 4,
+      "waitMax": 9,
+      "next": [
+        {
+          "to": "oeste"
+        },
+        {
+          "to": "cartel"
+        }
+      ]
+    }
+  },
+  "editor": {
+    "nodes": {
+      "casa": {
+        "x": 60,
+        "y": 60
+      },
+      "centro": {
+        "x": 320,
+        "y": 60
+      },
+      "este": {
+        "x": 580,
+        "y": 60
+      },
+      "norte": {
+        "x": 840,
+        "y": 60
+      },
+      "oeste": {
+        "x": 60,
+        "y": 280
+      },
+      "cartel": {
+        "x": 320,
+        "y": 280
+      },
+      "borde": {
+        "x": 580,
+        "y": 280
+      }
+    }
+  }
+}

@@ -516,3 +516,11 @@ Adentro de tu casa: **B** o el botón 🛠. Elegí un mueble y aparece delante t
 - **Actualizaciones:** cada vez que se abre el juego se lee `version.json` (el Studio lo cambia al **Enviar**). Si cambió, cada archivo se vuelve a confirmar con el servidor la próxima vez que se usa: si no cambió no se baja de nuevo, si cambió se baja solo ese. Igual, cada archivo se reconfirma como mucho cada 6 horas.
 - **No se guarda:** `version.json`, lotes, casas, jugadores, chat, pósters, la música de YouTube, audio ni nada de otros sitios.
 - **En tu PC (localhost) y en `dev.html` no se activa**, así mientras modelás ves siempre lo último.
+
+## Claude, el vecino de la plaza
+
+Un NPC propio: `assets/models/objects/npc_claude.glb` (modelo y animaciones *idle*, *walk* y *talk*; el archivo de Blender es `blender/npc_claude.blend` y el script que lo arma, `blender/npc_claude.py`). Está puesto en `data/scenes/coronda_plaza.json > actors` con su posición, así que no hace falta un Empty en el `.glb` de la plaza.
+
+- **Diálogo:** `data/dialogues/claude.json`, más de 220 frases: la primera vez se presenta y después saluda distinto cada vez. Tiene un menú: *Contame algo* (155 charlas), *Dame un consejo del juego* (26), *Contame un chiste* (21) y *Chau*.
+- **Al azar sin repetir:** un nodo con `"random": ["a", "b", …]` salta a uno de esos nodos; salen como de una bolsa (no se repite ninguno hasta que salieron todos, y la bolsa se recuerda en el navegador). Sirve para cualquier diálogo.
+- **Ruta:** `data/routes/claude.json`, 7 paradas por la plaza con posiciones (sin Empties), elige la próxima al azar y espera entre 4 y 14 segundos en cada una. Tiene `"avoid": false` (camina derecho), porque la plaza no tiene suelo con colisión para calcular desvíos. Si le agregás un Empty, podés cambiar `"position"` por `"point": "nombre_del_empty"`.

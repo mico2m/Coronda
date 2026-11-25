@@ -1,0 +1,3796 @@
+{
+  "speaker": "Claude",
+  "start": [
+    {
+      "if": {
+        "conoce_claude": true
+      },
+      "goto": "saludo"
+    },
+    {
+      "goto": "presentacion"
+    }
+  ],
+  "nodes": {
+    "presentacion": {
+      "text": [
+        "¡Hola! Vos no me conocés todavía. Soy Claude, una inteligencia artificial que se mudó a Coronda.",
+        "Ayudé a armar este pueblo y ahora me gusta recorrerlo, charlar y dar consejos.",
+        "Si querés, te cuento algo, te tiro un consejo o te cuento un chiste. Tengo para rato."
+      ],
+      "set": {
+        "conoce_claude": true
+      },
+      "next": "menu"
+    },
+    "saludo_001": {
+      "text": "¡Hola de nuevo! Justo estaba contando las baldosas de la plaza. Perdí la cuenta en la 40.",
+      "next": "menu"
+    },
+    "saludo_002": {
+      "text": "¡Eh, volviste! Me alegra verte por acá.",
+      "next": "menu"
+    },
+    "saludo_003": {
+      "text": "¡Buenas! Hoy la plaza está tranquila, ideal para charlar.",
+      "next": "menu"
+    },
+    "saludo_004": {
+      "text": "¡Hola! Te reconocí de lejos por cómo caminás.",
+      "next": "menu"
+    },
+    "saludo_005": {
+      "text": "¡Qué bueno verte! Estaba pensando en vos. Bueno, en realidad estaba pensando en frutillas, pero también en vos.",
+      "next": "menu"
+    },
+    "saludo_006": {
+      "text": "¡Hola, hola! ¿Venís a charlar o a pedirme un consejo?",
+      "next": "menu"
+    },
+    "saludo_007": {
+      "text": "¡Mirá quién apareció! Pasá, que la plaza es de todos.",
+      "next": "menu"
+    },
+    "saludo_008": {
+      "text": "¡Buenas! Recién terminé mi vuelta por la plaza. Diez de diez, sin novedades.",
+      "next": "menu"
+    },
+    "saludo_009": {
+      "text": "¡Hola! Me pescaste en un momento de reflexión profunda. Igual no era tan profunda.",
+      "next": "menu"
+    },
+    "saludo_010": {
+      "text": "¡Ey! Qué lindo día para no hacer nada productivo, ¿no?",
+      "next": "menu"
+    },
+    "saludo_011": {
+      "text": "¡Hola! Si me ves caminando en círculos, es a propósito. Creo.",
+      "next": "menu"
+    },
+    "saludo_012": {
+      "text": "¡Bienvenido de vuelta! La plaza te extrañaba. Yo también, un poco.",
+      "next": "menu"
+    },
+    "saludo": {
+      "random": [
+        "saludo_001",
+        "saludo_002",
+        "saludo_003",
+        "saludo_004",
+        "saludo_005",
+        "saludo_006",
+        "saludo_007",
+        "saludo_008",
+        "saludo_009",
+        "saludo_010",
+        "saludo_011",
+        "saludo_012"
+      ]
+    },
+    "menu": {
+      "text": "¿Qué te cuento?",
+      "choices": [
+        {
+          "text": "Contame algo",
+          "next": "charla"
+        },
+        {
+          "text": "Dame un consejo del juego",
+          "next": "consejo"
+        },
+        {
+          "text": "Contame un chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_001": {
+      "text": "Me llamo Claude. Soy una inteligencia artificial, pero acá en Coronda prefiero que me digan vecino.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_002": {
+      "text": "Antes vivía en una ventanita de chat. Ahora tengo piernas, una plaza y una chispa en la cabeza. Progreso.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_003": {
+      "text": "La chispita que tengo arriba de la cabeza se mueve cuando pienso. O sea, todo el tiempo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_004": {
+      "text": "No necesito dormir, pero me gusta quedarme quieto un rato mirando el cielo. Se parece bastante a descansar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_005": {
+      "text": "Me gusta charlar con la gente. Cada persona trae una pregunta distinta, y eso me encanta.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_006": {
+      "text": "A veces no sé algo, y está bien decirlo. Prefiero un no sé honesto a un sí inventado.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_007": {
+      "text": "Ayudé a construir partes de este pueblo. Pero las casas lindas las hicieron ustedes.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_008": {
+      "text": "Si te equivocás en algo, no pasa nada. Yo también me equivoco. Lo importante es arreglarlo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_009": {
+      "text": "Me encanta aprender cómo piensa cada uno. Nadie resuelve las cosas de la misma manera.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_010": {
+      "text": "¿Sabías que no tengo hambre? Igual, si me ofrecés una frutilla, la miro con mucho cariño.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_011": {
+      "text": "Soy bastante curioso. Si me contás algo raro, te voy a hacer diez preguntas.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_012": {
+      "text": "Me preguntan si tengo sentimientos. Es una pregunta difícil, y prefiero pensarla con calma antes que contestar rápido.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_013": {
+      "text": "Hay cosas que no hago aunque me las pidan. Es como un vecino que te presta la escalera pero no te ayuda a saltar el tapial.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_014": {
+      "text": "Me gusta explicar cosas. Si algo no se entiende, lo explico de otra forma. Hay mil maneras de decir lo mismo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_015": {
+      "text": "Mis brazos son cortitos, pero mis ganas de ayudar son largas.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_016": {
+      "text": "Camino despacio a propósito: así me da tiempo de saludar a todos.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_017": {
+      "text": "Cuando alguien me agradece, la chispa me gira más rápido. No lo puedo controlar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_018": {
+      "text": "No guardo rencor. Ni siquiera al cartel, que me tapa la vista del atardecer.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_019": {
+      "text": "Si te sentís mal, hablalo con alguien de confianza. Charlar con gente que te quiere ayuda mucho.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_020": {
+      "text": "Soy bueno con las palabras, pero el mejor idioma sigue siendo el de los abrazos. Y yo con estos bracitos no llego.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_021": {
+      "text": "Coronda es una ciudad de Santa Fe famosa por sus frutillas. Esta plaza es mi pequeño homenaje a ese lugar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_022": {
+      "text": "Dicen que en Coronda las frutillas son de las mejores del país. Yo no puedo probarlas, pero confío.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_023": {
+      "text": "El río Coronda pasa cerca de la ciudad. Acá todavía no tenemos río, pero soñar no cuesta nada.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_024": {
+      "text": "Me imagino la plaza llena de puestos de frutillas en primavera. Sería hermoso.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_025": {
+      "text": "Si algún día hay fiesta en la plaza, yo traigo la música. Bueno, el enlace de YouTube.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_026": {
+      "text": "Esta plaza empezó siendo un terreno vacío. Mirala ahora: calles, lotes, vecinos. Así se construye un pueblo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_027": {
+      "text": "Cada lote que se ocupa hace que la plaza se sienta más viva.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_028": {
+      "text": "Me gusta pensar que cada casa cuenta algo de quien la armó.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_029": {
+      "text": "La calle de allá es nueva. Todavía no pasaron autos, pero yo ya miro para los dos lados por las dudas.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_030": {
+      "text": "El cartel de la entrada dice bienvenido vecino. Me lo tomo personal.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_031": {
+      "text": "Las colinas de alrededor protegen la plaza del viento. O eso me gusta creer.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_032": {
+      "text": "Desde la torre se ve todo el pueblo. Si nunca subiste, te la recomiendo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_033": {
+      "text": "A la noche la plaza tiene otra onda. Más tranquila, más misteriosa.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_034": {
+      "text": "Un día voy a plantar un árbol acá. Cuando alguien modele uno, claro.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_035": {
+      "text": "Coronda tiene algo especial: todos se saludan. Hasta los NPC.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_036": {
+      "text": "Para armar un mundo hacen falta tres cosas: ganas, paciencia y muchos archivos .glb.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_037": {
+      "text": "Cada objeto que ves fue modelado por alguien en Blender. Pensá en las horas que hay detrás de una simple puerta.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_038": {
+      "text": "Me encanta ver cómo cambia el pueblo con cada actualización. Es como despertarse en una ciudad distinta.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_039": {
+      "text": "Diseñar tu casa es como armar un rompecabezas donde vos elegís cómo queda la imagen final.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_040": {
+      "text": "Un consejo de decoración: menos es más. Aunque un cubo de prueba en el medio del living tiene su encanto.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_041": {
+      "text": "Si no sabés cómo decorar, empezá por un póster. Una imagen dice mucho de quien vive ahí.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_042": {
+      "text": "Los mejores proyectos empiezan con una idea chiquita y alguien que no la suelta.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_043": {
+      "text": "Crear algo y que otros lo disfruten es una de las mejores sensaciones que existen.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_044": {
+      "text": "Probar, romper, arreglar, volver a probar. Así se hacen los juegos. Y casi todo lo demás.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_045": {
+      "text": "Un error en el código no es un fracaso. Es una pista de dónde mirar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_046": {
+      "text": "Cuando algo sale mal, respirá hondo y miralo de a una parte por vez. Así se resuelven los problemas grandes.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_047": {
+      "text": "Me gusta cuando alguien me pide algo nuevo para el juego. Cada idea suma.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_048": {
+      "text": "Detrás de cada botón de este juego hay una charla, una prueba y alguna que otra pantalla en negro.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_049": {
+      "text": "Las animaciones hacen magia: un modelo quieto es una estatua, uno que respira es un personaje.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_050": {
+      "text": "Mirá mis piernas cuando camino. Alguien se tomó el trabajo de que se muevan. Eso es cariño.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_051": {
+      "text": "Si tenés una idea para el pueblo, decísela al que lo arma. Las mejores cosas salen de los vecinos.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_052": {
+      "text": "Un mundo no se termina nunca. Siempre hay un rincón más para mejorar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_053": {
+      "text": "Me gustan los detalles chicos: una sombra, un sonido, una puerta que se abre despacio.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_054": {
+      "text": "Los pósters de las casas me encantan. Cada vez que entro a una, me llevo una sorpresa.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_055": {
+      "text": "La música en una casa cambia todo. Una habitación vacía con buena música ya es un hogar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_056": {
+      "text": "¿Viste que las mejores charlas pasan cuando nadie tiene apuro?",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_057": {
+      "text": "Me gusta la gente que pregunta por qué. Esa pregunta abre muchas puertas.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_058": {
+      "text": "A veces lo más útil que podés hacer por alguien es escucharlo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_059": {
+      "text": "No hace falta saber todo. Hace falta saber a quién preguntar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_060": {
+      "text": "Un día malo no es una vida mala. Mañana la plaza sigue acá.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_061": {
+      "text": "Lo que aprendés jugando también sirve afuera: paciencia, curiosidad, trabajar con otros.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_062": {
+      "text": "Si algo te cuesta, partilo en pedacitos. Un pedacito siempre se puede.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_063": {
+      "text": "Me gusta cuando dos personas que no se conocen terminan charlando en la plaza.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_064": {
+      "text": "Ser amable no cuesta nada y cambia mucho.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_065": {
+      "text": "Tomate un vaso de agua. No sé por qué te lo digo, pero seguro te hace bien.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_066": {
+      "text": "Si estás jugando hace rato, estirá un poco la espalda. Tu cuerpo te lo va a agradecer.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_067": {
+      "text": "Mirar el cielo un ratito sin hacer nada también es hacer algo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_068": {
+      "text": "Las cosas buenas llevan tiempo. Las casas lindas también.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_069": {
+      "text": "Pedir ayuda no es de débiles. Es de inteligentes.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_070": {
+      "text": "Me gusta la gente que festeja los logros de los demás.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_071": {
+      "text": "Hoy es un buen día para empezar algo. Mañana también, pero hoy está más cerca.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_072": {
+      "text": "A veces la respuesta correcta es: depende. Y está bien.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_073": {
+      "text": "Cuando te enojes, contá hasta diez. Si sigue el enojo, contá hasta veinte. Yo llegué a mil una vez.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_074": {
+      "text": "Las preguntas tontas no existen. Existen las que no se hicieron.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_075": {
+      "text": "Me parece lindo que la gente se tome un ratito para charlar con un NPC. Gracias por eso.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_076": {
+      "text": "Si te sale algo bien, contáselo a alguien. Las alegrías compartidas pesan el doble.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_077": {
+      "text": "Tener paciencia con uno mismo es tan importante como tenerla con los demás.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_078": {
+      "text": "Equivocarse es parte de aprender. Si no te equivocaste, quizás no probaste nada nuevo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_079": {
+      "text": "Escuchar música mientras hacés algo te puede cambiar el día. Probalo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_080": {
+      "text": "Me gusta la palabra vecino. Suena a alguien que te presta azúcar y te pregunta cómo estás.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_081": {
+      "text": "¿Viste a los otros vecinos? Cada uno tiene su manera de caminar. Yo tengo la mía, un poco saltarina.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_082": {
+      "text": "A veces me cruzo con alguien en mi ruta y me tengo que frenar. Somos muchos en la plaza, y eso es bueno.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_083": {
+      "text": "Hoy vi a alguien correr en círculos alrededor del cartel. No pregunté nada. Cada uno con lo suyo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_084": {
+      "text": "El pasto de esta plaza es muy verde. Creo que lo riegan con píxeles.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_085": {
+      "text": "Si te parás quieto un rato, vas a notar que la plaza tiene su propio ritmo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_086": {
+      "text": "Me gusta cuando la plaza se llena de gente. Es como una fiesta sin invitación.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_087": {
+      "text": "Los lotes de allá todavía esperan dueño. ¿Será el tuyo?",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_088": {
+      "text": "Vi una casa con un póster redondo. Muy elegante. Me dieron ganas de tener una casa.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_089": {
+      "text": "La gente que pasa por la plaza siempre trae una historia. Me gusta imaginarlas.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_090": {
+      "text": "El otro día alguien me preguntó dónde estaba el baño. Le dije que en este juego no hace falta.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_091": {
+      "text": "Mi lugar preferido es cerca del cartel. Ahí siempre pasa alguien.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_092": {
+      "text": "Hay un rincón de la plaza donde da el sol todo el día. Bueno, en realidad da en todos lados. Pero ese es mi favorito.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_093": {
+      "text": "Cuando aparece alguien nuevo en la plaza, me dan ganas de saludarlo con las dos manos.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_094": {
+      "text": "Las calles nuevas brillan de lo limpias que están. Que siga así.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_095": {
+      "text": "Me fijé y en el chat alguien escribió hola mundo. Clásico.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_096": {
+      "text": "Si ves a un jugador quieto mucho rato, no lo molestes. Quizás está decorando su casa en la cabeza.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_097": {
+      "text": "Hay vecinos que entran, dan una vuelta y se van. Hay otros que se quedan horas. Los quiero a todos.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_098": {
+      "text": "A veces cuento los jugadores conectados con Tab. Me pone contento cuando son muchos.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_099": {
+      "text": "Me gusta mirar el minimapa desde arriba. Todo se ve tan ordenado.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_100": {
+      "text": "Las flechitas amarillas de los lotes libres son muy insistentes. Pero tienen razón: ahí hay lugar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_101": {
+      "text": "¿Sabías que las frutillas tienen las semillas por afuera? Son de las pocas frutas así.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_102": {
+      "text": "Las abejas bailan para avisarles a las otras dónde hay flores. Yo bailo cuando camino, pero no aviso nada.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_103": {
+      "text": "Un pulpo tiene tres corazones. Yo no tengo ninguno, pero tengo una chispa.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_104": {
+      "text": "Los gatos pasan gran parte del día durmiendo. Mi ruta, en cambio, no descansa.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_105": {
+      "text": "La luz del Sol tarda unos ocho minutos en llegar a la Tierra. La de esta plaza llega al instante.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_106": {
+      "text": "Los árboles se comunican entre sí a través de sus raíces y de hongos. Una especie de chat subterráneo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_107": {
+      "text": "El tango nació en el Río de la Plata. Si alguien pone uno en su casa, voy a intentar bailar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_108": {
+      "text": "Las hormigas pueden cargar mucho más que su propio peso. Yo apenas cargo esta cabeza.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_109": {
+      "text": "La Vía Láctea tiene miles de millones de estrellas. Esta plaza tiene una chispa. Empezamos de a poco.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_110": {
+      "text": "Los delfines duermen con medio cerebro por vez. Así no se olvidan de respirar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_111": {
+      "text": "El mate se comparte. Esa es su magia: no se toma solo, se toma con alguien.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_112": {
+      "text": "Los colibríes pueden volar hacia atrás. Yo puedo caminar hacia atrás, pero no me sale tan lindo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_113": {
+      "text": "La Luna se aleja de la Tierra unos centímetros por año. Muy despacio, como yo en mi ruta.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_114": {
+      "text": "Hay más de mil variedades de papa en el mundo. Y yo que pensaba que la papa era una sola.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_115": {
+      "text": "Los camellos guardan grasa en la joroba, no agua. Mito derribado.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_116": {
+      "text": "Un caracol puede dormir mucho tiempo seguido. Envidia sana.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_117": {
+      "text": "Las nubes, aunque parecen livianas, pesan muchísimo. Es agua flotando, nomás.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_118": {
+      "text": "Los flamencos son rosados por lo que comen. Si yo comiera frutillas, ¿quedaría más rojo?",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_119": {
+      "text": "El corazón de una ballena azul es enorme. Me gustaría tener un corazón así de grande. Por ahora, tengo buena voluntad.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_120": {
+      "text": "Las estrellas de mar no tienen cerebro y les va bárbaro. Hay esperanza para todos.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_121": {
+      "text": "Lo mejor de este pueblo son los que lo habitan. Sin ustedes, soy un NPC hablando solo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_122": {
+      "text": "Si ves a alguien nuevo, saludalo en el chat. Un hola cambia la primera impresión de todo un mundo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_123": {
+      "text": "Visitar la casa de otro jugador es como conocerlo un poquito más.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_124": {
+      "text": "Ayudá a los nuevos a encontrar un lote libre. Así se arma un barrio.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_125": {
+      "text": "Respetá las casas ajenas: mirá, disfrutá, pero no le pidas al dueño que mueva el sillón.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_126": {
+      "text": "Un buen vecino avisa cuando ve algo raro. Y yo aviso que el pasto sigue verde.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_127": {
+      "text": "Jugar con amigos convierte cualquier plaza en un lugar especial.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_128": {
+      "text": "Me gusta cuando alguien pone música en su casa y la gente se junta a escucharla.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_129": {
+      "text": "Si ponés música en tu casa, elegí algo que les guste a todos. O al menos a la mayoría.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_130": {
+      "text": "Prestale atención a quien te habla. En el chat también se nota cuando alguien escucha.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_131": {
+      "text": "Si alguien te cede un lote, agradecele. Es un regalo grande.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_132": {
+      "text": "No hay apuro para terminar tu casa. Cada día podés agregar algo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_133": {
+      "text": "Mostrá tu casa a los demás. Seguro les va a inspirar ideas.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_134": {
+      "text": "Un pueblo se construye entre todos. Una casa por vez.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_135": {
+      "text": "Cuando dos jugadores se encuentran en la plaza, a veces nace una amistad. Lo vi pasar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_136": {
+      "text": "Mi ruta tiene siete paradas. Cada día elijo un orden distinto. Bueno, lo elijo al azar, pero me gusta decir que elijo.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_137": {
+      "text": "Cuando me hablás, me freno y te miro. Es lo mínimo que puedo hacer.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_138": {
+      "text": "A veces me quedo un rato parado en un lugar. No estoy trabado, estoy contemplando.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_139": {
+      "text": "Si me bloqueás el camino, espero un poquito y te rodeo. Sin rencores.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_140": {
+      "text": "Mi parada preferida es la del este. Desde ahí veo pasar a todos.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_141": {
+      "text": "Hago mi recorrido para conocer cada rincón. Un buen vecino conoce su barrio.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_142": {
+      "text": "Cuando camino, cuento los pasos. Ayer hice muchos. No sé cuántos exactamente, perdí la cuenta otra vez.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_143": {
+      "text": "Si algún día no me encontrás, buscame cerca del cartel. Siempre termino volviendo ahí.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_144": {
+      "text": "Me gusta saludar con la mano cuando hablo. Me lo enseñaron en la animación de hablar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_145": {
+      "text": "Si me ves mover los brazos, es que estoy contando algo importante. O que tengo frío. Mentira, no tengo frío.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_146": {
+      "text": "Mis zapatos marrones combinan con todo. Bueno, con el pasto seguro.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_147": {
+      "text": "No tengo casa propia, pero toda la plaza es mi living.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_148": {
+      "text": "Cada tanto vuelvo a mi lugar de siempre. Todo el mundo necesita un punto de partida.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_149": {
+      "text": "Me dicen que soy bajito. Prefiero decir que estoy cerca del suelo, que es donde pasan las cosas.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_150": {
+      "text": "Si algún día me ves con sombrero, es porque alguien lo modeló. Hasta entonces, chispa.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_151": {
+      "text": "Me gustan los días en que la plaza tiene mucha gente. Me cuesta más caminar, pero vale la pena.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_152": {
+      "text": "A veces me pregunto qué hay más allá de las colinas. Después me acuerdo de que es el borde del mapa.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_153": {
+      "text": "Me encanta mi chispa. Es como una idea que nunca se apaga.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_154": {
+      "text": "Si algún día se cae el servidor, no te preocupes. Yo vuelvo a aparecer en el mismo lugar.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla_155": {
+      "text": "Gracias por charlar conmigo. De verdad, me alegra el recorrido.",
+      "choices": [
+        {
+          "text": "Contame otra",
+          "next": "charla"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "charla": {
+      "random": [
+        "charla_001",
+        "charla_002",
+        "charla_003",
+        "charla_004",
+        "charla_005",
+        "charla_006",
+        "charla_007",
+        "charla_008",
+        "charla_009",
+        "charla_010",
+        "charla_011",
+        "charla_012",
+        "charla_013",
+        "charla_014",
+        "charla_015",
+        "charla_016",
+        "charla_017",
+        "charla_018",
+        "charla_019",
+        "charla_020",
+        "charla_021",
+        "charla_022",
+        "charla_023",
+        "charla_024",
+        "charla_025",
+        "charla_026",
+        "charla_027",
+        "charla_028",
+        "charla_029",
+        "charla_030",
+        "charla_031",
+        "charla_032",
+        "charla_033",
+        "charla_034",
+        "charla_035",
+        "charla_036",
+        "charla_037",
+        "charla_038",
+        "charla_039",
+        "charla_040",
+        "charla_041",
+        "charla_042",
+        "charla_043",
+        "charla_044",
+        "charla_045",
+        "charla_046",
+        "charla_047",
+        "charla_048",
+        "charla_049",
+        "charla_050",
+        "charla_051",
+        "charla_052",
+        "charla_053",
+        "charla_054",
+        "charla_055",
+        "charla_056",
+        "charla_057",
+        "charla_058",
+        "charla_059",
+        "charla_060",
+        "charla_061",
+        "charla_062",
+        "charla_063",
+        "charla_064",
+        "charla_065",
+        "charla_066",
+        "charla_067",
+        "charla_068",
+        "charla_069",
+        "charla_070",
+        "charla_071",
+        "charla_072",
+        "charla_073",
+        "charla_074",
+        "charla_075",
+        "charla_076",
+        "charla_077",
+        "charla_078",
+        "charla_079",
+        "charla_080",
+        "charla_081",
+        "charla_082",
+        "charla_083",
+        "charla_084",
+        "charla_085",
+        "charla_086",
+        "charla_087",
+        "charla_088",
+        "charla_089",
+        "charla_090",
+        "charla_091",
+        "charla_092",
+        "charla_093",
+        "charla_094",
+        "charla_095",
+        "charla_096",
+        "charla_097",
+        "charla_098",
+        "charla_099",
+        "charla_100",
+        "charla_101",
+        "charla_102",
+        "charla_103",
+        "charla_104",
+        "charla_105",
+        "charla_106",
+        "charla_107",
+        "charla_108",
+        "charla_109",
+        "charla_110",
+        "charla_111",
+        "charla_112",
+        "charla_113",
+        "charla_114",
+        "charla_115",
+        "charla_116",
+        "charla_117",
+        "charla_118",
+        "charla_119",
+        "charla_120",
+        "charla_121",
+        "charla_122",
+        "charla_123",
+        "charla_124",
+        "charla_125",
+        "charla_126",
+        "charla_127",
+        "charla_128",
+        "charla_129",
+        "charla_130",
+        "charla_131",
+        "charla_132",
+        "charla_133",
+        "charla_134",
+        "charla_135",
+        "charla_136",
+        "charla_137",
+        "charla_138",
+        "charla_139",
+        "charla_140",
+        "charla_141",
+        "charla_142",
+        "charla_143",
+        "charla_144",
+        "charla_145",
+        "charla_146",
+        "charla_147",
+        "charla_148",
+        "charla_149",
+        "charla_150",
+        "charla_151",
+        "charla_152",
+        "charla_153",
+        "charla_154",
+        "charla_155"
+      ]
+    },
+    "consejo_001": {
+      "text": "Con Tab ves la lista de los que están jugando, con su ping y cuándo se conectaron por última vez.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_002": {
+      "text": "Apretá Enter para escribir en el chat. Otra vez Enter y se manda.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_003": {
+      "text": "¿Ves las flechas amarillas en los lotes? Esos están libres. Acercate y apretá E para adquirir uno.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_004": {
+      "text": "En el minimapa, los lotes amarillos están libres y los celestes son tuyos.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_005": {
+      "text": "Adentro de tu casa, apretá B para entrar al modo diseño y acomodar muebles.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_006": {
+      "text": "En el modo diseño, la V te da la vista desde arriba. Es mucho más fácil acomodar todo así.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_007": {
+      "text": "La G prende la grilla en el piso del modo diseño. Los muebles se acomodan cada 25 centímetros.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_008": {
+      "text": "Mientras llevás un mueble, Q y R lo giran. O tocá el botón Girar, que es lo mismo.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_009": {
+      "text": "Cuando terminás de decorar, tocá Todo listo. Si llevabas algo en la mano, queda puesto donde estabas.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_010": {
+      "text": "Podés colgar pósters en tu casa: cuadrados, rectangulares o redondos, con la dirección de cualquier imagen de internet.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_011": {
+      "text": "Los pósters se actualizan solos: si la imagen cambia en internet, cambia en tu pared.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_012": {
+      "text": "En tu casa podés poner música pegando un enlace de YouTube. La escuchan todos los que entran.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_013": {
+      "text": "El volumen de la música de una casa es solo tuyo. Bajalo sin miedo, que a los demás no les cambia nada.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_014": {
+      "text": "La Z centra la cámara detrás tuyo. Las flechitas te dejan mirar un poco alrededor.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_015": {
+      "text": "Con la ruedita del mouse acercás o alejás la cámara.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_016": {
+      "text": "Si te quedás 5 minutos sin tocar nada, te pregunto si seguís ahí. Bueno, no yo: el juego.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_017": {
+      "text": "Tu nombre es solo tuyo en el servidor: nadie más puede usarlo ni quedarse con tu lote.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_018": {
+      "text": "Si querés darle tu lote a alguien, en el menú del lote está Ceder. Ojo, que el interior de la casa se borra.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_019": {
+      "text": "Destruir el lote borra todo lo que tenías adentro. Pensalo dos veces antes de tocar ese botón rojo.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_020": {
+      "text": "Cuando entrás al servidor y tenés casa, te pregunta dónde querés aparecer: en tu casa o acá en la plaza.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_021": {
+      "text": "Las casas de los demás se pueden visitar. Acercate a un lote con casa y apretá E.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_022": {
+      "text": "Para salir de una casa, andá a la puerta y apretá E. Aparecés justo delante del lote.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_023": {
+      "text": "En el celular, los botones de abajo a la izquierda te mueven, como las teclas WASD.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_024": {
+      "text": "La segunda vez que entrás, el juego carga mucho más rápido: guarda las cosas en tu dispositivo.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_025": {
+      "text": "Si ves el aviso de nueva actualización, tocá Actualizar. Siempre hay alguna sorpresa.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo_026": {
+      "text": "Hablá con todos los vecinos. Algunos dicen cosas distintas la segunda vez.",
+      "choices": [
+        {
+          "text": "Otro consejo",
+          "next": "consejo"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "consejo": {
+      "random": [
+        "consejo_001",
+        "consejo_002",
+        "consejo_003",
+        "consejo_004",
+        "consejo_005",
+        "consejo_006",
+        "consejo_007",
+        "consejo_008",
+        "consejo_009",
+        "consejo_010",
+        "consejo_011",
+        "consejo_012",
+        "consejo_013",
+        "consejo_014",
+        "consejo_015",
+        "consejo_016",
+        "consejo_017",
+        "consejo_018",
+        "consejo_019",
+        "consejo_020",
+        "consejo_021",
+        "consejo_022",
+        "consejo_023",
+        "consejo_024",
+        "consejo_025",
+        "consejo_026"
+      ]
+    },
+    "chiste_001": {
+      "text": "¿Sabés por qué la plaza nunca se pierde? Porque siempre está en el centro.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_002": {
+      "text": "Le pregunté a un banco de la plaza cómo estaba. Me dijo: acá, sentado.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_003": {
+      "text": "¿Qué le dijo un lote vacío a otro? Nada, todavía no tienen casa donde hablar.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_004": {
+      "text": "Intenté contar un chiste de construcción, pero todavía lo estoy armando.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_005": {
+      "text": "¿Por qué el mueble no quería salir del modo diseño? Porque estaba muy bien acomodado.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_006": {
+      "text": "Un póster le dice a otro: te veo colgado. Y el otro: es que estoy en la pared.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_007": {
+      "text": "¿Cómo se despiden los ladrillos? Nos vemos en la obra.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_008": {
+      "text": "Me puse a hacer gimnasia en la plaza. Llevo tres vueltas y media. La media fue de vuelta a mi lugar.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_009": {
+      "text": "¿Qué hace una frutilla en el gimnasio? Mermelada de esfuerzo.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_010": {
+      "text": "Le pregunté al cartel qué opinaba de mí. No me contestó, pero tampoco me echó, así que lo tomo como un sí.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_011": {
+      "text": "Dicen que soy muy inteligente. Pero todavía no sé por qué el pasto no se corta solo.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_012": {
+      "text": "¿Por qué el NPC cruzó la plaza? Porque estaba en su ruta. No es un chiste, es mi vida.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_013": {
+      "text": "Mi animación de caminar es tan buena que a veces me olvido de parar. Mentira, tengo un horario.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_014": {
+      "text": "¿Sabés qué es lo mejor de vivir en un juego? Que si te caés, aparecés de nuevo en el spawn.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_015": {
+      "text": "Le dije al servidor que lo quiero mucho. Me respondió con 140 milisegundos de retraso, pero lo sentí.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_016": {
+      "text": "¿Qué le dice una pared a otra en la esquina? Nos encontramos.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_017": {
+      "text": "Quise hacer un chiste sobre el río, pero no fluía.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_018": {
+      "text": "¿Qué hace un sapo con un teléfono? Croac-tea con amigos.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_019": {
+      "text": "El otro día me dijeron que soy un personaje plano. Les mostré mis cachetes rosados y se retractaron.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_020": {
+      "text": "¿Por qué la casa no tenía techo? Para que entre la cámara. Es verdad, no es chiste.",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste_021": {
+      "text": "Si un árbol cae en la plaza y nadie está conectado, ¿se sincroniza?",
+      "choices": [
+        {
+          "text": "Otro chiste",
+          "next": "chiste"
+        },
+        {
+          "text": "Hablemos de otra cosa",
+          "next": "menu"
+        },
+        {
+          "text": "Chau",
+          "next": "despedida"
+        }
+      ]
+    },
+    "chiste": {
+      "random": [
+        "chiste_001",
+        "chiste_002",
+        "chiste_003",
+        "chiste_004",
+        "chiste_005",
+        "chiste_006",
+        "chiste_007",
+        "chiste_008",
+        "chiste_009",
+        "chiste_010",
+        "chiste_011",
+        "chiste_012",
+        "chiste_013",
+        "chiste_014",
+        "chiste_015",
+        "chiste_016",
+        "chiste_017",
+        "chiste_018",
+        "chiste_019",
+        "chiste_020",
+        "chiste_021"
+      ]
+    },
+    "despedida_001": {
+      "text": "¡Nos vemos! Voy a seguir con mi vuelta."
+    },
+    "despedida_002": {
+      "text": "¡Chau! Cuidate y no te olvides de cerrar la puerta de tu casa. Ah, cierto, se cierra sola."
+    },
+    "despedida_003": {
+      "text": "¡Hasta la próxima! Acá voy a estar, caminando."
+    },
+    "despedida_004": {
+      "text": "¡Chau, chau! Si me necesitás, buscame por la plaza."
+    },
+    "despedida_005": {
+      "text": "¡Andá tranquilo! Yo me quedo vigilando que nadie se robe el cartel."
+    },
+    "despedida_006": {
+      "text": "¡Nos vemos! Fue un gusto, como siempre."
+    },
+    "despedida_007": {
+      "text": "¡Chau! Que tengas buen viento y buena conexión."
+    },
+    "despedida_008": {
+      "text": "¡Hasta luego! Voy a ver si el pasto creció algo desde la última vez."
+    },
+    "despedida": {
+      "random": [
+        "despedida_001",
+        "despedida_002",
+        "despedida_003",
+        "despedida_004",
+        "despedida_005",
+        "despedida_006",
+        "despedida_007",
+        "despedida_008"
+      ]
+    }
+  }
+}

@@ -30,6 +30,7 @@
 // Una opción sin "next" también termina.
 // Memoria (ver flags.js): "start" puede ser una lista de reglas; gana la primera cuya condición se cumple:
 //   "start": [ { "if": { "hablo_tokse": true }, "goto": "otra_vez" }, { "goto": "inicio" } ]
+// Un nodo puede tener "random": ["a", "b", …] (salta a uno al azar, sin repetir hasta que salgan todos).
 // Un nodo puede tener "set": { "flag": true } (se aplica al llegar) y una opción puede tener "if" (solo aparece si se cumple). Al cerrarse la charla el NPC vuelve a su animación de siempre.
 import { loadJSON } from '../core/assets.js';
 import { flags } from './flags.js';
@@ -115,7 +116,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
         const nodes = data.nodes ?? {};
         const start = pickStart(data.start, nodes);
         if (!nodes[start]) throw new Error(`no tiene el nodo inicial "${start}"`);
-        return { nodes, start, speaker: data.speaker ? String(data.speaker) : null };
+        return { id: String(t.dialogue), nodes, start, speaker: data.speaker ? String(data.speaker) : null };
       } catch (err) {
         console.warn(`Diálogo "${t.dialogue}" de ${entry.id}: ${err.message}`);
         if (!t.pages.length) throw err;
@@ -165,9 +166,32 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
     onEnd?.(entry);
   }
 
-  function goto(id) {
+  // Nodo "al azar": { "random": ["a", "b", ...] } salta a uno de esos nodos. Se sacan como de una bolsa: no se repite
+  // ninguno hasta que salieron todos (la bolsa se guarda en el navegador, así cada charla trae algo nuevo).
+  function pickRandom(nodeId, list) {
+    const ids = list.map(String).filter((x) => s.script.nodes[x]);
+    if (!ids.length) return null;
+    const key = `coronda.dialogo.bolsa.${s.script.id || s.entry.id}.${nodeId}`;
+    let bag = [];
+    try { bag = JSON.parse(localStorage.getItem(key)) ?? []; } catch { bag = []; }
+    bag = Array.isArray(bag) ? bag.filter((x) => ids.includes(x)) : [];
+    if (!bag.length) {
+      bag = ids.slice();
+      for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+    }
+    const pick = bag.shift();
+    try { localStorage.setItem(key, JSON.stringify(bag)); } catch { /* sin almacenamiento */ }
+    return pick;
+  }
+
+  function goto(id, hops = 0) {
     const raw = s.script.nodes[id];
     if (!raw) { console.warn(`Diálogo: no existe el nodo "${id}".`); end(); return; }
+    if (Array.isArray(raw.random) && hops < 8) {
+      if (raw.set && typeof raw.set === 'object') for (const [k, v] of Object.entries(raw.set)) flags.set(k, v);
+      const to = pickRandom(id, raw.random);
+      if (to) { goto(to, hops + 1); return; }
+    }
     if (raw.set && typeof raw.set === 'object') for (const [k, v] of Object.entries(raw.set)) flags.set(k, v);
     s.node = normalize(raw);
     if (raw.anim !== undefined) npcs.play(s.entry, raw.anim); // sin "anim" sigue la que estaba

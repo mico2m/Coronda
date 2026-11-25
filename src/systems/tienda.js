@@ -196,6 +196,9 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
   const orders = new Map();
   const SOLO_KEY = 'coronda.tienda.solo';
   let plan = [], planAt = 0; // la fila calculada (ver schedule)
+  // Va antes de cargar los pedidos: accept() ya calcula la fila, que usa el horario (ver hor() más abajo)
+  let horario = null; // { abre, cierra } (tiempo.config hace una copia cada vez: se guarda acá)
+  tiempo?.onConfig?.(() => { horario = null; planAt = 0; });
   function cleanOrder(id, r) {
     if (!r || typeof r !== 'object' || !ID_RE.test(String(r.m ?? ''))) return null;
     const t = Number(r.t), d = Number(r.d), s = Math.round(Number(r.s));
@@ -233,8 +236,6 @@ export function createTienda({ stage = null, getRoot, net = null, claude = null,
   // Los pedidos con h (todos los nuevos) avanzan solo de tienda.abre a tienda.cierra (data/tables/tiempo.json, hora del
   // juego): uno que tarda 10 minutos, pedido 1 minuto antes del cierre, termina 9 minutos después de abrir al día
   // siguiente. Los pedidos viejos (sin h) siguen como antes, así ninguno que ya estaba listo vuelve atrás.
-  let horario = null; // { abre, cierra } (tiempo.config hace una copia cada vez: se guarda acá)
-  tiempo?.onConfig?.(() => { horario = null; planAt = 0; });
   function hor() { if (tiempo && !horario) horario = tiempo.config.tienda; return horario; }
   function abiertaEn(t) { const h = hor(); return !h || tiempo.enRango(tiempo.hora(t), h.abre, h.cierra); }
   function proximaApertura(t) { const h = hor(); return !h || abiertaEn(t) ? t : t + tiempo.hastaHora(h.abre, t); }

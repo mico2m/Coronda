@@ -362,3 +362,6 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .update-notice button { font: 600 13px var(--font-body); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
 .update-go { background: #5eead4; color: #062a25; border: 0; }
 .update-later { background: transparent; color: #f6f9fa; border: 1px solid rgba(255, 255, 255, 0.4); }
+.casa-modes { display: flex; gap: 6px; flex-wrap: wrap; }
+.casa-modes button[aria-pressed="true"] { background: #5eead4; color: #062a25; border-color: #5eead4; }
+.casa-modes button[aria-pressed="true"] kbd { color: #062a25; border-color: rgba(0, 0, 0, 0.35); background: rgba(0, 0, 0, 0.08); }

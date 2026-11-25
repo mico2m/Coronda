@@ -18,7 +18,8 @@
 // Modo diseño (el dueño, adentro, tecla B o el botón 🛠):
 //   - elegí un mueble del catálogo y aparece delante tuyo: caminá para llevarlo,
 //   - Q / R giran 15°, clic o Enter lo apoya, Supr lo borra, Esc cancela,
-//   - clic sobre un mueble ya puesto para agarrarlo y moverlo.
+//   - clic sobre un mueble ya puesto para agarrarlo y moverlo,
+//   - V: vista desde arriba (la cámara mira el cuarto entero y el mueble sigue al mouse) · G: grilla de 25 cm en el piso.
 //
 // Cómo se comparte (igual que los lotes): cada cambio se manda en vivo y se guarda en el broker MQTT (retained)
 // bajo casa~<lote>. Registro: { c: id de la casa, o: dueño, v: versión, items: [{ i, m, p: [x, z], y: grados }] }.
@@ -62,6 +63,13 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   let inside = null;          // { key, group, items: Map(i -> obj), exit: Vector3, back: spotInfo }
   let design = false;
   let carry = null;           // { obj, item, isNew, before }
+  let topView = false;        // vista desde arriba (cenital) para acomodar muebles con el mouse
+  let showGrid = false;       // grilla en el piso (se recuerda)
+  try { showGrid = localStorage.getItem('coronda.casas.grilla') === '1'; } catch { /* nada */ }
+  let grid = null;
+  const mouse = { x: 0, y: 0, in: false };
+  const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const _hit = new THREE.Vector3();
 
   const ready = Promise.all([
     loadJSON('data/muebles.json').catch(() => ({ muebles: [] })),
@@ -196,7 +204,15 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     group.add(items);
     // Hasta dónde se puede llevar un mueble (en la habitación armada: adentro de las paredes)
     const bounds = glb ? null : { x: w / 2 - 0.35, z: d / 2 - 0.35 };
-    inside = { key, id, group, itemsGroup: items, items: new Map(), exit, back, bounds };
+    // Tamaño del cuarto (para la vista desde arriba y la grilla)
+    let room = { cx: 0, cz: 0, w, d };
+    if (glb) {
+      const box = new THREE.Box3().setFromObject(group);
+      if (!box.isEmpty()) room = { cx: (box.min.x + box.max.x) / 2, cz: (box.min.z + box.max.z) / 2, w: box.max.x - box.min.x, d: box.max.z - box.min.z };
+    }
+    inside = { key, id, group, itemsGroup: items, items: new Map(), exit, back, bounds, room };
+    grid = null;
+    if (showGrid && design) makeGrid();
     await renderItems();
   }
 
@@ -263,6 +279,35 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   let onExit = null;
   exitPrompt.addEventListener('click', () => onExit?.());
 
+  // Grilla del piso: una línea cada 25 cm (la misma grilla en la que se acomodan los muebles), más marcada cada metro
+  function makeGrid() {
+    if (!inside || grid) return;
+    const { cx, cz, w, d } = inside.room;
+    const size = Math.ceil(Math.max(w, d));
+    grid = new THREE.Group();
+    grid.name = 'casa-grilla';
+    const fine = new THREE.GridHelper(size, Math.round(size / GRID), 0x2b2b2b, 0x2b2b2b);
+    fine.material.transparent = true; fine.material.opacity = 0.28; fine.material.depthWrite = false;
+    const coarse = new THREE.GridHelper(size, size, 0x111111, 0x111111);
+    coarse.material.transparent = true; coarse.material.opacity = 0.55; coarse.material.depthWrite = false;
+    grid.add(fine, coarse);
+    grid.position.set(snap(cx), 0.015, snap(cz));
+    grid.renderOrder = 2;
+    inside.group.add(grid);
+  }
+  function setGrid(on) {
+    showGrid = on;
+    try { localStorage.setItem('coronda.casas.grilla', on ? '1' : '0'); } catch { /* nada */ }
+    if (grid) { grid.removeFromParent(); grid = null; }
+    if (on && design) makeGrid();
+    drawUI();
+  }
+  function setTopView(on) {
+    topView = on;
+    if (!on) camera.up.set(0, 1, 0);
+    drawUI();
+  }
+
   const isOwner = () => inside && lotes.record(inside.key)?.o === uid;
   function drawUI() {
     if (!inside) { ui.hidden = true; return; }
@@ -274,8 +319,12 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
       const list = [...catalog.values()];
       ui.innerHTML = `<div class="casa-panel">
         <div class="casa-head"><b>Diseñar tu casa</b><button type="button" data-a="done">Listo <kbd>B</kbd></button></div>
+        <div class="casa-modes">
+          <button type="button" data-a="top" aria-pressed="${topView}">Vista desde arriba <kbd>V</kbd></button>
+          <button type="button" data-a="grid" aria-pressed="${showGrid}">Grilla <kbd>G</kbd></button>
+        </div>
         <div class="casa-cat">${list.map((m) => `<button type="button" data-m="${esc(m.id)}">${esc(m.nombre)}</button>`).join('') || '<p>No hay muebles en data/muebles.json</p>'}</div>
-        <p class="casa-help">${carry ? 'Caminá para llevarlo · <kbd>Q</kbd>/<kbd>R</kbd> girar · <kbd>clic</kbd> o <kbd>Enter</kbd> apoyar · <kbd>Supr</kbd> borrar · <kbd>Esc</kbd> cancelar' : 'Elegí un mueble, o hacé clic sobre uno puesto para moverlo.'}</p>
+        <p class="casa-help">${carry ? `${topView ? 'Mové el mouse para llevarlo' : 'Caminá para llevarlo'} · <kbd>Q</kbd>/<kbd>R</kbd> girar · <kbd>clic</kbd> o <kbd>Enter</kbd> apoyar · <kbd>Supr</kbd> borrar · <kbd>Esc</kbd> cancelar` : 'Elegí un mueble, o hacé clic sobre uno puesto para moverlo.'}</p>
         <p class="casa-count">${current(inside.key).items.length} / ${MAX_ITEMS} muebles</p>
       </div>`;
     }
@@ -286,6 +335,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     if (!b) return;
     if (b.dataset.a === 'design') setDesign(true);
     else if (b.dataset.a === 'done') setDesign(false);
+    else if (b.dataset.a === 'top') setTopView(!topView);
+    else if (b.dataset.a === 'grid') setGrid(!showGrid);
     else if (b.dataset.m) startNew(b.dataset.m);
     b.blur();
   });
@@ -294,6 +345,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     if (on && !isOwner()) return;
     if (!on && carry) cancelCarry();
     design = on;
+    if (!on) { if (topView) setTopView(false); if (grid) { grid.removeFromParent(); grid = null; } }
+    else if (showGrid) makeGrid();
     drawUI();
   }
   async function startNew(m) {
@@ -345,6 +398,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   const ray = new THREE.Raycaster();
   let down = null;
   stage.addEventListener('pointerdown', (e) => { if (design) down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+  stage.addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.in = true; });
+  stage.addEventListener('pointerleave', () => { mouse.in = false; });
   stage.addEventListener('pointerup', (e) => {
     if (!design || !down || !inside) return;
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || performance.now() - down.t > 400;
@@ -364,6 +419,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     if (!inside || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.code === 'KeyE' && !e.repeat && !design && !exitPrompt.hidden && !blocked()) { onExit?.(); e.preventDefault(); return; }
     if (e.code === 'KeyB' && !e.repeat && !blocked()) { setDesign(!design); e.preventDefault(); return; }
+    if (design && !e.repeat && e.code === 'KeyV') { setTopView(!topView); e.preventDefault(); return; }
+    if (design && !e.repeat && e.code === 'KeyG') { setGrid(!showGrid); e.preventDefault(); return; }
     if (!design || !carry) return;
     if (e.code === 'KeyQ') { carry.item.y = (carry.item.y + 15) % 360; e.preventDefault(); }
     else if (e.code === 'KeyR') { carry.item.y = (carry.item.y + 345) % 360; e.preventDefault(); }
@@ -378,7 +435,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     // Después de cargar cualquier escena: si no es un interior, se apaga todo lo de las casas
     afterScene(sceneId) {
       if (inside && inside.id !== sceneId) inside = null;
-      if (!inside) { design = false; carry = null; ui.hidden = true; exitPrompt.hidden = true; }
+      if (!inside) { design = false; carry = null; topView = false; camera.up.set(0, 1, 0); grid = null; ui.hidden = true; exitPrompt.hidden = true; }
       else drawUI();
     },
     setOnExit(fn) { onExit = fn; },
@@ -396,7 +453,25 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     update(focus) {
       if (!inside) return;
       const p = getPlayer();
-      if (carry && p) {
+      // Vista desde arriba: la cámara mira el cuarto entero, derecho hacia abajo (el norte arriba)
+      if (topView && design) {
+        const { cx, cz, w, d } = inside.room;
+        const half = Math.max(w / 2 / Math.max(camera.aspect, 0.1), d / 2) + 1;
+        const h = half / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        camera.up.set(0, 0, -1);
+        camera.position.set(cx, h, cz);
+        camera.lookAt(cx, 0, cz);
+        camera.updateMatrixWorld();
+      }
+      if (carry && topView && design && mouse.in) { // el mueble sigue al mouse sobre el piso
+        const r = stage.getBoundingClientRect();
+        ray.setFromCamera(new THREE.Vector2(((mouse.x - r.left) / r.width) * 2 - 1, -((mouse.y - r.top) / r.height) * 2 + 1), camera);
+        if (ray.ray.intersectPlane(floorPlane, _hit)) carry.item.p = [_hit.x, _hit.z];
+        const b = inside.bounds;
+        if (b) carry.item.p = [THREE.MathUtils.clamp(carry.item.p[0], -b.x, b.x), THREE.MathUtils.clamp(carry.item.p[1], -b.z, b.z)];
+        carry.obj.position.set(snap(carry.item.p[0]), 0, snap(carry.item.p[1]));
+        carry.obj.rotation.y = THREE.MathUtils.degToRad(carry.item.y);
+      } else if (carry && p) {
         const f = p.facing;
         carry.item.p = [p.position.x + Math.sin(f) * CARRY_DIST, p.position.z + Math.cos(f) * CARRY_DIST];
         const b = inside.bounds;

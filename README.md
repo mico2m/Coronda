@@ -493,7 +493,7 @@ Cada mueble es un `.glb` aparte en **`assets/models/muebles/`** y se anota en **
 
 ### Modo diseño
 
-Adentro de tu casa: **B** o el botón 🛠. Elegí un mueble y aparece delante tuyo; caminá para llevarlo, **Q**/**R** giran 15°, **clic** o **Enter** lo apoya, **Supr** lo borra, **Esc** cancela. Clic sobre un mueble puesto para moverlo. Se acomodan en una grilla de 25 cm. Máximo 150 por casa. Se comparte igual que los lotes: en vivo y guardado en el broker MQTT (`casa~<lote>`); jugando solo, en el navegador.
+Adentro de tu casa: **B** o el botón 🛠. Elegí un mueble y aparece delante tuyo; caminá para llevarlo, **Q**/**R** giran 15°, **clic** o **Enter** lo apoya, **Supr** lo borra, **Esc** cancela. Clic sobre un mueble puesto para moverlo. **V** = vista desde arriba (la cámara mira el cuarto entero y el mueble sigue al mouse) · **G** = muestra la grilla de 25 cm en el piso (se recuerda). Los muebles se acomodan en esa grilla. Máximo 150 por casa. Se comparte igual que los lotes: en vivo y guardado en el broker MQTT (`casa~<lote>`); jugando solo, en el navegador.
 
 ## Servidor: jugadores, nombres, minimapa e inactividad
 

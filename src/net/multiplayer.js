@@ -22,6 +22,7 @@ import { getUid } from './uid.js';
 const APP_ID = 'coronda-mirkuwu-3d';
 const SEND_EVERY = 0.1;      // s entre envíos de posición (10 por segundo)
 const HEARTBEAT = 2;         // s: aunque no te muevas, se avisa que seguís ahí
+const INTERP_DELAY = 140;    // ms: los demás se dibujan este tiempo "atrás", interpolando entre dos posiciones recibidas
 const TIMEOUT = 75;          // s sin noticias de alguien conectado -> deja de contarse (la pestaña quedó congelada)
 const NAME_HEIGHT = 2.05;    // m: altura de la etiqueta con el nombre
 const CHAT_MAX = 120;        // letras por mensaje
@@ -40,7 +41,10 @@ function localRoom(roomId) {
     onPeerJoin: null,
     onPeerLeave: null,
     makeAction(name) {
-      const a = { onMessage: null, send(data, opts) { ch.postMessage({ from: id, to: opts?.target ?? null, name, data }); } };
+      // ?lag: simula internet (demora variable y cada mensaje dos veces, como llega por dos caminos)
+      const lag = /[?&]lag/.test(location.search);
+      const post = (m) => (lag ? [20 + Math.random() * 60, 120 + Math.random() * 250].forEach((ms) => setTimeout(() => ch.postMessage(m), ms)) : ch.postMessage(m));
+      const a = { onMessage: null, send(data, opts) { post({ from: id, to: opts?.target ?? null, name, data }); } };
       actions.set(name, a);
       return a;
     },
@@ -189,7 +193,7 @@ export async function connectServer(roomId = 'coronda') {
         beatT += SEND_EVERY;
         const s = myState();
         const j = JSON.stringify(s);
-        if (j !== lastSent || beatT >= HEARTBEAT) { lastSent = j; beatT = 0; state.send(s); }
+        if (j !== lastSent || beatT >= HEARTBEAT) { lastSent = j; beatT = 0; state.send(stamp(s)); }
       }, SEND_EVERY * 1000);
     },
     setShade(s) { shade = s; for (const p of peers.values()) if (p.avatar?.model) setShade(p.avatar.model, shade); },
@@ -366,9 +370,19 @@ export async function connectServer(roomId = 'coronda') {
   state.onMessage = (data, { peerId }) => {
     let p = peers.get(peerId);
     if (!p) { p = { last: 0, data: null, avatar: null }; peers.set(peerId, p); }
+    // Una copia repetida o más vieja que la última (llegó por un camino más lento): no se usa
+    if (Number.isFinite(data?.q) && Number.isFinite(p.q) && data.q <= p.q) return;
+    if (Number.isFinite(data?.q)) p.q = data.q;
     const wasPlaying = !!p.data?.playing;
     p.last = performance.now();
     p.data = data;
+    // Posiciones con su hora, para dibujarlo fluido (interpolando) aunque lleguen a los saltos
+    if (data?.playing && Array.isArray(data.p) && Number.isFinite(data.t)) {
+      const off = Date.now() - data.t; // diferencia de relojes + demora de la red
+      // el menor desfase visto (el mensaje que llegó más rápido), que se adapta despacio si los relojes se corren
+      p.off = p.off == null ? off : Math.min(off, p.off + 1);
+      (p.snaps ??= []).push({ t: data.t, p: data.p, f: data.f ?? 0, s: data.s, a: data.a });
+    }
     if (wasPlaying !== !!data?.playing) emitCount();
     if (p.avatar && p.avatar.modelUrl !== data.m) { removeAvatar(p); }
   };
@@ -445,10 +459,14 @@ export async function connectServer(roomId = 'coronda') {
     const s = me?.();
     return s ? { playing: true, u: uid, ...s } : { playing: false };
   }
+  // Cada envío lleva la hora (t) y un número que crece (q): así el que recibe descarta las copias viejas
+  // (cada mensaje llega por varios caminos, y el más lento llega tarde) y sabe cuándo pasó cada posición.
+  let seq = 0;
+  const stamp = (s) => ({ ...s, t: Date.now(), q: ++seq });
   function sendNow(target) {
     const s = myState();
     lastSent = JSON.stringify(s);
-    state.send(s, target ? { target } : undefined);
+    state.send(stamp(s), target ? { target } : undefined);
   }
 
   // Muestra a un jugador con su personaje (el .glb se descarga una vez y se clona)
@@ -515,16 +533,35 @@ export async function connectServer(roomId = 'coronda') {
       if (!p.avatar) { avatarFor(p); continue; }
       const av = p.avatar;
       av.root.visible = true;
-      // Se acerca suave a la última posición recibida (si está muy lejos, salta: un teleport)
-      const tx = d.p[0], ty = d.p[1], tz = d.p[2];
-      const far = Math.hypot(tx - av.root.position.x, tz - av.root.position.z) > 6;
-      const k = far ? 1 : Math.min(1, dt * 12);
-      av.root.position.x += (tx - av.root.position.x) * k;
-      av.root.position.y += (ty - av.root.position.y) * k;
-      av.root.position.z += (tz - av.root.position.z) * k;
-      let dy = ((d.f - av.pivot.rotation.y + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
-      av.pivot.rotation.y += dy * Math.min(1, dt * 12);
-      playOn(av, d.a);
+      // Se dibuja un poquito en el pasado (INTERP_DELAY) entre las dos posiciones recibidas que rodean ese momento:
+      // así se mueve parejo aunque los mensajes lleguen a los saltos o desordenados.
+      const sn = p.snaps;
+      if (sn?.length && p.off != null) {
+        const rt = Date.now() - p.off - INTERP_DELAY;
+        while (sn.length > 2 && sn[1].t <= rt) sn.shift(); // ya pasaron
+        let a = sn[0], b = sn[1];
+        let x, y, z, f;
+        if (!b || rt <= a.t) { [x, y, z] = a.p; f = a.f; }
+        else {
+          const k = Math.min(1, (rt - a.t) / Math.max(1, b.t - a.t));
+          const jump = Math.hypot(b.p[0] - a.p[0], b.p[2] - a.p[2]) > 6 || a.s !== b.s; // teleport: sin deslizar
+          const u = jump ? (k < 1 ? 0 : 1) : k;
+          x = a.p[0] + (b.p[0] - a.p[0]) * u; y = a.p[1] + (b.p[1] - a.p[1]) * u; z = a.p[2] + (b.p[2] - a.p[2]) * u;
+          const df = ((b.f - a.f + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+          f = a.f + df * u;
+        }
+        av.root.position.set(x, y, z);
+        av.pivot.rotation.y = f;
+        av.clipNow = (b && rt > a.t ? (rt - a.t) / Math.max(1, b.t - a.t) > 0.5 ? b : a : a).a; // la animación de ese momento
+        if (sn.length > 60) sn.splice(0, sn.length - 60);
+      } else { // versión vieja sin hora: se acerca suave a la última posición
+        const k = Math.min(1, dt * 12);
+        av.root.position.x += (d.p[0] - av.root.position.x) * k;
+        av.root.position.y += (d.p[1] - av.root.position.y) * k;
+        av.root.position.z += (d.p[2] - av.root.position.z) * k;
+        av.pivot.rotation.y = d.f ?? av.pivot.rotation.y;
+      }
+      playOn(av, av.clipNow ?? d.a);
       av.mixer?.update(dt);
       if (av.bubble && now > av.bubbleUntil) { av.root.remove(av.bubble); av.bubble.material.map.dispose(); av.bubble.material.dispose(); av.bubble = null; }
     }

@@ -19,7 +19,9 @@
 //   - elegí un mueble del catálogo y aparece delante tuyo: caminá para llevarlo,
 //   - Q / R giran 15°, clic o Enter lo apoya, Supr lo borra, Esc cancela,
 //   - clic sobre un mueble ya puesto para agarrarlo y moverlo,
-//   - V: vista desde arriba (la cámara mira el cuarto entero y el mueble sigue al mouse) · G: grilla de 25 cm en el piso.
+//   - V: vista desde arriba (la cámara mira el cuarto entero y el mueble sigue al mouse) · G: grilla de 25 cm en el piso,
+//   - Pósters (cuadrado, rectangular o circular): se pega la dirección https de una imagen; se cuelga en la pared y
+//     la imagen se vuelve a pedir cada 5 minutos (si cambia en internet, cambia en la casa).
 //
 // Cómo se comparte (igual que los lotes): cada cambio se manda en vivo y se guarda en el broker MQTT (retained)
 // bajo casa~<lote>. Registro: { c: id de la casa, o: dueño, v: versión, items: [{ i, m, p: [x, z], y: grados }] }.
@@ -89,8 +91,16 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     const items = Array.isArray(r.items) ? r.items.slice(0, MAX_ITEMS).map((it) => ({
       i: String(it?.i ?? '').slice(0, 16), m: String(it?.m ?? '').slice(0, 60),
       p: [Number(it?.p?.[0]) || 0, Number(it?.p?.[1]) || 0], y: Number(it?.y) || 0,
+      ...(it?.m === 'poster' ? { k: cleanPoster(it.k) } : {}),
     })).filter((it) => it.i && it.m) : [];
     return { c, o: r.o ? String(r.o).slice(0, 40) : null, v, items };
+  }
+  // Póster: { f: 'cuadrado' | 'rectangular' | 'circular', u: url https de la imagen }
+  function cleanPoster(k) {
+    const f = ['cuadrado', 'rectangular', 'circular'].includes(k?.f) ? k.f : 'cuadrado';
+    let u = String(k?.u ?? '').trim().slice(0, 500);
+    if (!/^https:\/\/[^\s"'<>]+$/i.test(u)) u = '';
+    return { f, u };
   }
   // El interior vale solo si es de la casa que está hoy en el lote (mismo id c)
   function current(key) {
@@ -221,7 +231,9 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     if (!templates.has(file)) templates.set(file, loadGLB(file).then((g) => { makeUnlit(g.scene); return g; }).catch(() => null));
     return templates.get(file);
   }
+  const itemName = (it) => (it.m === 'poster' ? `mueble:poster:${it.k?.f}:${it.k?.u}` : `mueble:${it.m}`);
   async function makeItem(item) {
+    if (item.m === 'poster') return makePoster(item);
     const def = catalog.get(item.m);
     let obj;
     const g = def ? await template(def.archivo) : null;
@@ -240,6 +252,98 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     setShade(obj, getShade());
     return obj;
   }
+  // ---------- Pósters ----------
+  // Una imagen de internet (https) en un marco: cuadrado (1 × 1 m), rectangular (1,2 m de ancho, alto según la
+  // imagen) o circular (1 m). Se cuelga a 1,6 m de altura; en la habitación armada se pega sola a la pared más cercana.
+  // La imagen se vuelve a pedir cada POSTER_REFRESH: si cambia en internet, cambia en la casa.
+  // Si el sitio de la imagen no deja usarla en 3D (CORS), se pide a través de images.weserv.nl (un servicio gratuito).
+  const POSTER_Y = 1.6, POSTER_REFRESH = 5 * 60 * 1000;
+  const posterLoader = new THREE.TextureLoader();
+  posterLoader.setCrossOrigin('anonymous');
+  const loadImage = (url) => new Promise((res, rej) => posterLoader.load(url, res, undefined, rej));
+  async function posterTexture(u) {
+    const bust = `${u.includes('?') ? '&' : '?'}_c=${Math.floor(Date.now() / POSTER_REFRESH)}`;
+    try { return await loadImage(u + bust); }
+    catch { return loadImage(`https://images.weserv.nl/?url=${encodeURIComponent(u)}&w=1024&_c=${Math.floor(Date.now() / POSTER_REFRESH)}`); }
+  }
+  function makePoster(item) {
+    const k = item.k ?? { f: 'cuadrado', u: '' };
+    const g = new THREE.Group();
+    g.name = itemName(item);
+    g.userData.mueble = item.i;
+    g.userData.poster = true;
+    const holder = new THREE.Group();
+    holder.position.y = POSTER_Y;
+    g.add(holder);
+    const frameMat = new THREE.MeshBasicMaterial({ color: 0x2b2118 });
+    const picMat = new THREE.MeshBasicMaterial({ color: 0xbfb6a8 });
+    let w = 1, h = 1;
+    const build = () => {
+      holder.clear();
+      if (k.f === 'circular') {
+        const frame = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.54, 0.03, 48), frameMat);
+        frame.rotation.x = Math.PI / 2;
+        const pic = new THREE.Mesh(new THREE.CircleGeometry(0.5, 48), picMat);
+        pic.position.z = 0.017;
+        holder.add(frame, pic);
+      } else {
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.08, h + 0.08, 0.03), frameMat);
+        const pic = new THREE.Mesh(new THREE.PlaneGeometry(w, h), picMat);
+        pic.position.z = 0.017;
+        holder.add(frame, pic);
+      }
+    };
+    if (k.f === 'rectangular') { w = 1.2; h = 0.8; }
+    build();
+    const refresh = async () => {
+      if (!k.u || !g.parent) return;
+      try {
+        const tex = await posterTexture(k.u);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        if (k.f === 'rectangular' && tex.image?.width) { // el alto sigue la forma de la imagen
+          h = Math.min(2, Math.max(0.3, w * (tex.image.height / tex.image.width)));
+          build();
+        }
+        picMat.map?.dispose();
+        picMat.map = tex; picMat.color.set(0xffffff); picMat.needsUpdate = true;
+      } catch { console.warn(`Casas: no se pudo cargar la imagen del póster (${k.u})`); }
+    };
+    g.userData.refresh = refresh;
+    setTimeout(refresh, 0);
+    return g;
+  }
+  // Cada tanto se vuelven a pedir las imágenes de los pósters de la casa en la que estás
+  setInterval(() => { if (inside) for (const obj of inside.items.values()) obj.userData.refresh?.(); }, POSTER_REFRESH);
+  // En la habitación armada el póster se pega a la pared más cercana, mirando hacia adentro
+  function stickToWall(item) {
+    const b = inside?.bounds;
+    if (!b) return;
+    const [x, z] = item.p;
+    const wx = b.x + 0.35 - 0.12, wz = b.z + 0.35 - 0.12; // la cara de adentro de cada pared
+    const opts = [
+      { d: wz + z, p: [x, -wz], y: 0 },      // pared de atrás (norte): mira hacia +z
+      { d: wz - z, p: [x, wz], y: 180 },     // pared del frente
+      { d: wx + x, p: [-wx, z], y: 90 },     // izquierda
+      { d: wx - x, p: [wx, z], y: 270 },     // derecha
+    ];
+    const best = opts.reduce((a, o) => (o.d < a.d ? o : a));
+    item.p = [THREE.MathUtils.clamp(best.p[0], -b.x, b.x), THREE.MathUtils.clamp(best.p[1], -b.z, b.z)];
+    if (best.p[0] !== x) item.p[0] = best.p[0];
+    if (best.p[1] !== z) item.p[1] = best.p[1];
+    item.y = best.y;
+  }
+
+  // Ubica lo que llevás: los muebles en la grilla; los pósters, pegados a la pared (y en la grilla a lo largo de ella)
+  function placeCarry() {
+    const it = carry.item;
+    if (it.m === 'poster' && inside.bounds) {
+      stickToWall(it);
+      if (it.y === 0 || it.y === 180) it.p[0] = snap(it.p[0]); else it.p[1] = snap(it.p[1]);
+    } else it.p = [snap(it.p[0]), snap(it.p[1])];
+    carry.obj.position.set(it.p[0], 0, it.p[1]);
+    carry.obj.rotation.y = THREE.MathUtils.degToRad(it.y);
+  }
+
   function place(obj, item) {
     obj.position.set(item.p[0], 0, item.p[1]);
     obj.rotation.y = THREE.MathUtils.degToRad(item.y);
@@ -254,7 +358,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     for (const [i, obj] of inside.items) if (!keep.has(i)) { obj.removeFromParent(); inside.items.delete(i); changed = true; }
     for (const it of want) {
       let obj = inside.items.get(it.i);
-      if (obj && obj.name !== `mueble:${it.m}`) { obj.removeFromParent(); inside.items.delete(it.i); obj = null; }
+      if (obj && obj.name !== itemName(it)) { obj.removeFromParent(); inside.items.delete(it.i); obj = null; }
       if (!obj) {
         obj = await makeItem(it);
         if (my !== renderToken || !inside) return;
@@ -324,12 +428,23 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
           <button type="button" data-a="grid" aria-pressed="${showGrid}">Grilla <kbd>G</kbd></button>
         </div>
         <div class="casa-cat">${list.map((m) => `<button type="button" data-m="${esc(m.id)}">${esc(m.nombre)}</button>`).join('') || '<p>No hay muebles en data/muebles.json</p>'}</div>
+        <div class="casa-cat casa-posters"><span>Pósters:</span>
+          <button type="button" data-poster="cuadrado">▢ Cuadrado</button>
+          <button type="button" data-poster="rectangular">▭ Rectangular</button>
+          <button type="button" data-poster="circular">◯ Circular</button>
+        </div>
+        ${carry?.item.m === 'poster' ? `<form class="casa-url"><input class="casa-url-in" type="url" inputmode="url" placeholder="https://… dirección de la imagen" value="${esc(carry.item.k?.u ?? '')}" aria-label="Dirección de la imagen del póster"><button type="submit">Usar imagen</button></form>` : ''}
         <p class="casa-help">${carry ? `${topView ? 'Mové el mouse para llevarlo' : 'Caminá para llevarlo'} · <kbd>Q</kbd>/<kbd>R</kbd> girar · <kbd>clic</kbd> o <kbd>Enter</kbd> apoyar · <kbd>Supr</kbd> borrar · <kbd>Esc</kbd> cancelar` : 'Elegí un mueble, o hacé clic sobre uno puesto para moverlo.'}</p>
         <p class="casa-count">${current(inside.key).items.length} / ${MAX_ITEMS} muebles</p>
       </div>`;
     }
     ui.hidden = false;
   }
+  ui.addEventListener('submit', (e) => {
+    e.preventDefault();
+    setPosterUrl(ui.querySelector('.casa-url-in')?.value ?? '');
+  });
+  ui.addEventListener('keydown', (e) => { if (e.target.classList?.contains('casa-url-in')) e.stopPropagation(); }); // escribir no mueve al personaje
   ui.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -338,6 +453,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     else if (b.dataset.a === 'top') setTopView(!topView);
     else if (b.dataset.a === 'grid') setGrid(!showGrid);
     else if (b.dataset.m) startNew(b.dataset.m);
+    else if (b.dataset.poster) startNew('poster', { f: b.dataset.poster, u: '' }).then(() => ui.querySelector('.casa-url-in')?.focus());
     b.blur();
   });
 
@@ -349,10 +465,10 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     else if (showGrid) makeGrid();
     drawUI();
   }
-  async function startNew(m) {
+  async function startNew(m, k) {
     if (carry) cancelCarry();
     if (current(inside.key).items.length >= MAX_ITEMS) { notify(`Máximo ${MAX_ITEMS} muebles`); return; }
-    const item = { i: Math.random().toString(36).slice(2, 10), m, p: [0, 0], y: 0 };
+    const item = { i: Math.random().toString(36).slice(2, 10), m, p: [0, 0], y: 0, ...(m === 'poster' ? { k: cleanPoster(k) } : {}) };
     const obj = await makeItem(item);
     if (!inside || !design) return;
     inside.itemsGroup.add(obj);
@@ -366,17 +482,36 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     carry = { obj, item: { ...it, p: [...it.p] }, isNew: false, before: { ...it } };
     drawUI();
   }
+  // Cambiar la imagen del póster que llevás
+  function setPosterUrl(url) {
+    if (!carry || carry.item.m !== 'poster') return;
+    const k = cleanPoster({ f: carry.item.k?.f, u: url });
+    if (url.trim() && !k.u) { notify('La dirección tiene que empezar con https://'); return; }
+    carry.item.k = k;
+    const old = carry.obj;
+    const obj = makePoster(carry.item);
+    old.parent?.add(obj);
+    old.removeFromParent();
+    carry.obj = obj;
+    if (!carry.isNew) inside.items.set(carry.item.i, obj);
+    placeCarry();
+    drawUI();
+  }
   function cancelCarry() {
     if (!carry) return;
     if (carry.isNew) carry.obj.removeFromParent();
-    else place(carry.obj, carry.before);
+    else if (carry.item.m === 'poster' && carry.obj.name !== itemName(carry.before)) { // le habías cambiado la imagen
+      const obj = makePoster(carry.before);
+      carry.obj.parent?.add(obj); carry.obj.removeFromParent();
+      inside.items.set(carry.before.i, obj); place(obj, carry.before);
+    } else place(carry.obj, carry.before);
     carry = null;
     drawUI();
   }
   function drop() {
     if (!carry) return;
     const items = current(inside.key).items.filter((x) => x.i !== carry.item.i);
-    items.push({ ...carry.item, p: [snap(carry.item.p[0]), snap(carry.item.p[1])] });
+    items.push({ ...carry.item, p: [...carry.item.p] });
     if (carry.isNew) { inside.items.set(carry.item.i, carry.obj); }
     carry = null;
     save(inside.key, items);
@@ -469,15 +604,13 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
         if (ray.ray.intersectPlane(floorPlane, _hit)) carry.item.p = [_hit.x, _hit.z];
         const b = inside.bounds;
         if (b) carry.item.p = [THREE.MathUtils.clamp(carry.item.p[0], -b.x, b.x), THREE.MathUtils.clamp(carry.item.p[1], -b.z, b.z)];
-        carry.obj.position.set(snap(carry.item.p[0]), 0, snap(carry.item.p[1]));
-        carry.obj.rotation.y = THREE.MathUtils.degToRad(carry.item.y);
+        placeCarry();
       } else if (carry && p) {
         const f = p.facing;
         carry.item.p = [p.position.x + Math.sin(f) * CARRY_DIST, p.position.z + Math.cos(f) * CARRY_DIST];
         const b = inside.bounds;
         if (b) carry.item.p = [THREE.MathUtils.clamp(carry.item.p[0], -b.x, b.x), THREE.MathUtils.clamp(carry.item.p[1], -b.z, b.z)];
-        carry.obj.position.set(snap(carry.item.p[0]), 0, snap(carry.item.p[1]));
-        carry.obj.rotation.y = THREE.MathUtils.degToRad(carry.item.y);
+        placeCarry();
       }
       const nearExit = !design && Math.hypot(focus.x - inside.exit.x, focus.z - inside.exit.z) < EXIT_RADIUS;
       if (exitPrompt.hidden === nearExit) exitPrompt.hidden = !nearExit;

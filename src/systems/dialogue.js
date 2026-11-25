@@ -48,7 +48,12 @@ function el(tag, className, parent) {
   return e;
 }
 
-export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }) {
+// hooks (opcional, para NPC especiales como Claude, ver systems/claude-npc.js):
+//   gate(entry)            -> Promise<true | "mensaje">: antes de empezar (ej. "Claude está charlando con Ana")
+//   ended(entry)           -> al terminar la charla
+//   choiceOk(choice, entry) -> false esconde esa opción (ej. "Decile algo" cuando la IA está descansando)
+//   ask(entry, texto)      -> Promise<{ text, choices? }>: nodo { "ask": true }: el jugador escribe y el NPC contesta
+export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError, hooks = {} }) {
   const host = stage.parentElement;
   let entries = [];     // NPC con algo para decir
   let near = null;      // NPC al alcance
@@ -93,7 +98,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
       pages: asPages(raw.text),
       next: raw.next ?? null,
       choices: (Array.isArray(raw.choices) ? raw.choices : [])
-        .filter((c) => flags.check(c?.if))
+        .filter((c) => flags.check(c?.if) && (!hooks.choiceOk || hooks.choiceOk(c, s?.entry) !== false))
         .map((c) => ({ text: String(c?.text ?? ''), next: c?.next ?? null }))
         .filter((c) => c.text),
     };
@@ -131,6 +136,11 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
     if (s || busy || performance.now() < cooldownUntil) return;
     busy = true;
     setNear(null);
+    if (hooks.gate) {
+      let ok = true;
+      try { ok = await hooks.gate(entry); } catch { ok = true; }
+      if (ok !== true) { busy = false; cooldownUntil = performance.now() + 600; if (ok) onError?.(String(ok)); return; }
+    }
     let script;
     try {
       script = await buildScript(entry);
@@ -163,7 +173,9 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
     sr.textContent = '';
     npcs.release(entry);
     cooldownUntil = performance.now() + 250; // evita que el mismo toque de E vuelva a abrir la charla
+    closeAsk();
     onEnd?.(entry);
+    hooks.ended?.(entry);
   }
 
   // Nodo "al azar": { "random": ["a", "b", ...] } salta a uno de esos nodos. Se sacan como de una bolsa: no se repite
@@ -193,6 +205,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
       if (to) { goto(to, hops + 1); return; }
     }
     if (raw.set && typeof raw.set === 'object') for (const [k, v] of Object.entries(raw.set)) flags.set(k, v);
+    if (raw.ask && hooks.ask) { openAsk(raw); return; }
     s.node = normalize(raw);
     if (raw.anim !== undefined) npcs.play(s.entry, raw.anim); // sin "anim" sigue la que estaba
     // Cada página del texto se parte en las cajas que hagan falta (4 renglones). La última deja lugar a las opciones.
@@ -262,6 +275,51 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
     paint();
   }
 
+  // ---- Nodo "ask": el jugador escribe y el NPC contesta (ver hooks.ask) ----
+  const askBox = el('form', 'dlg-ask', host);
+  askBox.hidden = true;
+  askBox.innerHTML = '<input class="dlg-ask-in" maxlength="200" autocomplete="off" spellcheck="true" placeholder="Escribile algo…" aria-label="Escribile algo"><button type="submit">Decir</button><button type="button" class="dlg-ask-x">Volver</button>';
+  const askIn = askBox.querySelector('.dlg-ask-in');
+  let asking = null; // { raw }
+  function openAsk(raw) {
+    asking = { raw };
+    s.node = normalize({ text: raw.text ?? 'Te escucho…' });
+    s.pages = [{ ...textbox.paginate(s.node.pages[0] ?? 'Te escucho…', 0)[0] }];
+    s.page = 0;
+    showPage();
+    askBox.hidden = false;
+    askIn.value = '';
+    setTimeout(() => askIn.focus(), 30);
+  }
+  function closeAsk() { asking = null; askBox.hidden = true; askIn.blur(); }
+  async function sendAsk() {
+    const text = askIn.value.trim();
+    if (!s || !asking || !text) return;
+    const raw = asking.raw;
+    closeAsk();
+    const back = raw.back ?? null; // a qué nodo vuelve si el jugador no quiere seguir
+    s.node = normalize({ text: '…' });
+    s.pages = [{ ...textbox.paginate('…', 0)[0] }];
+    s.page = 0;
+    showPage();
+    const my = s;
+    let res;
+    try { res = await hooks.ask(s.entry, text); } catch (err) { res = { text: String(err?.message || err) }; }
+    if (s !== my) return; // se cerró mientras pensaba
+    const id = '__respuesta';
+    const choices = res?.choices ?? [
+      { text: 'Decile otra cosa', next: '__ask' },
+      ...(back ? [{ text: 'Hablemos de otra cosa', next: back }] : []),
+      { text: 'Chau', next: raw.bye ?? null },
+    ];
+    s.script.nodes.__ask = raw;
+    s.script.nodes[id] = { text: res?.text || '…', choices: choices.filter((c) => c.next !== undefined) };
+    goto(id);
+  }
+  askBox.addEventListener('submit', (e) => { e.preventDefault(); sendAsk(); });
+  askBox.querySelector('.dlg-ask-x').addEventListener('click', () => { const raw = asking?.raw; closeAsk(); if (raw?.back) goto(raw.back); else end(); });
+  askIn.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') { closeAsk(); end(); } });
+
   function choose(i) {
     const c = s?.choices[i];
     if (!c) return;
@@ -272,6 +330,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
     if (!s) return;
     if (s.shown < s.count) { s.shown = s.count; pageDone(); return; } // completa la página
     if (s.choices.length && !s.picking) { s.choiceShown = s.choiceTotal; s.picking = true; paint(); return; } // completa las opciones
+    if (asking) return;
     if (s.picking) { choose(s.sel); return; }
     if (s.page < s.pages.length - 1) { s.page++; showPage(); return; }
     if (s.node.next) goto(s.node.next); else end();
@@ -287,6 +346,7 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
       return;
     }
     if (e.code === 'Escape') { end(); e.preventDefault(); return; }
+    if (asking) return; // escribiendo
     if (s.picking && /^Digit[1-9]$/.test(e.code)) {
       const i = Number(e.code.slice(5)) - 1;
       if (i < s.choices.length) { s.sel = i; choose(i); }
@@ -328,6 +388,9 @@ export function createDialogue({ stage, npcs, textbox, onStart, onEnd, onError }
       entries = npcs.list.filter((n) => n.talk);
     },
     get active() { return !!s; },
+    get entry() { return s?.entry ?? null; },
+    // Cierra la charla desde afuera (ej. Claude se fue a otra parte)
+    close() { end(); },
     // true mientras haya una charla, se esté cargando una o haya un NPC al alcance: las puertas esperan.
     get blocked() { return !!s || busy || !!near; },
 

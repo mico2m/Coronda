@@ -243,6 +243,7 @@ export async function connectServer(roomId = 'coronda') {
     return ch;
   }
   net.lotes = channel('lotes', '');      // ver systems/lotes.js
+  net.claude = channel('claude', 'claude~'); // ver systems/claude-npc.js (el NPC Claude, uno solo para todo el servidor)
   net.casas = channel('casas', 'casa~'); // ver systems/casas.js (interiores)
   const SEEN = 'visto~';                 // última conexión de cada jugador (ver players())
   const NAME = 'nombre~';                // registro de nombres: cada nombre es de un solo jugador (ver checkName)
@@ -335,6 +336,19 @@ export async function connectServer(roomId = 'coronda') {
   }, PING_EVERY * 1000);
   // Todos los jugadores: los conectados (con su ping) y los que estuvieron antes (con su última conexión), los más recientes primero
   // Posiciones de los otros jugadores que están en tu misma escena (para el minimapa)
+  // Jugadores conectados (vos incluido) con su id, nombre, escena y posición: para el NPC Claude (systems/claude-npc.js)
+  net.uid = uid;
+  net.roster = () => {
+    const out = [];
+    const mine = me?.();
+    if (playing && mine) out.push({ me: true, u: uid, n: mine.n, s: mine.s, p: mine.p, peerId: room.selfId });
+    for (const [peerId, p] of peers) {
+      const d = p.data;
+      if (!d?.playing || !d.u || performance.now() - p.last > 15000) continue;
+      out.push({ me: false, u: String(d.u), n: d.n ?? 'Jugador', s: d.s, p: d.p, peerId });
+    }
+    return out;
+  };
   net.positions = () => {
     const mine = me?.()?.s;
     const out = [];

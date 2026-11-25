@@ -72,6 +72,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
   let lotes = null; // lotes que los jugadores pueden adquirir (ver systems/lotes.js)
   let minimap = null; // ver ui/minimap.js
   let casas = null;   // interiores de las casas de los lotes (ver systems/casas.js)
+  let claudeNpc = null; // Claude, el NPC de la plaza: uno solo para todo el servidor (ver systems/claude-npc.js)
   let player = null;
   let world = null; // gestor de escenas (para mover el cielo)
   let mode = 'free'; // 'player' (tercera persona) o 'free' (cámara libre)
@@ -89,7 +90,13 @@ export async function startGame({ dev = false, retro = null } = {}) {
     textbox,
     onStart: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
     onEnd: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
-    onError: (msg) => ui.setStatus(msg),
+    onError: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 3000); },
+    hooks: {
+      gate: (e) => claudeNpc?.gate(e) ?? true,
+      ended: (e) => claudeNpc?.ended(e),
+      choiceOk: (c) => claudeNpc?.choiceOk(c) ?? c?.needs !== 'ia',
+      ask: (e, t) => claudeNpc?.ask(e, t) ?? Promise.resolve({ text: '…' }),
+    },
   });
 
   function setMode(m) {
@@ -119,6 +126,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     last = now;
     controls.update(dt);
     player?.update(dt);
+    claudeNpc?.update(dt, npcs.list);
     npcs.update(dt);
     net?.update(dt);
     inspector?.update(dt);
@@ -317,6 +325,16 @@ export async function startGame({ dev = false, retro = null } = {}) {
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
       getShade: () => sceneManager.shade,
     });
+
+    // Claude: uno solo para todo el servidor, charla de a uno y (si hay IA configurada) le podés escribir
+    {
+      const { createClaudeNpc } = await import('./systems/claude-npc.js');
+      claudeNpc = createClaudeNpc({
+        net, npcs, lotes, getPlayer: () => (mode === 'player' ? player : null), getSceneId: () => sceneManager.current?.id ?? null,
+        myName: choice?.name ?? 'Viajero', notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
+      });
+      window.corondaClaude = claudeNpc; // para revisar desde la consola: corondaClaude.state
+    }
 
     // Interiores de las casas (ver systems/casas.js): se entra desde el menú del lote, se sale por la puerta
     casas = createCasas({

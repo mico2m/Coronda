@@ -91,6 +91,11 @@
       "text": "¿Qué te cuento?",
       "choices": [
         {
+          "text": "Decile algo (escribile)",
+          "next": "ia",
+          "needs": "ia"
+        },
+        {
           "text": "Contame algo",
           "next": "charla"
         },
@@ -107,6 +112,12 @@
           "next": "despedida"
         }
       ]
+    },
+    "ia": {
+      "ask": true,
+      "text": "¡Te escucho! Escribime lo que quieras. Si querés, pedime que te siga o que vaya a tu casa.",
+      "back": "menu",
+      "bye": "despedida"
     },
     "charla_001": {
       "text": "Me llamo Claude. Soy una inteligencia artificial, pero acá en Coronda prefiero que me digan vecino.",

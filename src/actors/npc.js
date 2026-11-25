@@ -215,6 +215,7 @@ export function createNpcs() {
     // Fin de la charla: vuelve a su posición y a su animación de siempre (si camina, sigue su recorrido)
     release(n) {
       api.play(n, null);
+      if (n.keepHold) return; // otro sistema lo tiene ocupado (ej. Claude siguiendo a alguien): no vuelve a su ruta
       if (n.route) n.route.resume(); else n.targetYaw = n.baseYaw;
     },
 
@@ -304,7 +305,7 @@ export function createNpcs() {
 
     update(dt) {
       for (const n of list) {
-        n.route?.update(dt);
+        if (!n.external) n.route?.update(dt); // external: lo mueve otro sistema (ej. Claude, que lo maneja la red)
         n.mixer?.update(dt);
         const cur = n.holder.rotation.y;
         if (cur === n.targetYaw) continue;

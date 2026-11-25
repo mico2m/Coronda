@@ -170,6 +170,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     // Arma (o rehace) las colisiones de la escena actual. Se rehace cuando alguien adquiere o libera un lote (aparece o
     // desaparece una casa) sin cambiar de escena.
     function rebuildCollision() {
+      if (!sceneManager.current || !sceneManager.root) return; // en medio de un cambio de escena
       // Colisiones: se leen las propiedades `colision` de los objetos del .glb (ver collision.js)
       const scol = sceneManager.current.collision ?? {};
       sceneManager.root.getObjectByName('collision-debug')?.removeFromParent(); // la capa de depuración anterior

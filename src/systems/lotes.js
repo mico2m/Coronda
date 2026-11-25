@@ -37,6 +37,14 @@ const SOLO_STORE = 'coronda.lotes.solo';
 const HEAL_DELAY = 4000; // ms: se espera a recibir lo guardado en el broker antes de reponer lo propio
 const FALLBACK_COLORS = [0xd9a066, 0x6fa8dc, 0x93c47d, 0xe06666, 0xc27ba0];
 
+// ¿Este modelo trae colisión propia (col_… o colision en sus propiedades)? Si no, poner o sacar la casa no cambia las colisiones
+const COL_RE = /^(?:col|colision)_/i;
+function hasCollision(obj) {
+  let yes = false;
+  obj?.traverse((o) => { const c = o.userData?.colision; if (COL_RE.test(o.name ?? '') || (c !== undefined && c !== false && c !== 0 && c !== '0')) yes = true; });
+  return yes;
+}
+
 const _p = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
@@ -211,6 +219,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     let house = null;
     if (want) house = await buildHouse(want, s);
     if (token !== s.token || !spots.includes(s)) return; // cambió otra vez mientras cargaba, o cambió la escena
+    const hadCol = hasCollision(s.house);
     if (s.house) { s.house.removeFromParent(); s.house = null; }
     if (house) {
       house.position.copy(s.pos); house.quaternion.copy(s.quat);
@@ -218,7 +227,8 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       house.updateMatrixWorld(true);
       s.house = house;
     }
-    if (!s.silent) onChange?.(key);
+    // Solo se rehacen las colisiones si la casa nueva o la que se fue tenían (así no se toca nada de lo que ya funciona)
+    if (!s.silent && (hadCol || hasCollision(house))) onChange?.(key);
   }
 
   // ---------- Panel para elegir la casa ----------
@@ -318,7 +328,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       await Promise.all(spots.map((s) => render(s.key)));
       spots.forEach((s) => { s.silent = false; });
       console.info(`Lotes de "${sceneId}":`, spots.map((s) => `${s.key}${state.get(s.key)?.o ? ` (${state.get(s.key).n})` : ''}`));
-      return spots.filter((s) => s.house).length; // casas puestas (si hay, hay que rehacer las colisiones)
+      return spots.filter((s) => hasCollision(s.house)).length; // casas con colisión propia (si hay, hay que rehacer las colisiones)
     },
 
     get blocked() { return panelKey !== null; },

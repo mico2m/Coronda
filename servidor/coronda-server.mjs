@@ -994,7 +994,23 @@ server.listen(PUERTO, () => {
   console.log('  └──────────────────────────────────────────────┘');
   console.log(`  Cuentas: ${Object.keys(D.cuentas).length} · Admins: ${(config.admins ?? []).join(', ') || '(ninguno: agregalos en servidor/config.json)'}`);
   console.log('  Para cerrarlo: Ctrl+C (guarda todo antes de salir).');
+  probarIA();
 });
+// Al arrancar se prueba la IA de Claude una vez y se avisa acá si anda (así se sabe por qué Claude "se abruma")
+async function probarIA() {
+  const ia = leer('data/tables/ia.json', {});
+  const destino = String(process.env.CORONDA_IA || ia.endpoint || '').trim();
+  if (!destino || ia.activa === false) { console.log('  IA de Claude: apagada (data/tables/ia.json).'); return; }
+  try {
+    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 20000);
+    const r = await fetch(destino, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Coronda-Jugador': 'prueba-servidor' }, signal: ctl.signal,
+      body: JSON.stringify({ modo: 'comentario', jugador: 'Servidor', texto: '', historial: [], mundo: {} }) });
+    clearTimeout(to);
+    const txt = await r.text();
+    if (r.ok) console.log(`  IA de Claude: anda ✔ (dijo: ${txt.slice(0, 90)})`);
+    else console.log(`  IA de Claude: ✘ el worker contestó ${r.status}: ${txt.slice(0, 200)}`);
+  } catch (e) { console.log(`  IA de Claude: ✘ no se pudo hablar con el worker (${destino}): ${e.message}`); }
+}
 function cerrar() {
   console.log('\nGuardando el mundo…');
   try { db.guardarYa(); } catch (e) { console.error(e); }

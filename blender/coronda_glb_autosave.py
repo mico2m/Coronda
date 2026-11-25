@@ -11,7 +11,7 @@ Usar:     en la vista 3D apretá N > pestaña "Coronda" > activá "GLB autosave"
 bl_info = {
     "name": "Coronda · GLB autosave",
     "author": "Coronda",
-    "version": (1, 0, 0),
+    "version": (1, 1, 0),
     "blender": (3, 6, 0),
     "location": "Vista 3D > N > Coronda",
     "description": "Exporta el .glb solo al guardar (o al cambiar algo)",
@@ -36,6 +36,7 @@ state = {
     "last_ok": 0.0,
     "took": 0.0,
     "error": "",
+    "warning": "",
     "redrawn": 0.0,
 }
 
@@ -107,18 +108,32 @@ def export_now():
     tmp = os.path.join(tmpdir, "export.glb")
     opts = dict(filepath=tmp, export_format="GLB", export_extras=True, export_yup=True,
                 export_apply=sc.coronda_glb_apply, use_visible=sc.coronda_glb_visible,
-                export_animations=True)
+                export_animations=sc.coronda_glb_anims)
     state["exporting"] = True
     t0 = time.time()
     ob = bpy.context.view_layer.objects.active
     mode = ob.mode if ob else "OBJECT"
     win = _window()
-    try:
+    def run(o):
         if win:
             with bpy.context.temp_override(window=win):
-                _gltf(opts)
+                _gltf(o)
         else:
-            _gltf(opts)
+            _gltf(o)
+
+    try:
+        state["warning"] = ""
+        try:
+            run(opts)
+        except RuntimeError as e:
+            if not opts.get("export_animations"):
+                raise
+            # El exportador de Blender a veces falla con las animaciones (ej. un esqueleto con drivers o
+            # que no se exporta). Se exporta igual, sin animaciones, y se avisa en el panel.
+            print("[GLB autosave] falló con animaciones, reintento sin ellas:", str(e).strip().splitlines()[-1:])
+            run(dict(opts, export_animations=False))
+            last = str(e).strip().splitlines()[-1] if str(e).strip() else ""
+            state["warning"] = f"Exportado SIN animaciones: el exportador falló con ellas ({last[:60]})"
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         # Se reemplaza de una: el juego nunca lee un .glb a medio escribir
         for intento in range(5):
@@ -264,12 +279,18 @@ class CORONDA_PT_glb_autosave(bpy.types.Panel):
         col = lay.column()
         col.prop(sc, "coronda_glb_visible")
         col.prop(sc, "coronda_glb_apply")
+        col.prop(sc, "coronda_glb_anims")
         lay.operator("coronda.glb_export", icon="FILE_REFRESH")
 
         if state["exporting"]:
             lay.label(text="Exportando…", icon="TIME")
         elif state["error"]:
             lay.label(text=state["error"], icon="ERROR")
+        elif state["warning"]:
+            col = lay.column(align=True)
+            col.label(text="Exportado, pero SIN animaciones:", icon="ERROR")
+            col.label(text="el exportador de Blender falló con ellas.")
+            col.label(text="Mirá la consola o destildá 'Animaciones'.")
         elif not sc.coronda_glb_autosave:
             lay.label(text="Apagado", icon="PAUSE")
         elif sc.coronda_glb_when == "CHANGE" and state["dirty"]:
@@ -306,6 +327,9 @@ PROPS = {
     "coronda_glb_visible": bpy.props.BoolProperty(
         name="Solo lo visible", default=False,
         description="No exportar lo que tengas oculto (ojito cerrado)"),
+    "coronda_glb_anims": bpy.props.BoolProperty(
+        name="Animaciones", default=True,
+        description="Exportar las animaciones (puertas, objetos animados). Si el exportador falla con ellas, se exporta igual sin animaciones y se avisa"),
     "coronda_glb_apply": bpy.props.BoolProperty(
         name="Aplicar modificadores", default=True,
         description="Exporta los objetos con sus modificadores aplicados"),

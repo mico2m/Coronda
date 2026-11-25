@@ -113,7 +113,10 @@ export function createNpcs() {
       const templates = new Map();
       const template = (path) => {
         if (!templates.has(path)) {
-          templates.set(path, loadGLB(path).then((g) => {
+          // Si no está "villager1.glb", se prueba "npc_villager1.glb" (el archivo con el mismo nombre que el Empty)
+          const alt = path.startsWith(DIR) && !/^npc_/i.test(path.slice(DIR.length)) ? `${DIR}npc_${path.slice(DIR.length)}` : null;
+          const load = alt ? loadGLB(path).catch(() => loadGLB(alt)) : loadGLB(path);
+          templates.set(path, load.then((g) => {
             makeUnlit(g.scene);               // sin luces, como el resto del mundo
             setShade(g.scene, shade);         // mismo tono y brillo que la escena
             return g;

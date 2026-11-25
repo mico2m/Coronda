@@ -162,7 +162,7 @@ Para cambiar tecla o texto, o para enlazar un clip que ya existe sin renombrarlo
 
 Un NPC es un modelo `.glb` con su animación, puesto en la escena con un Empty de Blender. Código: `src/actors/npc.js`.
 
-1. Exportá el modelo a `assets/models/objects/vecino.glb` (origen en los pies, frente hacia -Y de Blender) con una animación en bucle, por ejemplo una acción llamada `idle`.
+1. Exportá el modelo a `assets/models/objects/vecino.glb` (o `npc_vecino.glb`, también lo encuentra) (origen en los pies, frente hacia -Y de Blender) con una animación en bucle, por ejemplo una acción llamada `idle`.
 2. En el `.glb` de la escena poné un **Empty llamado `npc_vecino`** en el suelo, donde va a estar. El NPC mira hacia donde apunta la **flecha verde (eje Y)** del Empty, igual que los spawns. Duplicá el Empty para tener más de uno (`npc_vecino.001` sigue siendo "vecino"; el modelo se descarga una sola vez).
 3. Opcional, en *Custom Properties* del Empty (tildá *Include > Custom Properties* al exportar):
 

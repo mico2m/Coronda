@@ -370,6 +370,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
       getPlayer: () => (mode === 'player' ? player : null), blocked: () => !!dialogue?.active || !!casas?.inside,
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); },
     });
+    // Barra de energía (hachazos que te quedan hoy) abajo en el HUD (ver ui/energia.js)
+    const { createEnergia } = await import('./ui/energia.js');
+    createEnergia({ stage, getBosque: () => bosque });
 
     // Claude: uno solo para todo el servidor, charla de a uno y (si hay IA configurada) le podés escribir
     {

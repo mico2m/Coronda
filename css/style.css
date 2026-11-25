@@ -509,6 +509,26 @@ body:has(.talking) .reloj { opacity: 0.4; }
 .casa-cat button small { opacity: 0.8; font-weight: 600; }
 .casa-hint { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
 
+/* ---------- Barra de energía (ui/energia.js) ---------- */
+.energia { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom, 0px)); z-index: 3; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 9px; border-radius: 999px; background: rgba(12, 20, 26, 0.72); color: #f4f8fa; font: 700 12px var(--font-body); pointer-events: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); }
+.energia[hidden] { display: none; }
+.energia-ico { font-size: 14px; line-height: 1; }
+.energia-bar { width: 160px; height: 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+.energia-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #facc15, #fde047); transition: width 0.35s ease; }
+.energia-n { min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; opacity: 0.9; }
+.energia.poca .energia-bar i { background: linear-gradient(90deg, #f97316, #fb923c); }
+.energia.vacia { opacity: 0.75; } .energia.vacia .energia-n { color: #f87171; }
+.energia.gasta { animation: energia-gasta 0.3s ease; }
+.energia.llena .energia-bar i { box-shadow: 0 0 10px #fde047; }
+@keyframes energia-gasta { 30% { transform: translateX(-50%) scale(1.06); } }
+body:has(.talking) .energia { opacity: 0.4; }
+@media (pointer: coarse) {
+  .energia { bottom: calc(var(--edge-b) + 144px); padding: 4px 10px 4px 8px; } /* arriba del joystick */
+  .energia-bar { width: 110px; }
+}
+
 /* ---------- Primera persona: cruceta (game.js) ---------- */
 .fp-mira { position: absolute; left: 50%; top: 50%; z-index: 2; width: 22px; height: 22px; transform: translate(-50%, -50%); pointer-events: none; }
 .fp-mira[hidden] { display: none; }

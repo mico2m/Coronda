@@ -174,7 +174,7 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     const t = near;
     const player = getPlayer?.();
     if (!t || busy || !player || isDown(t)) return;
-    if (quedan() <= 0) { toast('😮‍💨 Sin fuerzas'); notify(`Estás agotado: no podés talar. ${recupera()}`); return; }
+    if (quedan() < 1 - 1e-6) { toast('😮‍💨 Sin fuerzas'); notify(`Estás agotado: no podés talar. ${recupera()}`); return; }
     busy = true; // el botón sigue a la vista, atenuado, mientras da el hachazo
     // Con servidor: el hachazo se pide ya (mientras se ve la animación); él decide si vale
     const pedido = net ? net.rpc('bosque.hachazo', { k: t.key }).catch((e) => ({ error: e.message })) : null;
@@ -232,13 +232,13 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     if (show2) {
       // 🪓 = botón: en la PC "🪓 E Talar 1/3"; en el celular un botón redondo con el hacha y el progreso (ver css .tala-prompt)
       // ⚡ = hachazos que te quedan hoy (resistencia)
-      const q = quedan();
+      const q = Math.floor(quedan() + 1e-6); // hachazos enteros que te quedan (la energía va con decimales: correr gasta de a poco)
       const energia = Number.isFinite(q) ? `<b class="tala-res${q === 0 ? ' vacia' : q <= 5 ? ' poca' : ''}" title="Hachazos que te quedan hoy">⚡${q}</b>` : '';
       const html = `<span class="tala-ico" aria-hidden="true">🪓</span><kbd>E</kbd><span class="tala-txt">${q === 0 ? 'Sin fuerzas' : 'Talar'}</span><small>${near.tandas}/${cfg.tandas_por_arbol}</small>${energia}`;
       if (html !== promptHtml) { prompt.innerHTML = html; promptHtml = html; }
     }
     prompt.classList.toggle('busy', busy);
-    prompt.classList.toggle('agotado', show2 && quedan() === 0);
+    prompt.classList.toggle('agotado', show2 && quedan() < 1 - 1e-6);
     prompt.hidden = !show2;
   }
 

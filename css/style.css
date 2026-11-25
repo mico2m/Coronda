@@ -475,3 +475,8 @@ body:has(.talking) .reloj { opacity: 0.4; }
 .tala-pop[hidden] { display: none; }
 .tala-pop.sube { animation: tala-sube 1.3s ease-out forwards; }
 @keyframes tala-sube { from { opacity: 0; transform: translate(-50%, 10px); } 15% { opacity: 1; transform: translate(-50%, 0); } 75% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -24px); } }
+
+/* Modo diseño: muebles de la mochila */
+.casa-cat button[disabled] { opacity: 0.45; cursor: not-allowed; }
+.casa-cat button small { opacity: 0.8; font-weight: 600; }
+.casa-hint { margin: 4px 0 0; font-size: 12px; color: var(--muted); }

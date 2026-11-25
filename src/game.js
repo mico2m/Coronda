@@ -383,6 +383,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
       blocked: () => (dialogue?.blocked ?? false) || (lotes?.blocked ?? false),
       onChange: () => { rebuildCollision(); minimap?.capture(sceneManager.root); },
+      inventario,
     });
     // La Carpintería de Claude: pedidos de muebles a cambio de madera, retiro y notas en los buzones (ver systems/tienda.js)
     tienda = createTienda({

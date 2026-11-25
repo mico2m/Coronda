@@ -100,7 +100,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     const f = ['cuadrado', 'rectangular', 'circular'].includes(k?.f) ? k.f : 'cuadrado';
     let u = String(k?.u ?? '').trim().slice(0, 500);
     if (!/^https:\/\/[^\s"'<>]+$/i.test(u)) u = '';
-    return { f, u };
+    const h = Number.isFinite(Number(k?.h)) ? Math.min(2.6, Math.max(0.6, Math.round(Number(k.h) * 10) / 10)) : 1.6; // altura del centro (m)
+    return { f, u, h };
   }
   // El interior vale solo si es de la casa que está hoy en el lote (mismo id c)
   function current(key) {
@@ -273,7 +274,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     g.userData.mueble = item.i;
     g.userData.poster = true;
     const holder = new THREE.Group();
-    holder.position.y = POSTER_Y;
+    holder.name = 'poster-cuadro';
+    holder.position.y = k.h ?? POSTER_Y;
     g.add(holder);
     const frameMat = new THREE.MeshBasicMaterial({ color: 0x2b2118 });
     const picMat = new THREE.MeshBasicMaterial({ color: 0xbfb6a8 });
@@ -342,11 +344,18 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     } else it.p = [snap(it.p[0]), snap(it.p[1])];
     carry.obj.position.set(it.p[0], 0, it.p[1]);
     carry.obj.rotation.y = THREE.MathUtils.degToRad(it.y);
+    if (it.m === 'poster') { const c = carry.obj.getObjectByName('poster-cuadro'); if (c) c.position.y = it.k?.h ?? POSTER_Y; }
+  }
+  function posterHeight(delta) {
+    if (carry?.item.m !== 'poster') return;
+    carry.item.k = cleanPoster({ ...carry.item.k, h: (carry.item.k?.h ?? POSTER_Y) + delta });
+    placeCarry();
   }
 
   function place(obj, item) {
     obj.position.set(item.p[0], 0, item.p[1]);
     obj.rotation.y = THREE.MathUtils.degToRad(item.y);
+    if (item.m === 'poster') { const c = obj.getObjectByName('poster-cuadro'); if (c) c.position.y = item.k?.h ?? POSTER_Y; }
   }
   let renderToken = 0;
   async function renderItems() {
@@ -421,8 +430,9 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
       ui.innerHTML = `<div class="casa-bar"><b>Casa de ${esc(lot?.n || '…')}</b>${own ? '<button type="button" data-a="design">🛠 Diseñar <kbd>B</kbd></button>' : ''}</div>`;
     } else {
       const list = [...catalog.values()];
+      const posters = current(inside.key).items.filter((it) => it.m === 'poster');
       ui.innerHTML = `<div class="casa-panel">
-        <div class="casa-head"><b>Diseñar tu casa</b><button type="button" data-a="done">Listo <kbd>B</kbd></button></div>
+        <div class="casa-head"><b>Diseñar tu casa</b><button type="button" data-a="done" class="casa-done">✓ Todo listo</button></div>
         <div class="casa-modes">
           <button type="button" data-a="top" aria-pressed="${topView}">Vista desde arriba <kbd>V</kbd></button>
           <button type="button" data-a="grid" aria-pressed="${showGrid}">Grilla <kbd>G</kbd></button>
@@ -434,7 +444,15 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
           <button type="button" data-poster="circular">◯ Circular</button>
         </div>
         ${carry?.item.m === 'poster' ? `<form class="casa-url"><input class="casa-url-in" type="url" inputmode="url" placeholder="https://… dirección de la imagen" value="${esc(carry.item.k?.u ?? '')}" aria-label="Dirección de la imagen del póster"><button type="submit">Usar imagen</button></form>` : ''}
-        <p class="casa-help">${carry ? `${topView ? 'Mové el mouse para llevarlo' : 'Caminá para llevarlo'} · <kbd>Q</kbd>/<kbd>R</kbd> girar · <kbd>clic</kbd> o <kbd>Enter</kbd> apoyar · <kbd>Supr</kbd> borrar · <kbd>Esc</kbd> cancelar` : 'Elegí un mueble, o hacé clic sobre uno puesto para moverlo.'}</p>
+        ${carry ? `<div class="casa-carry">
+          <button type="button" data-a="drop" class="casa-drop">✓ Colocar acá</button>
+          <button type="button" data-a="turn">↻ Girar</button>
+          ${carry.item.m === 'poster' ? `<button type="button" data-a="up">▲ Subir</button><button type="button" data-a="down">▼ Bajar</button>` : ''}
+          <button type="button" data-a="remove">🗑 Quitar</button>
+          <button type="button" data-a="cancel">✕ Cancelar</button>
+        </div>` : ''}
+        ${!carry && posters.length ? `<div class="casa-cat casa-placed"><span>Mover un póster:</span>${posters.map((it, n) => `<button type="button" data-pick="${esc(it.i)}">${it.k?.f === 'circular' ? '◯' : it.k?.f === 'rectangular' ? '▭' : '▢'} Póster ${n + 1}</button>`).join('')}</div>` : ''}
+        <p class="casa-help">${carry ? `${topView ? 'Mové el mouse' : 'Caminá'} para llevarlo y tocá <b>Colocar acá</b> (o hacé clic en la pantalla). Atajos: <kbd>Q</kbd>/<kbd>R</kbd> girar${carry.item.m === 'poster' ? ' · <kbd>RePág</kbd>/<kbd>AvPág</kbd> subir/bajar' : ''} · <kbd>Enter</kbd> colocar · <kbd>Supr</kbd> quitar · <kbd>Esc</kbd> cancelar` : 'Elegí un mueble o un póster, o hacé clic sobre uno puesto para moverlo. Cuando termines, <b>Todo listo</b>.'}</p>
         <p class="casa-count">${current(inside.key).items.length} / ${MAX_ITEMS} muebles</p>
       </div>`;
     }
@@ -449,7 +467,14 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.a === 'design') setDesign(true);
-    else if (b.dataset.a === 'done') setDesign(false);
+    else if (b.dataset.a === 'done') { if (carry) drop(); setDesign(false); } // lo que llevabas queda puesto
+    else if (b.dataset.a === 'drop') drop();
+    else if (b.dataset.a === 'up') posterHeight(0.1);
+    else if (b.dataset.a === 'down') posterHeight(-0.1);
+    else if (b.dataset.pick) pickUp(b.dataset.pick);
+    else if (b.dataset.a === 'turn') { if (carry) { carry.item.y = (carry.item.y + 345) % 360; placeCarry(); } }
+    else if (b.dataset.a === 'remove') removeCarried();
+    else if (b.dataset.a === 'cancel') cancelCarry();
     else if (b.dataset.a === 'top') setTopView(!topView);
     else if (b.dataset.a === 'grid') setGrid(!showGrid);
     else if (b.dataset.m) startNew(b.dataset.m);
@@ -537,7 +562,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   stage.addEventListener('pointerleave', () => { mouse.in = false; });
   stage.addEventListener('pointerup', (e) => {
     if (!design || !down || !inside) return;
-    const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || performance.now() - down.t > 400;
+    const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10 || performance.now() - down.t > 700;
     down = null;
     if (moved) return; // fue para girar la cámara
     if (carry) { drop(); return; }
@@ -559,6 +584,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     if (!design || !carry) return;
     if (e.code === 'KeyQ') { carry.item.y = (carry.item.y + 15) % 360; e.preventDefault(); }
     else if (e.code === 'KeyR') { carry.item.y = (carry.item.y + 345) % 360; e.preventDefault(); }
+    else if (e.code === 'PageUp') { posterHeight(0.1); e.preventDefault(); }
+    else if (e.code === 'PageDown') { posterHeight(-0.1); e.preventDefault(); }
     else if (e.code === 'Enter') { drop(); e.preventDefault(); e.stopImmediatePropagation(); }
     else if (e.code === 'Delete' || e.code === 'Backspace') { removeCarried(); e.preventDefault(); }
     else if (e.code === 'Escape') { cancelCarry(); e.preventDefault(); }

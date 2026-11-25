@@ -60,6 +60,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
   let collisionDebug = null;
   let spawnDebug = null;
   let routeDebug = null;
+  let choice = null;   // lo elegido en el menú de inicio
+  let net = null;      // multijugador (si elegiste jugar en el servidor)
   const npcs = createNpcs();
   const followers = createFollowers(); // objetos con la propiedad `seguir` (ver systems/followers.js)
   let dialogue = null;
@@ -112,6 +114,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     controls.update(dt);
     player?.update(dt);
     npcs.update(dt);
+    net?.update(dt);
     inspector?.update(dt);
     world?.updateSky(camera.position);
     // Punto que se compara con puertas y NPC: el jugador (a la altura del pecho) o la cámara libre
@@ -132,6 +135,24 @@ export async function startGame({ dev = false, retro = null } = {}) {
       loadJSON('data/tables/music.json'),
     ]);
     const playerConfig = await loadJSON('data/tables/player.json').catch(() => ({}));
+    // Menú de inicio (index): elegir personaje y jugar solo o en el servidor (ver ui/start-menu.js y net/multiplayer.js).
+    // En dev no aparece, salvo con ?menu en la dirección.
+    const params = new URLSearchParams(location.search);
+    if (!dev || params.has('menu')) {
+      const { findCharacters, showStartMenu } = await import('./ui/start-menu.js');
+      const { connectServer } = await import('./net/multiplayer.js');
+      const characters = await findCharacters(playerConfig);
+      choice = await showStartMenu({ characters, connect: () => connectServer(params.get('sala') || 'coronda') });
+      const ch = choice.character;
+      if (ch.id !== 'personaje') { // un NPC: su modelo, su escala y su idle (las acciones y clips de player.json son del personaje)
+        playerConfig.model = ch.model;
+        playerConfig.scale = ch.scale;
+        playerConfig.yawOffset = ch.yawOffset;
+        playerConfig.actions = {};
+        playerConfig.animation = { ...playerConfig.animation, clips: { idle: ch.idle || '', walk: '', run: '' } };
+      }
+      net = choice.online ? choice.net : null;
+    }
     player = await createPlayer({ scene, camera, stage, pad: document.getElementById('pad'), config: playerConfig });
     const audio = createAudio(musicTable);
     const sceneManager = createSceneManager({ scene, camera, controls, audio, ui, scenesTable });
@@ -164,6 +185,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       dialogue.setup(); // los NPC con diálogo (npc_texto / npc_dialogo)
       if (npcInfo.missing.length) ui.setStatus(`NPC: no se pudo cargar ${npcInfo.missing.join(', ')}`);
       player.setShade(sceneManager.shade); // mismo tono y brillo que la escena
+      net?.setShade(sceneManager.shade);
       const sp = sceneManager.spawn;
       if (sp) player.place([sp.position[0], sp.position[1] - EYE, sp.position[2]], sp.yaw ?? 0);
     }
@@ -292,8 +314,29 @@ export async function startGame({ dev = false, retro = null } = {}) {
     await enterScene(startId, kept ? { position: kept.pos, yaw: kept.yaw } : undefined);
     setMode(kept?.mode ?? (dev ? 'free' : 'player'));
     if (kept && mode === 'free') controls.setLook(kept.yaw, kept.pitch ?? 0);
-    // si el personaje o sus animaciones tienen problemas, se avisa en pantalla
-    const notice = player.loadError ?? player.animNotice;
+    // Servidor: desde ahora los demás te ven (y vos a ellos)
+    if (net) {
+      const r = (v) => Math.round(v * 100) / 100;
+      const ch = choice.character;
+      net.setShade(sceneManager.shade);
+      net.start({
+        scene,
+        me: () => (mode === 'player' && player ? {
+          s: sceneManager.current?.id, p: [r(player.position.x), r(player.position.y), r(player.position.z)],
+          f: r(player.facing), a: player.clipName, m: ch.model, sc: ch.scale, yo: ch.yawOffset, n: choice.name,
+        } : null),
+      });
+      const pill = document.createElement('div');
+      pill.className = 'online-pill';
+      pill.title = 'Jugadores en el servidor';
+      const show = (n) => { pill.innerHTML = `<i></i>${n === 1 ? 'Solo vos en el servidor' : `${n} en el servidor`}`; };
+      show(net.count);
+      net.onCount = show;
+      document.querySelector('.app')?.append(pill);
+    }
+    // si el personaje o sus animaciones tienen problemas, se avisa en pantalla (con un NPC elegido en el menú
+    // es normal que falten caminar/correr: no se avisa)
+    const notice = player.loadError ?? (choice && choice.character.id !== 'personaje' ? null : player.animNotice);
     if (notice) ui.setStatus(notice);
   } catch (err) {
     console.error(err);

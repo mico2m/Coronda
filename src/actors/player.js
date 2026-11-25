@@ -112,6 +112,8 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       }
       clips.walk ??= clips.run;
       clips.run ??= clips.walk;
+      // Sin nada que se llame idle (ej. un NPC con un solo clip "Armature.001Action"): el primero
+      if (!clips.idle) { clips.idle = mixer.clipAction(animations[0]); clips.idle.setLoop(THREE.LoopRepeat, Infinity); }
 
       // Acciones interactivas: todo clip llamado accion_<nombre> (ver el comentario de arriba)
       const found = animations.map((c) => ({ clip: c, ...parseActionName(c.name) })).filter((a) => a.id);
@@ -311,6 +313,9 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     loadError,
     get animNotice() { return animNotice; },
     get currentClip() { return currentName; },
+    // Nombre real del clip que se está viendo y hacia dónde mira (para el multijugador)
+    get clipName() { return currentClip?.getClip?.().name ?? null; },
+    get facing() { return facing; },
     get actions() { return actions; },
     triggerAction,
     get position() { return root.position; },

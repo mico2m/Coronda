@@ -315,6 +315,17 @@ En modo libre (`C` en `dev.html`) siguen a la cámara. Las colisiones del objeto
 
 Al exportar el `.glb` tildá **Include > Custom Properties**.
 
+## Menú de inicio y multijugador
+
+`index.html` arranca con un menú: elegís **personaje** y entrás **solo** (*Entrar al mundo*) o **al servidor** (*Jugar en el servidor*, con la cantidad de gente que está jugando). En `dev.html` no aparece (agregá `?menu` a la dirección para verlo).
+
+- **Personajes:** el de siempre (`data/tables/player.json`) y **todos los NPC del juego**. Se buscan solos en los `.glb` de todas las escenas (los Empties `npc_…`, con su `npc_nombre`, `npc_modelo`, `npc_escala`, `npc_giro` y `npc_anim`) y en los `actors` del JSON de cada escena. Si el NPC no tiene animación de caminar, camina con su idle.
+- **Servidor:** no hay servidor propio. Los navegadores se conectan entre sí (WebRTC) con [Trystero](https://github.com/dmotz/trystero) (`src/vendor/trystero.js`), que usa relays públicos de Nostr para encontrarse. Encontrar a los demás tarda unos segundos. Va bien para grupos chicos (2 a 8 personas).
+- **Qué se comparte:** posición, hacia dónde mirás, la animación, el personaje, el nombre y la escena. Ves a los que están en tu misma escena, con su nombre arriba. Los diálogos, los flags y los NPC son de cada uno.
+- **Salas privadas:** `index.html?sala=amigos` crea otro "servidor" aparte (todos tienen que usar el mismo nombre).
+- **Probar en una sola PC:** abrí dos pestañas con `index.html?mp=local` (se conectan entre pestañas, sin internet).
+- Código: `src/ui/start-menu.js` (menú) y `src/net/multiplayer.js` (red y jugadores remotos).
+
 ## Puertas y teleports
 
 Un objeto normal y visible (o un Empty) que te lleva a otro punto: de la **misma escena** o de **otra escena** (otro `.glb`). Siempre con fundido a negro. El código no oculta ni modifica el objeto.

@@ -102,6 +102,7 @@ export function createDoors({ stage, onEnter, dev = false, blocked = () => false
     Promise.resolve(onEnter(door)).catch((err) => console.error(err)).finally(() => { busy = false; });
   }
   window.addEventListener('keydown', (e) => {
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return; // escribiendo (ej. el chat)
     if (e.code === 'KeyE' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) trigger(near);
   });
 

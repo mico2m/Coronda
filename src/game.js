@@ -333,6 +333,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
       show(net.count);
       net.onCount = show;
       document.querySelector('.app')?.append(pill);
+      // Chat: Enter para escribir (ver ui/chat.js)
+      const { createChat } = await import('./ui/chat.js');
+      createChat({ net, myName: choice.name, blocked: () => !!dialogue?.active });
     }
     // si el personaje o sus animaciones tienen problemas, se avisa en pantalla (con un NPC elegido en el menú
     // es normal que falten caminar/correr: no se avisa)

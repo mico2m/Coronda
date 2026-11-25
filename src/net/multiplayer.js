@@ -23,6 +23,8 @@ const SEND_EVERY = 0.1;      // s entre envíos de posición (10 por segundo)
 const HEARTBEAT = 2;         // s: aunque no te muevas, se avisa que seguís ahí
 const TIMEOUT = 75;          // s sin noticias de alguien conectado -> deja de contarse (la pestaña quedó congelada)
 const NAME_HEIGHT = 2.05;    // m: altura de la etiqueta con el nombre
+const CHAT_MAX = 120;        // letras por mensaje
+const BUBBLE_SECS = 6;       // s que se ve el globo de chat arriba de alguien
 
 // Sala de prueba entre pestañas (misma PC): imita la API de Trystero que usamos
 function localRoom(roomId) {
@@ -155,6 +157,7 @@ function nameTag(text) {
 export async function connectServer(roomId = 'coronda') {
   const room = await openRoom(roomId);
   const state = room.makeAction('estado');   // { s: escena, p: [x,y,z], f: giro, a: clip, m: modelo, n: nombre, … }
+  const chat = room.makeAction('chat');      // { n: nombre, t: texto, s: escena }
   const peers = new Map();                    // peerId -> { last, data, avatar }
   let me = null, scene3d = null, shade = null, playing = false;
   let beatT = 0, lastSent = '';
@@ -179,6 +182,15 @@ export async function connectServer(roomId = 'coronda') {
     },
     setShade(s) { shade = s; for (const p of peers.values()) if (p.avatar?.model) setShade(p.avatar.model, shade); },
     update,
+    onChat: null,   // (nombre, texto, peerId) cuando alguien escribe en el chat
+    // Manda un mensaje de chat a todos (y aparece en un globo arriba de tu personaje en las pantallas de los demás)
+    say(text) {
+      const t = String(text ?? '').trim().slice(0, CHAT_MAX);
+      if (!t || !playing) return null;
+      const s = me?.();
+      chat.send({ n: s?.n ?? 'Jugador', t, s: s?.s ?? null });
+      return t;
+    },
     leave() { try { room.leave(); } catch { /* nada */ } },
   };
   const emitCount = () => net.onCount?.(net.count);
@@ -200,6 +212,49 @@ export async function connectServer(roomId = 'coronda') {
     if (wasPlaying !== !!data?.playing) emitCount();
     if (p.avatar && p.avatar.modelUrl !== data.m) { removeAvatar(p); }
   };
+
+  chat.onMessage = (data, { peerId }) => {
+    const t = String(data?.t ?? '').trim().slice(0, CHAT_MAX);
+    if (!t) return;
+    const p = peers.get(peerId);
+    const name = String(data?.n || p?.data?.n || 'Jugador').slice(0, 20);
+    net.onChat?.(name, t, peerId);
+    if (p?.avatar) showBubble(p.avatar, t);
+  };
+
+  // Globo con el mensaje arriba de la cabeza (encima del nombre)
+  function showBubble(av, text) {
+    if (av.bubble) { av.root.remove(av.bubble); av.bubble.material.map.dispose(); av.bubble.material.dispose(); }
+    const c = document.createElement('canvas');
+    const ctx = c.getContext('2d');
+    const size = 28, pad = 14, maxW = 520;
+    ctx.font = `500 ${size}px Inter, system-ui, sans-serif`;
+    const words = text.split(/\s+/), lines = [];
+    let line = '';
+    for (const w of words) { const t = line ? `${line} ${w}` : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; }
+    if (line) lines.push(line);
+    const shown = lines.slice(0, 4);
+    const w = Math.min(maxW, Math.max(...shown.map((l) => ctx.measureText(l).width))) + pad * 2;
+    const lh = size * 1.25, h = shown.length * lh + pad * 2 + 12;
+    c.width = Math.ceil(w); c.height = Math.ceil(h);
+    ctx.font = `500 ${size}px Inter, system-ui, sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.beginPath(); ctx.roundRect(0, 0, c.width, c.height - 12, 16); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(c.width / 2 - 10, c.height - 12); ctx.lineTo(c.width / 2, c.height); ctx.lineTo(c.width / 2 + 10, c.height - 12); ctx.fill();
+    ctx.fillStyle = '#12212b'; ctx.textBaseline = 'top';
+    shown.forEach((l, i) => ctx.fillText(l, pad, pad + i * lh));
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true }));
+    const k = 0.0062; // metros por píxel
+    s.scale.set(c.width * k, c.height * k, 1);
+    s.center.set(0.5, 0);
+    s.position.y = NAME_HEIGHT + 0.25;
+    s.renderOrder = 11;
+    av.root.add(s);
+    av.bubble = s;
+    av.bubbleUntil = performance.now() + BUBBLE_SECS * 1000;
+  }
 
   function drop(id) {
     const p = peers.get(id);
@@ -298,6 +353,7 @@ export async function connectServer(roomId = 'coronda') {
       av.pivot.rotation.y += dy * Math.min(1, dt * 12);
       playOn(av, d.a);
       av.mixer?.update(dt);
+      if (av.bubble && now > av.bubbleUntil) { av.root.remove(av.bubble); av.bubble.material.map.dispose(); av.bubble.material.dispose(); av.bubble = null; }
     }
   }
 

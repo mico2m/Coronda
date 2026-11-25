@@ -20,7 +20,7 @@ const TALK_LOST = 25;        // s sin aviso: se libera
 const FOLLOW_NEAR = 1.8;     // m: distancia a la que se queda cuando te sigue
 const STAY_SECS = 90;        // s que se queda en un lugar antes de volver a su ruta (si nadie le dice otra cosa)
 const FOLLOW_SECS = 240;     // s máximos siguiendo a alguien
-const REST_SECS = 10 * 60;   // s que la IA "descansa" después de agotarse
+const REST_SECS = 3 * 60;    // s que la IA "descansa" después de fallar dos veces seguidas
 const REST_KEY = 'coronda.claude.ia.descanso';
 const HIDE_Y = -100;         // m: así se "mete" en una casa o "se va": queda bajo el piso, sin chocar ni poder hablarle
 const INSIDE_SECS = [90, 180];  // s que se queda adentro de una casa antes de salir solo
@@ -435,11 +435,15 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   function resting() { try { return Number(localStorage.getItem(REST_KEY) || 0) > Date.now(); } catch { return false; } }
   function rest() { try { localStorage.setItem(REST_KEY, String(Date.now() + REST_SECS * 1000)); } catch { /* nada */ } }
   const aiOn = () => !!cfg.endpoint && cfg.activa !== false && !resting();
+  let fallos = 0;
+  // Un fallo suelto no apaga la IA: recién al segundo seguido descansa unos minutos
+  function fallo() { if (++fallos >= 2) rest(); return overload(); }
   const overload = () => ({ text: OVERLOAD, choices: [{ text: 'Dale, contame algo', next: 'charla' }, { text: 'Chau', next: 'despedida' }] });
 
   async function ask(e, text) {
     if (e.id !== ID) return { text: '…' };
-    if (!aiOn()) { rest(); return overload(); }
+    await cfgReady;
+    if (!aiOn()) return overload(); // sin IA o descansando: frases de siempre (no se renueva el descanso: si no, nunca se recuperaría)
     if (performance.now() - lastAsk < 2500) await new Promise((r) => setTimeout(r, 2500 - (performance.now() - lastAsk)));
     lastAsk = performance.now();
     const body = {
@@ -452,10 +456,12 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       const to = setTimeout(() => ctl.abort(), 15000);
       const r = await fetch(cfg.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
       clearTimeout(to);
-      if (!r.ok) { rest(); return overload(); }
+      if (r.status === 429) return { text: 'Pará, pará, que me mareás. Dame un cachito y seguimos.', choices: [{ text: 'Dale', next: 'menu' }, { text: 'Chau', next: 'despedida' }] };
+      if (!r.ok) return fallo();
       res = await r.json();
-    } catch { rest(); return overload(); }
-    if (!res || typeof res.decir !== 'string') { rest(); return overload(); }
+    } catch { return fallo(); }
+    if (!res || typeof res.decir !== 'string') return fallo();
+    fallos = 0;
     const say = res.decir.trim().slice(0, 400) || '…';
     history.push({ de: myName, texto: body.texto }, { de: 'Claude', texto: say });
     while (history.length > 12) history.shift();

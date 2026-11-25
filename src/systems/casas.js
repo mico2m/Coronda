@@ -408,6 +408,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
       save(inside.key, current(inside.key).items, mu);
       if (!mu) notify('Música quitada');
       else if (before?.v !== mu.v || before?.l !== mu.l) notify('Música puesta: la escuchan todos los que entren');
+      else if (mu.r && mu.r !== before?.r) notify('Música de nuevo desde el principio');
       else notify(mu.p ? 'Música en pausa para todos' : 'Música sonando para todos');
     },
   });

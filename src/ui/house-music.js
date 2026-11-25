@@ -29,7 +29,8 @@ export function cleanMusic(mu) {
   if (!mu || typeof mu !== 'object') return null;
   const v = ID.test(mu.v ?? '') ? mu.v : '';
   const l = LIST.test(mu.l ?? '') ? mu.l : '';
-  return v || l ? { v, l, p: !!mu.p } : null; // p: en pausa (lo decide el dueño, para todos)
+  const r = Number.isInteger(mu.r) && mu.r > 0 ? mu.r % 1e9 : 0;
+  return v || l ? { v, l, p: !!mu.p, ...(r ? { r } : {}) } : null; // p: en pausa · r: el dueño la volvió a poner (para todos)
 }
 
 let apiPromise = null;
@@ -61,6 +62,7 @@ export function createHouseMusic({ parent, onSet, notify = () => {} }) {
     <div class="cm-menu" hidden>
       <div class="cm-row">
         <button type="button" data-a="play" class="cm-play" aria-label="Pausa">⏸</button>
+        <button type="button" data-a="again" class="cm-again" aria-label="Volver a escucharla" title="Volver a escucharla">↺</button>
         <button type="button" data-a="mute" class="cm-mute" aria-label="Silenciar">🔊</button>
         <input class="cm-vol" type="range" min="0" max="100" step="1" aria-label="Volumen (solo para vos)" title="Volumen (solo para vos)">
       </div>
@@ -87,8 +89,8 @@ export function createHouseMusic({ parent, onSet, notify = () => {} }) {
   } catch { /* nada */ }
   vol.value = String(volume);
 
-  let blocked = false, started = false, player = null, playerReady = false, want = null, owner = false, active = false, playing = false, menuOpen = false, title = '', token = 0;
-  const same = (a, b) => (a?.v ?? '') === (b?.v ?? '') && (a?.l ?? '') === (b?.l ?? '');
+  let ended = false, blocked = false, started = false, player = null, playerReady = false, want = null, owner = false, active = false, playing = false, menuOpen = false, title = '', token = 0;
+  const same = (a, b) => (a?.v ?? '') === (b?.v ?? '') && (a?.l ?? '') === (b?.l ?? '') && (a?.r ?? 0) === (b?.r ?? 0);
 
   function draw() {
     const editing = !$('.cm-set').hidden;
@@ -97,13 +99,14 @@ export function createHouseMusic({ parent, onSet, notify = () => {} }) {
     $('.cm-name').textContent = title || (playerReady ? 'música' : 'cargando…');
     $('.cm-name').title = title;
     $('.cm-note').classList.toggle('on', playing);
-    $('.cm-title small').textContent = want?.p ? 'En pausa:' : 'Sonando:';
+    $('.cm-title small').textContent = ended ? 'Terminó:' : want?.p ? 'En pausa:' : 'Sonando:';
     $('.cm-listen').hidden = !blocked || !want || want.p;
     $('.cm-menu').hidden = !want || !menuOpen;
     $('.cm-more').setAttribute('aria-expanded', String(menuOpen));
     box.querySelectorAll('.cm-own').forEach((b) => { b.hidden = !owner || editing; });
     $('.cm-start').hidden = !owner || !!want || editing;
-    $('.cm-play').hidden = !owner;
+    $('.cm-play').hidden = !owner || ended;
+    $('.cm-again').hidden = !owner || !ended;
     $('.cm-play').textContent = want?.p ? '▶' : '⏸';
     $('.cm-play').setAttribute('aria-label', want?.p ? 'Reproducir para todos' : 'Pausar para todos');
     $('.cm-play').title = want?.p ? 'Reproducir (para todos)' : 'Pausar (para todos)';
@@ -119,8 +122,10 @@ export function createHouseMusic({ parent, onSet, notify = () => {} }) {
   }
   function destroy() {
     token++;
+    try { player?.stopVideo?.(); } catch { /* nada */ }
     try { player?.destroy(); } catch { /* nada */ }
-    player = null; playerReady = false; playing = false; started = false; title = ''; blocked = false;
+    $('.cm-player-wrap').innerHTML = ''; // que no quede ningún iframe sonando
+    player = null; ended = false; playerReady = false; playing = false; started = false; title = ''; blocked = false;
   }
   async function start(mu) {
     destroy();
@@ -130,9 +135,8 @@ export function createHouseMusic({ parent, onSet, notify = () => {} }) {
     try { YT = await loadApi(); } catch { if (my === token) { msg('No se pudo cargar YouTube'); draw(); } return; }
     if (my !== token || !same(want, mu)) return;
     $('.cm-player-wrap').innerHTML = '<div class="cm-player"></div>';
-    const vars = { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, rel: 0, modestbranding: 1, loop: 1 };
+    const vars = { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1, rel: 0, modestbranding: 1 }; // sin loop: cuando termina, termina
     if (mu.l) Object.assign(vars, { listType: 'playlist', list: mu.l });
-    else vars.playlist = mu.v; // un video solo: se repite
     player = new YT.Player($('.cm-player'), {
       width: 200, height: 200, videoId: mu.v || undefined, playerVars: vars,
       events: {
@@ -140,6 +144,8 @@ export function createHouseMusic({ parent, onSet, notify = () => {} }) {
         onStateChange: (e) => {
           if (my !== token) return;
           playing = e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.BUFFERING;
+          if (playing) ended = false;
+          if (e.data === YT.PlayerState.ENDED) ended = true;
           if (playing) { started = true; msg(''); }
           if (playing && want?.p) { player.pauseVideo(); playing = false; } // el dueño la tiene en pausa
           try { const t = player.getVideoData?.()?.title; if (t) title = t; } catch { /* nada */ }
@@ -162,6 +168,7 @@ export function createHouseMusic({ parent, onSet, notify = () => {} }) {
     if (!b) return;
     const a = b.dataset.a;
     if (a === 'play') { if (owner && want) onSet?.({ ...want, p: !want.p }); } // pausa para todos: solo el dueño
+    else if (a === 'again') { if (owner && want) { ended = false; onSet?.({ ...want, p: false, r: (Date.now() % 1e9) || 1 }); } }
     else if (a === 'listen') { blocked = false; if (!playerReady) { if (want) start(want); } else player.playVideo(); } // el navegador no la dejó arrancar sola
     else if (a === 'mute') {
       muted = !muted;

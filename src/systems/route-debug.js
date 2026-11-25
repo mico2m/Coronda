@@ -1,6 +1,6 @@
 // Solo modo desarrollador: muestra los recorridos de los NPC (data/routes/*.json) dentro del juego.
 //   Cada recorrido tiene su color. Las bolitas son las paradas (verde = donde empieza) con una etiqueta
-//   "número · nombre · espera"; las flechas van de cada parada a la siguiente. Las punteadas tienen
+//   "número · Empty · espera"; las flechas van de cada parada a la siguiente. Las punteadas tienen
 //   condición ("if": solo se toman cuando se cumple un flag).
 // Con el inspector, apuntá a una bolita para ver los datos de esa parada y a dónde puede ir.
 // Se prende y apaga con la tecla R o con el botón "Rutas" (al lado de "Spawns"). La elección se recuerda.
@@ -130,6 +130,8 @@ export function createRouteDebug() {
     const missing = ids.filter((id) => !at.has(id));
     if (missing.length) console.warn(`Ruta "${name}": no encontré en el .glb los puntos de ${missing.map((id) => `${id} (${data.nodes[id].point ?? 'sin point'})`).join(', ')}`);
 
+    // Cada parada se nombra por su Empty (si no tiene, por su nombre en la ruta)
+    const nameOf = (id) => String(data.nodes[id]?.point ?? id);
     // Paradas
     const order = new Map(ids.map((id, i) => [id, i + 1]));
     for (const [id, p] of at) {
@@ -143,8 +145,9 @@ export function createRouteDebug() {
       ball.userData.routeMarker = {
         route: name, file: `data/routes/${name}.json`, npcs: npcIds, stop: id, number: order.get(id), start: isStart,
         point: n.point ?? null, position: [p.x, p.y, p.z], ...a,
-        next: outsOf(n).map((o) => ({ to: o.to, weight: num(o.weight), cond: condText(o.if) })),
-        from: ids.filter((k) => outsOf(data.nodes[k]).some((o) => o.to === id)),
+        name: nameOf(id),
+        next: outsOf(n).map((o) => ({ to: nameOf(o.to), weight: num(o.weight), cond: condText(o.if) })),
+        from: ids.filter((k) => outsOf(data.nodes[k]).some((o) => o.to === id)).map(nameOf),
         routeSpeed: num(data.speed), scene,
       };
       g.add(ball);
@@ -153,7 +156,7 @@ export function createRouteDebug() {
       ring.position.copy(p).y += 0.03;
       noRay(ring);
       g.add(ring);
-      let txt = `${order.get(id)} · ${id}`;
+      let txt = `${order.get(id)} · ${nameOf(id)}`;
       if (a.loop) txt += ' · loop';
       else if (a.wait !== null) txt += ` · ${a.wait}${a.waitMax ? '–' + a.waitMax : ''} s`;
       if (isStart) txt = `▶ ${name}: ${txt}`;

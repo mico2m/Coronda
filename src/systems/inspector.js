@@ -185,13 +185,13 @@ export function createInspector({ scene, camera, getRoot }) {
   // Una parada de un recorrido (bolita del modo "Rutas", ver route-debug.js)
   function renderStop(r, distance) {
     const frag = document.createDocumentFragment();
-    frag.append(el('h2', 'insp-title', `${r.number} · ${r.stop}`));
+    frag.append(el('h2', 'insp-title', `${r.number} · ${r.name}`));
     const dl = el('dl', 'insp-list');
     const add = (k, v, cls) => { dl.append(el('dt', null, k)); const dd = el('dd', cls, v); dl.append(dd); return dd; };
     add('Tipo', r.start ? 'Parada de recorrido (empieza acá)' : 'Parada de recorrido');
     add('Recorrido', r.file);
     add('NPC', r.npcs.join(', '));
-    add('Punto', r.point ?? '(posición fija en el JSON)');
+    if (!r.point) add('Punto', '(posición fija en el JSON)');
     add('Posición', r.position.map((n) => fmt(n)).join(' · '));
     if (r.loop) add('Espera', 'loop: repite su animación hasta que se cumpla una condición');
     else add('Espera', r.wait === null ? 'no se queda' : `${r.wait}${r.waitMax ? ' a ' + r.waitMax : ''} s`);

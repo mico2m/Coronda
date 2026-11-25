@@ -1,0 +1,5 @@
+{
+  "_ayuda": "IA de Claude (el NPC de la plaza). endpoint = la dirección del intermediario (ver servidor-ia/README.md). Vacío = sin IA: Claude usa solo sus frases. activa = false la apaga sin borrar la dirección.",
+  "endpoint": "",
+  "activa": true
+}

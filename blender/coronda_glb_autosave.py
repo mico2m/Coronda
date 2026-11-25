@@ -139,7 +139,7 @@ def export_now():
                 state["warning"] = "SINANIM"
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         # Se reemplaza de una: el juego nunca lee un .glb a medio escribir
-        for intento in range(5):
+        for intento in range(20):   # hasta ~6 s: el .glb pesa y algo puede tenerlo abierto un rato (el juego, el antivirus, el sincronizador)
             try:
                 try:
                     os.replace(tmp, dst)
@@ -148,9 +148,9 @@ def export_now():
                     os.replace(dst + ".part", dst)
                 break
             except PermissionError:  # el juego justo lo estaba leyendo
-                if intento == 4:
+                if intento == 19:
                     raise
-                time.sleep(0.15)
+                time.sleep(0.3)
         state["took"] = time.time() - t0
         state["last_ok"] = time.time()
         state["dirty"] = False

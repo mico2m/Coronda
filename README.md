@@ -434,7 +434,7 @@ una casa y esa casa se levanta en el centro del Empty, con su giro, y la ven tod
 **En Blender:** Empty con `Display As = Cube`, `Size = 1`, escalado al tamaño del terreno (ese cubo es la zona; la escala NO se le aplica a la casa).
 Girá el Empty para orientar la casa. Un nombre distinto sirve si le ponés la Custom Property `lote = 1`.
 
-**Casas:** `data/tables/casas.json` (`maxPorJugador` + lista `{ id, nombre, archivo }`). Los modelos van en `assets/models/objects/`
+**Casas:** `data/casas.json` (`maxPorJugador` + lista `{ id, nombre, archivo }`). Los modelos van en `assets/models/objects/`
 (`casa_model01.glb`, `casa_model02.glb`). El origen del modelo es el centro del lote a nivel del suelo. Si el archivo no existe se muestra una
 caja de prueba. Los `col_…` del modelo hacen que la casa choque; un modelo con animaciones o con `puerta_casa` adentro funciona igual que en el resto del juego.
 

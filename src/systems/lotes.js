@@ -6,7 +6,7 @@
 //     La escala del Empty NO se le aplica: el modelo de la casa sale en metros reales.
 //   - Si un modelo de casa trae objetos col_… (o colision = 1), la casa colisiona (ver collision.js).
 //
-// Casas disponibles: data/tables/casas.json  { "maxPorJugador": 1, "casas": [{ id, nombre, archivo }] }
+// Casas disponibles: data/casas.json  { "maxPorJugador": 1, "casas": [{ id, nombre, archivo }] }
 // El .glb de cada casa va en assets/models/objects/. El origen del modelo = el centro del lote, a nivel del suelo.
 // Si el archivo todavía no existe se muestra una caja de prueba (así se puede probar el sistema antes de modelar).
 //
@@ -85,9 +85,9 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   let near = null, panelKey = null, sig = '';
   let templates = new Map();     // archivo -> Promise<gltf> (por escena)
 
-  const ready = loadJSON('data/tables/casas.json').catch(() => ({ casas: [] })).then((c) => {
+  const ready = loadJSON('data/casas.json').catch(() => ({ casas: [] })).then((c) => {
     casas = { max: Math.max(1, Number(c.maxPorJugador) || 1), map: new Map((c.casas ?? []).map((x) => [x.id, { id: x.id, nombre: x.nombre ?? x.id, archivo: x.archivo ?? `assets/models/objects/${x.id}.glb` }])) };
-    if (!casas.map.size) console.warn('Lotes: data/tables/casas.json no tiene casas.');
+    if (!casas.map.size) console.warn('Lotes: data/casas.json no tiene casas.');
     if (solo) for (const [k, r] of Object.entries(readJSON(SOLO_STORE))) { const c2 = clean(k, r); if (c2) state.set(k, c2); }
   });
 
@@ -246,7 +246,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     const items = [...casas.map.values()];
     panel.innerHTML = `<div class="lote-box">
       <h3>${esc(s.label)}${own ? ' · tu casa' : ''}</h3>
-      <div class="lote-list">${items.map((c, i) => `<button type="button" data-id="${esc(c.id)}"${own && cur.m === c.id ? ' class="on"' : ''}><kbd>${i + 1}</kbd> ${esc(c.nombre)}${own && cur.m === c.id ? ' ✓' : ''}</button>`).join('') || '<p>No hay casas en data/tables/casas.json</p>'}</div>
+      <div class="lote-list">${items.map((c, i) => `<button type="button" data-id="${esc(c.id)}"${own && cur.m === c.id ? ' class="on"' : ''}><kbd>${i + 1}</kbd> ${esc(c.nombre)}${own && cur.m === c.id ? ' ✓' : ''}</button>`).join('') || '<p>No hay casas en data/casas.json</p>'}</div>
       <div class="lote-foot">${own ? '<button type="button" data-act="release">Liberar lote</button>' : ''}<button type="button" data-act="close">Cancelar <kbd>Esc</kbd></button></div>
     </div>`;
     panel.hidden = false;

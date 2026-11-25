@@ -8,6 +8,7 @@
 //   /expulsar Ana                      sacarlo del servidor
 //   /borrarpedido id                   sacar un pedido de la Carpintería
 //   /ayuda                             la lista
+// Si sos admin, al escribir "/" en el chat aparece la lista de comandos (se filtra mientras escribís; clic o Tab la completa).
 //
 // Quién es admin: las cuentas anotadas en servidor/config.json > "admins" (por nombre). No hay clave que escribir en el
 // juego: el servidor sabe con qué cuenta entraste. Un jugador común que escribe un comando recibe "No sos admin".
@@ -29,6 +30,17 @@ export function createAdmin({ net, chat, stage = null, notify = () => {} }) {
     const prevA = net.onAnuncio; net.onAnuncio = (t) => { prevA?.(t); anunciar(t); };
   }
 
+  // Lista de comandos (la usa el chat para mostrarlos al escribir "/", solo a los admins)
+  const COMANDOS = [
+    { uso: '/time set ', ej: '/time set 19:30', desc: 'Poner la hora del mundo para todos' },
+    { uso: '/time reset', desc: 'Volver a la hora normal' },
+    { uso: '/anuncio ', ej: '/anuncio texto', desc: 'Cartel para todos' },
+    { uso: '/madera ', ej: '/madera Nombre 20', desc: 'Darle madera a un jugador (o "todos")' },
+    { uso: '/resistencia ', ej: '/resistencia Nombre', desc: 'Recargar la energía de un jugador (o "todos")' },
+    { uso: '/expulsar ', ej: '/expulsar Nombre', desc: 'Sacar a un jugador del servidor' },
+    { uso: '/borrarpedido ', ej: '/borrarpedido id', desc: 'Sacar un pedido de la Carpintería' },
+    { uso: '/ayuda', desc: 'Ver esta lista en el chat' },
+  ];
   const AYUDA = 'Comandos de admin: /time set 19 (o 19:30) · /time reset · /anuncio texto · /madera Jugador 20 · /resistencia Jugador · /expulsar Jugador · /borrarpedido id';
 
   // Devuelve true si el texto era un comando (nunca va al chat de los demás)
@@ -36,6 +48,7 @@ export function createAdmin({ net, chat, stage = null, notify = () => {} }) {
     const t = String(texto ?? '').trim();
     if (!t.startsWith('/')) return false;
     const cmd = t.slice(1).split(/\s+/)[0].toLowerCase();
+    if (!cmd && net?.admin) { for (const c of COMANDOS) sys(`${c.ej ?? c.uso.trim()} — ${c.desc}`); return true; } // solo "/"
     if (cmd === 'ayuda' || cmd === 'help') { sys(net?.admin ? AYUDA : 'Los comandos son para los admins del servidor.'); return true; }
     if (cmd === 'admin') { sys('Ya no hace falta clave: los admins se anotan en servidor/config.json > "admins" (con el nombre de su cuenta).'); return true; }
     if (!net) { sys('Los comandos solo andan en el servidor.'); return true; }
@@ -47,5 +60,5 @@ export function createAdmin({ net, chat, stage = null, notify = () => {} }) {
     return true;
   }
 
-  return { comando, anunciar };
+  return { comando, anunciar, get comandos() { return net?.admin ? COMANDOS : []; } };
 }

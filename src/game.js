@@ -487,7 +487,13 @@ export async function startGame({ dev = false, retro = null } = {}) {
       createAfk({ onDisconnect: () => net.disconnect() });
       // Chat: Enter para escribir (ver ui/chat.js)
       const { createChat } = await import('./ui/chat.js');
-      createChat({ net, myName: choice.name, blocked: () => !!dialogue?.active });
+      const chatUi = createChat({ net, myName: choice.name, blocked: () => !!dialogue?.active });
+      // Claudito también charla por el chat de vez en cuando (la IA lo pide; ver systems/claude-npc.js)
+      claudeNpc.onSay = (t) => chatUi.add('Claudito', t);
+      const onChat0 = net.onChat;
+      net.onChat = (n, t, peerId) => { onChat0?.(n, t, peerId); claudeNpc.heard(n, t); };
+      const say0 = net.say;
+      net.say = (t) => { const r = say0(t); if (r) claudeNpc.heard(choice.name, r); return r; };
     }
     // si el personaje o sus animaciones tienen problemas, se avisa en pantalla (con un NPC elegido en el menú
     // es normal que falten caminar/correr: no se avisa)

@@ -1,5 +1,10 @@
 {
-  "_ayuda": "IA de Claude (el NPC de la plaza). endpoint = la dirección del intermediario (ver servidor-ia/README.md). Vacío = sin IA: Claude usa solo sus frases. activa = false la apaga sin borrar la dirección.",
+  "_ayuda": "IA de Claude (el NPC de la plaza). endpoint = la dirección del intermediario (ver servidor-ia/README.md). Vacío = sin IA: Claude usa solo sus frases. activa = false la apaga sin borrar la dirección. comentarios = true/false: que Claudito tire comentarios por el chat (solo en el servidor). comentarios_cada = [mínimo, máximo] de segundos entre comentarios.",
   "endpoint": "https://coronda-claude.mirco-moreyra72.workers.dev/",
-  "activa": true
+  "activa": true,
+  "comentarios": true,
+  "comentarios_cada": [
+    90,
+    240
+  ]
 }

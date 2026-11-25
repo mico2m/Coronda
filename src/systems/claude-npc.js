@@ -22,6 +22,7 @@ const STAY_SECS = 90;        // s que se queda en un lugar antes de volver a su 
 const FOLLOW_SECS = 240;     // s máximos siguiendo a alguien
 const REST_SECS = 10 * 60;   // s que la IA "descansa" después de agotarse
 const REST_KEY = 'coronda.claude.ia.descanso';
+const CHAT_MAX = 120;        // letras por mensaje de chat (igual que net/multiplayer.js)
 const OVERLOAD = '¡Me abrumaste jajaja! ¿En un rato seguimos, querés?';
 const norm = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const PLACE_NAMES = { casa: 'mi lugar de siempre', centro: 'el centro de la plaza', este: 'el lado este', norte: 'el lado norte', oeste: 'el lado oeste', cartel: 'el cartel de bienvenida', borde: 'el borde oeste' };
@@ -30,7 +31,7 @@ const PLACE_NAMES = { casa: 'mi lugar de siempre', centro: 'el centro de la plaz
 export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId, myName = 'Viajero', notify = () => {} }) {
   const solo = !net;
   const myUid = net?.uid ?? 'yo';
-  let cfg = { endpoint: '', activa: true };
+  let cfg = { endpoint: '', activa: true, comentarios: true, comentarios_cada: [90, 240] };
   loadJSON('data/tables/ia.json').then((c) => { cfg = { ...cfg, ...c }; }).catch(() => {});
 
   // Estado compartido (lo decide el que maneja)
@@ -64,6 +65,11 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   function send(d) { if (net) net.claude.send(d); }
   function onMsg(d) {
     if (!d || typeof d !== 'object') return;
+    if (typeof d.say === 'string') { // comentario de Claude en el chat (lo dijo el que lo maneja)
+      const t = d.say.trim().slice(0, CHAT_MAX);
+      if (t) { heard('Claudito', t); onSay?.(t); }
+      return;
+    }
     if (d.st && typeof d.st === 'object') { // estado de Claude (del que lo maneja)
       if (driving && d.from !== myUid && String(d.from) < myUid) driving = false; // otro con id menor ya lo maneja
       const s2 = d.st;
@@ -246,6 +252,47 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     return { momento, jugadores, casas, lugares, otros_npc: otros };
   }
 
+  function mundoActual() {
+    const here = roster().filter((r) => r.s === getSceneId()).map((r) => r.n).slice(0, 12);
+    const owners = (lotes.list ?? []).map((sp) => ({ lote: sp.label, dueno: lotes.record(sp.key)?.n || null })).filter((x) => x.dueno);
+    const places = Object.keys(routeData?.nodes ?? {}).map((id) => ({ id, nombre: PLACE_NAMES[id] ?? id }));
+    return { jugadores_en_la_plaza: here, casas: owners, lugares: places, modo_actual: driving ? mode.type : (remote?.m ?? 'route'), vista: vista() };
+  }
+
+  // ---------- Comentarios por el chat (los tira la IA de vez en cuando; solo los pide el que maneja a Claude) ----------
+  let onSay = null;                 // (texto) => mostrarlo en el chat (lo conecta game.js)
+  const chatLog = [];               // últimos mensajes del chat { de, texto }
+  function heard(de, texto) {
+    chatLog.push({ de: String(de).slice(0, 20), texto: String(texto).slice(0, CHAT_MAX) });
+    while (chatLog.length > 8) chatLog.shift();
+  }
+  const nextDelay = () => {
+    const [a, b] = Array.isArray(cfg.comentarios_cada) ? cfg.comentarios_cada : [90, 240];
+    const lo = Math.max(30, Number(a) || 90), hi = Math.max(lo, Number(b) || 240);
+    return lo + Math.random() * (hi - lo);
+  };
+  let commentT = 60, commenting = false, lastSaid = '';
+  async function comentar() {
+    commenting = true;
+    try {
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 15000);
+      const r = await fetch(cfg.endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+        body: JSON.stringify({ modo: 'comentario', jugador: myName, texto: '', historial: [], chat_reciente: chatLog.slice(-6), mundo: mundoActual() }),
+      });
+      clearTimeout(to);
+      if (!r.ok) return;
+      const res = await r.json();
+      const t = typeof res?.decir === 'string' ? res.decir.trim().slice(0, CHAT_MAX) : '';
+      if (!t || t === lastSaid || !driving) return;
+      lastSaid = t;
+      heard('Claudito', t);
+      send({ say: t });
+      onSay?.(t);
+    } catch { /* sin IA por ahora: no pasa nada */ } finally { commenting = false; }
+  }
+
   // ---------- IA ----------
   let lastAsk = 0;
   const history = [];
@@ -261,12 +308,9 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     if (!aiOn()) { rest(); return overload(); }
     if (performance.now() - lastAsk < 2500) await new Promise((r) => setTimeout(r, 2500 - (performance.now() - lastAsk)));
     lastAsk = performance.now();
-    const here = roster().filter((r) => r.s === getSceneId()).map((r) => r.n).slice(0, 12);
-    const owners = (lotes.list ?? []).map((sp) => ({ lote: sp.label, dueno: lotes.record(sp.key)?.n || null })).filter((x) => x.dueno);
-    const places = Object.keys(routeData?.nodes ?? {}).map((id) => ({ id, nombre: PLACE_NAMES[id] ?? id }));
     const body = {
       jugador: myName, texto: String(text).slice(0, 200), historial: history.slice(-6),
-      mundo: { jugadores_en_la_plaza: here, casas: owners, lugares: places, modo_actual: driving ? mode.type : (remote?.m ?? 'route'), vista: vista() },
+      mundo: mundoActual(),
     };
     let res;
     try {
@@ -343,6 +387,11 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
       }
       sendT += dt;
       if (sendT >= SEND_EVERY) { sendT = 0; broadcast(); }
+      commentT -= dt;
+      if (commentT <= 0) {
+        commentT = nextDelay();
+        if (!solo && cfg.comentarios !== false && aiOn() && !talk.u && !myTalking && !commenting) comentar();
+      }
     } else if (remote) { // lo dibujo como me dicen
       const h = entry.holder;
       const k = Math.min(1, dt / INTERP);
@@ -356,7 +405,8 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
   }
 
   return {
-    update, gate, ended, ask, choiceOk, act,
+    update, gate, ended, ask, choiceOk, act, heard,
+    set onSay(fn) { onSay = fn; },
     get driving() { return driving; },
     get state() { return { driving, mode: driving ? mode.type : remote?.m, talkingWith: driving ? talk.n : remote?.wn, ai: aiOn() }; },
   };

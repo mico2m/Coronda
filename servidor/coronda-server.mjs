@@ -897,6 +897,7 @@ function servir(req, res) {
     res.writeHead(200, { ...base, 'Content-Type': MIME.json, 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ ok: true, jugadores: enLinea(), registro: !!config.registro_abierto })); return;
   }
+  if (p === '/ia' && req.method === 'POST') { proxyIA(req, res, base); return; }
   const foto = /^\/fotos\/([a-f0-9]{16})\.img$/.exec(p);
   if (foto) {
     const f = path.join(FOTOS, `${foto[1]}.img`);
@@ -925,6 +926,38 @@ function servir(req, res) {
     res.writeHead(200, { ...h, 'Content-Length': st.size });
     if (req.method === 'HEAD') { res.end(); return; }
     fs.createReadStream(file).pipe(res);
+  });
+}
+
+// ---------- IA de Claude: el juego le pregunta al servidor y el servidor al worker de Cloudflare ----------
+// Así no importa desde qué dirección se abra el juego (localhost, el túnel, que cambia cada vez): el worker no ve un
+// navegador sino al servidor, y la dirección del worker no queda a la vista. Solo jugadores con sesión.
+const iaUso = new Map(); // id de cuenta -> [momentos]
+function proxyIA(req, res, base) {
+  const h = { ...base, 'Content-Type': MIME.json, 'Cache-Control': 'no-store' };
+  const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1] ?? '';
+  const s = D.sesiones[sha(token)];
+  if (!s || s.exp < ahora() || !D.cuentas[s.u]) { res.writeHead(401, h).end('{"error":"sesion"}'); return; }
+  const t = ahora(), uso = (iaUso.get(s.u) ?? []).filter((x) => t - x < 60000);
+  if (uso.length >= 12) { res.writeHead(429, h).end('{"error":"limite"}'); return; }
+  uso.push(t); iaUso.set(s.u, uso);
+  const ia = leer('data/tables/ia.json', {});
+  const destino = String(process.env.CORONDA_IA || ia.endpoint || '').trim(); // CORONDA_IA: otro worker (pruebas)
+  if (!/^https?:\/\//.test(destino) || ia.activa === false) { res.writeHead(503, h).end('{"error":"sin IA"}'); return; }
+  let body = '';
+  req.on('data', (c) => { body += c; if (body.length > 16000) req.destroy(); });
+  req.on('end', async () => {
+    try {
+      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 20000);
+      const r = await fetch(destino, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Coronda-Jugador': s.u }, body, signal: ctl.signal });
+      clearTimeout(to);
+      const txt = await r.text();
+      if (!r.ok) console.warn(`IA: el worker contestó ${r.status}: ${txt.slice(0, 160)}`);
+      res.writeHead(r.status, h).end(txt);
+    } catch (e) {
+      console.warn(`IA: no se pudo hablar con el worker (${destino}): ${e.message}`);
+      res.writeHead(502, h).end('{"error":"sin conexión con el worker"}');
+    }
   });
 }
 

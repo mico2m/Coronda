@@ -207,8 +207,8 @@ export default {
     if (req.method !== 'POST') return json({ error: 'usar POST' }, 405, h);
     if (!env.AI && !env.GROQ_API_KEY) return json({ error: 'falta conectar la IA: binding "AI" (Workers AI) o secreto GROQ_API_KEY' }, 500, h);
 
-    // Límite por jugador (aproximado: por IP)
-    const ip = req.headers.get('CF-Connecting-IP') || 'x';
+    // Límite por jugador: si viene del servidor de Coronda (todos desde la misma IP), por cuenta; si no, por IP
+    const ip = req.headers.get('X-Coronda-Jugador') || req.headers.get('CF-Connecting-IP') || 'x';
     const now = Date.now();
     const list = (recientes.get(ip) || []).filter((t) => now - t < 60000);
     if (list.length >= POR_MINUTO) return json({ error: 'limite' }, 429, h);

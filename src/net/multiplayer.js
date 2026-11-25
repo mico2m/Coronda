@@ -71,6 +71,7 @@ export async function connectServer() {
     get uid() { return srv.sesion?.u ?? ''; },
     get nombre() { return srv.sesion?.nombre ?? ''; },
     get admin() { return !!srv.sesion?.admin; },
+    get token() { return srv.sesion?.token ?? ''; },
     base: srv.base,
     onCount: null,
     onEstado: null,           // ('conectado' | 'reconectando' | 'expulsado', texto) para avisar en pantalla

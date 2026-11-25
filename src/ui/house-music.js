@@ -109,7 +109,7 @@ export function createHouseMusic({ parent, onSet, notify = () => {} }) {
   async function start(mu) {
     destroy();
     const my = token;
-    msg('');
+    msg('Cargando música…');
     let YT;
     try { YT = await loadApi(); } catch { if (my === token) { msg('No se pudo cargar YouTube'); draw(); } return; }
     if (my !== token || !same(want, mu)) return;
@@ -120,7 +120,7 @@ export function createHouseMusic({ parent, onSet, notify = () => {} }) {
     player = new YT.Player($('.cm-player'), {
       width: 200, height: 113, videoId: mu.v || undefined, playerVars: vars,
       events: {
-        onReady: () => { if (my !== token) return; playerReady = true; applyVolume(); try { player.playVideo(); } catch { /* nada */ } },
+        onReady: () => { if (my !== token) return; playerReady = true; msg(''); applyVolume(); try { player.playVideo(); } catch { /* nada */ } },
         onStateChange: (e) => {
           if (my !== token) return;
           playing = e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.BUFFERING;

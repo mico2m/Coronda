@@ -404,3 +404,8 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 .sc-txt b { font-size: 16px; }
 .sc-txt small { color: #c9d4d8; font-size: 12px; }
 .sc-opt kbd { font: 600 11px var(--font-body); color: #f6f9fa; background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.34); border-radius: 4px; padding: 1px 6px; }
+
+/* Cargando un mueble en el modo diseño */
+.casa-loading { display: grid; gap: 6px; font-size: 13px; color: var(--fg); }
+.casa-loading i { display: block; height: 5px; border-radius: 99px; background: linear-gradient(90deg, transparent, var(--accent), transparent) 0 0 / 40% 100% no-repeat, rgba(255, 255, 255, 0.18); animation: casa-load 1s linear infinite; }
+@keyframes casa-load { from { background-position: -40% 0, 0 0; } to { background-position: 140% 0, 0 0; } }

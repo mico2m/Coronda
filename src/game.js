@@ -202,6 +202,14 @@ export async function startGame({ dev = false, retro = null } = {}) {
       npcs.setWorld(cworld); // las rutas de los NPC esquivan los objetos con colisión
     }
 
+    // Mientras algo carga detrás del fundido a negro: si tarda más que un instante aparece la pantalla de carga con su
+    // barra (nunca una pantalla negra). La barra sigue a lo que va bajando (ver ui/boot.js).
+    async function withLoading(go, text = 'Cargando…') {
+      let shown = false;
+      const t = setTimeout(() => { shown = true; boot.show(text, { tip: false }); }, 200);
+      try { return await go(); } finally { clearTimeout(t); if (shown) await boot.hideNow(); }
+    }
+
     // Carga una escena y deja listas sus puertas
     async function enterScene(id, spawn, spawnName) {
       await sceneManager.loadScene(id, { spawn, spawnName });
@@ -269,7 +277,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
             if (!sp) throw new Error(`Teleport "${door.id}": no existe el Empty "${key ? 'spawn_' + key : 'spawn'}" en esta escena.`);
             moveTo(sp);
           } else {
-            await enterScene(door.scene, door.spawn, door.spawnName);
+            await withLoading(() => enterScene(door.scene, door.spawn, door.spawnName), `Cargando ${scenesTable[door.scene]?.name || 'el lugar'}…`);
           }
         } catch (err) { // destino inexistente: nos quedamos donde estábamos, sin pantalla negra eterna
           console.error(err);
@@ -310,31 +318,33 @@ export async function startGame({ dev = false, retro = null } = {}) {
       blocked: () => (dialogue?.blocked ?? false) || (lotes?.blocked ?? false),
       onChange: () => { rebuildCollision(); minimap?.capture(sceneManager.root); },
     });
-    async function travel(go) {
+    async function travel(go, text) {
       player.frozen = true;
       if (mode === 'free') controls.setEnabled(false);
       await fade.fadeOut();
-      try { await go(); } catch (err) { console.error(err); ui.setStatus(String(err.message || err)); }
+      try { await withLoading(go, text); } catch (err) { console.error(err); ui.setStatus(String(err.message || err)); }
       await fade.fadeIn();
       player.frozen = false;
       if (mode === 'free') controls.setEnabled(true);
     }
     function goToHouse(key, back) {
+      const owner = lotes.record(key);
+      const text = owner?.o === lotes.uid ? 'Entrando a tu casa…' : `Entrando a la casa de ${owner?.n || 'otro jugador'}…`;
       return travel(async () => {
         const entry = await casas.sceneEntry(key, back); // scene_lote<nro>_<dueño> (ver systems/casas.js)
         scenesTable[entry.id] = entry;
         await enterScene(entry.id);
-      });
+      }, text);
     }
     casas.setOnExit(() => {
       const b = casas.inside?.back;
-      if (!b) return travel(() => enterScene(Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0]));
+      if (!b) return travel(() => enterScene(Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0]), 'Saliendo…');
       // Aparecés delante del lote, mirando hacia afuera
       const q = new THREE.Quaternion().fromArray(b.quat);
       const out = new THREE.Vector3(0, 0, 1).applyQuaternion(q).setY(0).normalize();
       const dist = Math.abs(b.size[2] || 6) / 2 + 1.5;
       const pos = [b.pos[0] + out.x * dist, b.pos[1] + 1.7, b.pos[2] + out.z * dist];
-      return travel(() => enterScene(b.scene, { position: pos, yaw: Math.atan2(-out.x, -out.z) }));
+      return travel(() => enterScene(b.scene, { position: pos, yaw: Math.atan2(-out.x, -out.z) }), 'Saliendo…');
     });
 
     if (dev) {

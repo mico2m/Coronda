@@ -69,6 +69,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
   let inside = null;          // { key, group, items: Map(i -> obj), exit: Vector3, back: spotInfo }
   let design = false;
   let carry = null;           // { obj, item, isNew, before }
+  let loadingItem = false;    // bajando el modelo de un mueble (se muestra "Cargando…")
   let topView = false;        // vista desde arriba (cenital) para acomodar muebles con el mouse
   let showGrid = false;       // grilla en el piso (se recuerda)
   try { showGrid = localStorage.getItem('coronda.casas.grilla') === '1'; } catch { /* nada */ }
@@ -460,6 +461,7 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
           <button type="button" data-poster="rectangular">▭ Rectangular</button>
           <button type="button" data-poster="circular">◯ Circular</button>
         </div>
+        ${loadingItem ? '<div class="casa-loading" role="status"><span>Cargando mueble…</span><i></i></div>' : ''}
         ${carry?.item.m === 'poster' ? `<form class="casa-url"><input class="casa-url-in" type="url" inputmode="url" placeholder="https://… dirección de la imagen" value="${esc(carry.item.k?.u ?? '')}" aria-label="Dirección de la imagen del póster"><button type="submit">Usar imagen</button></form>` : ''}
         ${carry ? `<div class="casa-carry">
           <button type="button" data-a="drop" class="casa-drop">✓ Colocar acá</button>
@@ -511,7 +513,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
     if (carry) cancelCarry();
     if (current(inside.key).items.length >= MAX_ITEMS) { notify(`Máximo ${MAX_ITEMS} muebles`); return; }
     const item = { i: Math.random().toString(36).slice(2, 10), m, p: [0, 0], y: 0, ...(m === 'poster' ? { k: cleanPoster(k) } : {}) };
-    const obj = await makeItem(item);
+    const slow = setTimeout(() => { loadingItem = true; drawUI(); }, 150); // la primera vez el modelo tiene que bajar
+    const obj = await makeItem(item).finally(() => { clearTimeout(slow); if (loadingItem) { loadingItem = false; drawUI(); } });
     if (!inside || !design) return;
     inside.itemsGroup.add(obj);
     carry = { obj, item, isNew: true };

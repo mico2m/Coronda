@@ -77,7 +77,8 @@ En `environment` de cada escena (`data/scenes/*.json`):
 
 El jugador se mueve en tercera persona con la cámara siguiéndolo. Código en `src/actors/player.js`; parámetros en `data/tables/player.json`.
 
-- **Controles:** `W A S D` (o flechas) mover relativo a la cámara · `Shift` correr · arrastrar para girar la cámara · rueda para el zoom · `E` interactuar (puertas).
+- **Controles:** `W A S D` mover relativo a la cámara · `Shift` correr · `E` interactuar (puertas) · arrastrar para girar la cámara · rueda para el zoom. En celular aparecen los botones W A S D.
+- **Cámara como en Ocarina:** te sigue de atrás sola mientras caminás · `Z` la pone detrás del personaje · las **flechas** miran alrededor desde la cabeza, un rango corto, y al soltarlas vuelve despacio. Se ajusta en `data/tables/player.json > camera`: `follow` (0 = no te sigue), `lookYaw` y `lookPitch` (grados), `lookSpeed`, `lookReturn`, `recenterTime`.
 - **Modelo:** exportá el personaje a `assets/models/objects/personaje.glb` (o cambiá `model` en `player.json`). Hasta que exista se ve una cápsula con una "nariz" que marca el frente.
 - **Origen y orientación en Blender:** el origen del personaje en los **pies**; el frente hacia **-Y** de Blender (vista frontal, que es lo normal), que en el juego queda como +Z. Si en el juego camina de espaldas, poné `"yawOffset": 180` en `player.json`.
 - **Tamaño:** se respeta el de Blender (1 unidad = 1 m). Si hace falta, `scale` en `player.json`.

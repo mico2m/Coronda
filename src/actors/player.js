@@ -1,5 +1,8 @@
 // Jugador: personaje en tercera persona con cámara que lo sigue.
-//  WASD / flechas = mover (relativo a la cámara) · Shift = correr · arrastrar = girar cámara · rueda = zoom
+//  WASD = mover (relativo a la cámara) · Shift = correr · arrastrar = girar cámara · rueda = zoom
+//  Cámara como en Ocarina: te sigue de atrás sola mientras caminás · Z = centrarla detrás del personaje ·
+//  flechas = mirar alrededor desde la cabeza (un rango corto); al soltarlas vuelve despacio a donde estaba.
+//  Ajustes en data/tables/player.json > camera: follow, lookYaw, lookPitch, lookSpeed, lookReturn, recenterTime.
 // El modelo (.glb) y los parámetros se configuran en data/tables/player.json.
 // Si el .glb todavía no existe se muestra una cápsula con una "nariz" que indica hacia dónde mira.
 //
@@ -29,7 +32,15 @@ const DEFAULTS = {
   walkSpeed: 3,     // m/s
   runSpeed: 6.5,    // m/s con Shift
   turnSpeed: 12,    // qué rápido gira hacia donde camina
-  camera: { distance: 4.5, minDistance: 1.5, maxDistance: 12, height: 1.5, pitch: 0.3 },
+  camera: {
+    distance: 4.5, minDistance: 1.5, maxDistance: 12, height: 1.5, pitch: 0.3,
+    follow: 1.6,        // qué tan rápido se acomoda detrás tuyo al caminar (0 = no sigue)
+    lookYaw: 45,        // flechas: cuánto se puede mirar a los costados (grados)
+    lookPitch: 25,      // flechas: cuánto arriba/abajo (grados)
+    lookSpeed: 120,     // flechas: grados por segundo
+    lookReturn: 2.5,    // al soltar, qué tan rápido vuelve (más alto = más rápido)
+    recenterTime: 0.25, // Z: segundos que tarda en ponerse detrás
+  },
   // Animaciones: se buscan por nombre en el .glb (idle, walk, run).
   // fade = segundos de transición. walkAnimSpeed/runAnimSpeed = a qué velocidad (m/s) fue animado el ciclo;
   // con eso la animación se acelera o frena para que los pies no resbalen (0 = no ajustar).
@@ -56,8 +67,8 @@ function parseActionName(clipName) {
 }
 const humanize = (id) => { const t = id.replace(/_+/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
 
-const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
-const ALIAS = { ArrowUp: 'KeyW', ArrowDown: 'KeyS', ArrowLeft: 'KeyA', ArrowRight: 'KeyD', ShiftRight: 'ShiftLeft' };
+const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const ALIAS = { ShiftRight: 'ShiftLeft' }; // las flechas no mueven: miran (ver la cámara)
 const TAU = Math.PI * 2;
 const INTERACT = 'interactuar'; // clave de la animación de puertas en `clips`
 
@@ -161,6 +172,8 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   let frozen = false;
   let facing = 0;
   const cam = { yaw: 0, pitch: cfg.camera.pitch, dist: cfg.camera.distance };
+  const look = { yaw: 0, pitch: 0 };   // flechas: desvío de la mirada (radianes), vuelve solo a 0
+  let recenter = null;                 // Z: { from, to, pitchFrom, t }
   let keys = {};
   let world = null;   // mundo de colisión de la escena actual (ver collision.js)
   let fallSpeed = 0;  // m/s hacia abajo
@@ -213,9 +226,16 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.code === 'KeyZ' && active && !frozen) { centerCamera(); return; }
     const a = actions.find((x) => x.key === e.code);
     if (a) triggerAction(a.id);
   });
+
+  // Z: la cámara se pone detrás del personaje (a la altura de siempre), en un ratito
+  function centerCamera() {
+    const to = facing - Math.PI; // yaw de la cámara que queda detrás de hacia donde mira
+    recenter = { from: cam.yaw, to: cam.yaw + angleDiff(cam.yaw, to), pitchFrom: cam.pitch, t: 0 };
+  }
 
   // Cámara: arrastrar para girar, rueda para el zoom
   let dragging = false, lx = 0, ly = 0;
@@ -226,6 +246,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
   });
   stage.addEventListener('pointermove', (e) => {
     if (!active || !dragging) return;
+    recenter = null;
     cam.yaw -= (e.clientX - lx) * 0.005;
     cam.pitch = THREE.MathUtils.clamp(cam.pitch + (e.clientY - ly) * 0.004, -0.1, 1.3);
     lx = e.clientX; ly = e.clientY;
@@ -262,6 +283,7 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
     return a + d * Math.min(t, 1);
   };
   // Hacia dónde mira la cámara con ese yaw -> ángulo de giro del modelo (el frente del modelo es +Z)
+  const angleDiff = (a, b) => ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
   const facingFromYaw = (yaw) => Math.atan2(-Math.sin(yaw), -Math.cos(yaw));
 
   // Se desliza (rápido, ~0,25 s) hasta un punto { x, y, z, yaw } girando hacia yaw. Mientras, camina en el lugar.
@@ -305,6 +327,8 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
       facing = facingFromYaw(yaw);
       pivot.rotation.y = facing;
       cam.yaw = yaw;
+      look.yaw = look.pitch = 0;
+      recenter = null;
     },
     // Animación de interactuar (abrir una puerta…): mira hacia `face` ({x,z}), reproduce el clip una vez y
     // espera a que termine (o `wait` segundos). Se queda en la última pose hasta que se mueva o se lo ubique de nuevo.
@@ -428,13 +452,38 @@ export async function createPlayer({ scene, camera, stage, pad, config = {} }) {
         if (root.position.y === g) fallSpeed = 0;
       }
 
-      // Cámara detrás del jugador
-      target.copy(root.position).y += cfg.camera.height;
-      const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+      // Cámara detrás del jugador (como en Ocarina)
+      const cc = cfg.camera;
+      if (recenter) { // Z: se acomoda detrás, con aceleración suave
+        recenter.t = Math.min(1, recenter.t + dt / Math.max(0.01, cc.recenterTime));
+        const k = recenter.t * recenter.t * (3 - 2 * recenter.t);
+        cam.yaw = recenter.from + (recenter.to - recenter.from) * k;
+        cam.pitch = recenter.pitchFrom + (cc.pitch - recenter.pitchFrom) * k;
+        if (recenter.t >= 1) recenter = null;
+      } else if (moving && cc.follow > 0 && !dragging) {
+        // Caminando te sigue de atrás de a poco; si venís hacia la cámara no da la vuelta
+        const d = angleDiff(cam.yaw, facing - Math.PI);
+        if (Math.abs(d) < 2.2) cam.yaw += d * Math.min(1, cc.follow * dt * Math.min(1, Math.abs(d) * 1.5));
+      }
+      // Flechas: mirar alrededor desde la cabeza, un rango corto; al soltar vuelve despacio
+      const lx = (keys.ArrowLeft ? 1 : 0) - (keys.ArrowRight ? 1 : 0);
+      const ly = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
+      const lim = THREE.MathUtils.degToRad;
+      const spd = lim(cc.lookSpeed) * dt, back = Math.min(1, cc.lookReturn * dt);
+      if (lx && !frozen) look.yaw = THREE.MathUtils.clamp(look.yaw + lx * spd, -lim(cc.lookYaw), lim(cc.lookYaw));
+      else look.yaw -= look.yaw * back;
+      if (ly && !frozen) look.pitch = THREE.MathUtils.clamp(look.pitch + ly * spd, -lim(cc.lookPitch), lim(cc.lookPitch));
+      else look.pitch -= look.pitch * back;
+
+      target.copy(root.position).y += cc.height;
+      // La cámara gira alrededor de la cabeza: hacia arriba con la flecha arriba (mira hacia arriba, baja la cámara)
+      const yaw = cam.yaw + look.yaw;
+      const pitch = THREE.MathUtils.clamp(cam.pitch - look.pitch, -0.25, 1.4);
+      const cp = Math.cos(pitch), sp = Math.sin(pitch);
       camera.position.set(
-        target.x + Math.sin(cam.yaw) * cp * cam.dist,
+        target.x + Math.sin(yaw) * cp * cam.dist,
         target.y + sp * cam.dist,
-        target.z + Math.cos(cam.yaw) * cp * cam.dist
+        target.z + Math.cos(yaw) * cp * cam.dist
       );
       camera.lookAt(target);
     },

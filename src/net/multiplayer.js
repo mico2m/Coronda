@@ -283,10 +283,9 @@ export async function connectServer(roomId = 'coronda') {
     return true;
   };
   // ¿Ya llegó el registro? (unos segundos después de conectarse a un broker MQTT)
+  const watchNames = setInterval(() => { if (!namesSince && (room.status?.().open ?? 1) > 0) { namesSince = performance.now(); clearInterval(watchNames); } }, 200);
   net.namesReady = () => {
-    const st = room.status?.();
-    if (!st) return true; // prueba local entre pestañas
-    if (!namesSince && st.open > 0) namesSince = performance.now();
+    if (!room.status) return true; // prueba local entre pestañas
     return namesSince > 0 && performance.now() - namesSince > 2500;
   };
   // Un nombre libre de la forma "Viajero 1234"

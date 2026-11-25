@@ -518,3 +518,21 @@ body:has(.talking) .reloj { opacity: 0.4; }
   .chat { bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); left: calc(var(--edge-l) + 228px); width: min(360px, calc(100% - var(--edge-l) - var(--edge-r) - 240px)); }
   .reloj { padding: 4px 10px; }
 }
+
+/* ---------- Avisos de interactuar en el celular ("Ir al Bosque", "Talar", "Hablar", "Salir de la casa"…) ----------
+   En el celular se tocan, así que no se muestra la tecla E: una píldora compacta, solo el texto, con borde turquesa
+   (se ve que es un botón), en una sola línea (si es muy largo termina en "…") y más arriba que el joystick, el 🎥 y el 💬. */
+@media (pointer: coarse) {
+  .door-prompt, .talk-prompt {
+    display: block; bottom: calc(var(--edge-b) + 24%); max-width: min(70vw, 320px); padding: 9px 18px; border-radius: 999px;
+    border: 1.5px solid var(--accent); font: 600 15px var(--font-body); text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; touch-action: manipulation;
+  }
+  .door-prompt kbd, .talk-prompt kbd { display: none; }
+  .door-prompt.lote-prompt { bottom: calc(var(--edge-b) + 34%); }
+  .door-prompt.lote-prompt.passive { border-color: var(--line); } /* solo informa, no se toca */
+}
+@media (pointer: coarse) and (max-height: 500px) {
+  .door-prompt, .talk-prompt { bottom: calc(var(--edge-b) + 84px); }
+  .door-prompt.lote-prompt { bottom: calc(var(--edge-b) + 136px); }
+}

@@ -508,3 +508,11 @@ Adentro de tu casa: **B** o el botón 🛠. Elegí un mueble y aparece delante t
 - **Aviso de actualización:** cada vez que apretás *Enviar a GitHub* en el Studio se escribe `version.json` con una versión nueva (y tu mensaje). Los que tienen el juego abierto lo revisan cada minuto y les aparece *¡Hay una nueva actualización de Coronda!* con el botón *Actualizar*. Código: `src/ui/update-notice.js`.
 - **Movimiento de los demás:** cada posición viaja con su hora; los otros jugadores se dibujan 0,14 s "atrás", interpolando entre dos posiciones, y se descartan las copias viejas que llegan por los caminos más lentos. Así se mueven parejo aunque los mensajes lleguen a los saltos. Para probarlo con demoras: `?mp=local&lag`.
 - **Probar con dos jugadores en una PC:** `index.html?mp=local` en dos pestañas (cada pestaña es un jugador distinto).
+
+## Guardado en el dispositivo (carga rápida)
+
+`sw.js` (un *service worker*) guarda en el navegador de cada jugador lo que el juego baja: modelos, texturas, código, datos, three.js y las fuentes. La segunda vez que entran, todo sale de ahí y la pantalla de carga dura un instante.
+
+- **Actualizaciones:** cada vez que se abre el juego se lee `version.json` (el Studio lo cambia al **Enviar**). Si cambió, cada archivo se vuelve a confirmar con el servidor la próxima vez que se usa: si no cambió no se baja de nuevo, si cambió se baja solo ese. Igual, cada archivo se reconfirma como mucho cada 6 horas.
+- **No se guarda:** `version.json`, lotes, casas, jugadores, chat, pósters, la música de YouTube, audio ni nada de otros sitios.
+- **En tu PC (localhost) y en `dev.html` no se activa**, así mientras modelás ves siempre lo último.

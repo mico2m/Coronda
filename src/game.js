@@ -154,6 +154,15 @@ export async function startGame({ dev = false, retro = null } = {}) {
     const params = new URLSearchParams(location.search);
     // Aviso de actualización: cuando se sube una versión nueva, a los que están jugando les avisa (ver ui/update-notice.js)
     if (!dev) import('./ui/update-notice.js').then((m) => m.createUpdateNotice()).catch(() => {});
+    // Guardar lo bajado en el dispositivo (sw.js): la próxima vez carga desde ahí. No en localhost (ahí modelás).
+    if (!dev && 'serviceWorker' in navigator) {
+      const local = /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/.test(location.hostname);
+      if (local) navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+      else {
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch((err) => console.warn('No se pudo activar el guardado en el dispositivo:', err));
+        navigator.storage?.persist?.().catch(() => {}); // que el navegador no lo borre por falta de espacio
+      }
+    }
     if (!dev || params.has('menu')) {
       const { findCharacters, showStartMenu } = await import('./ui/start-menu.js');
       const { connectServer } = await import('./net/multiplayer.js');

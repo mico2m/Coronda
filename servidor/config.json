@@ -1,7 +1,7 @@
 {
   "_ayuda": "Configuración del servidor de Coronda. puerto = donde escucha (el túnel de Cloudflare apunta acá). admins = nombres de las cuentas que pueden usar los comandos de admin (/time, /anuncio, /madera…). registro_abierto = false para que nadie más pueda crear cuentas. max_jugadores = cuántos pueden estar adentro a la vez. escena_claude = escena donde vive el NPC Claude.",
   "puerto": 8080,
-  "admins": [],
+  "admins": ["mirkuwu"],
   "registro_abierto": true,
   "max_jugadores": 40,
   "escena_claude": "coronda_plaza"

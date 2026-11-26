@@ -9,7 +9,7 @@ if errorlevel 1 (
   pause
   exit /b
 )
-powershell -NoProfile -Command "try { Invoke-WebRequest http://localhost:8080/__coronda/estado -UseBasicParsing -TimeoutSec 2 | Out-Null; exit 0 } catch { exit 1 }"
+curl -s -f -o nul http://localhost:8080/__coronda/estado
 if errorlevel 1 (
   echo Prendiendo tambien el servidor del juego...
   start "Servidor de Coronda (no cerrar)" cmd /k node servidor\coronda-server.mjs

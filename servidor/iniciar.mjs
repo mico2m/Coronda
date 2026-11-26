@@ -54,8 +54,14 @@ for (let i = 0; i < 60 && !enlace; i++) {
 if (!enlace) { console.log('  No apareció el enlace. Mirá la ventana "Tunel de Coronda".'); process.exit(1); }
 
 // 3) Esperar a que el enlace ande, abrirlo y copiarlo
-console.log(`  Enlace: ${enlace}  (activándose, puede tardar unos segundos...)`);
-for (let i = 0; i < 40 && !(await responde(enlace)); i++) await espera(1000);
+console.log(`  Enlace: ${enlace}  (activándose, puede tardar hasta un minuto y medio...)`);
+let anda = false;
+for (let i = 0; i < 90 && !anda; i++) { anda = await responde(enlace); if (!anda) await espera(1000); }
+if (!anda) {
+  console.log('  ⚠ El enlace todavía no responde. Esperá un minuto y recargá la página (F5).');
+  console.log('    Si sigue igual, mirá la ventana "Tunel de Coronda" por errores, o apretá Desconectar en el');
+  console.log('    Cloudflare One Client (WARP) si lo tenés prendido.');
+}
 fs.writeFileSync(path.join(ROOT, 'servidor', 'enlace-actual.txt'), enlace + '\n');
 try { spawnSync('clip', { input: enlace }); } catch { /* sin portapapeles */ }
 spawn('cmd.exe', ['/c', `start "" "${enlace}"`], { windowsVerbatimArguments: true, detached: true, stdio: 'ignore' }).unref();

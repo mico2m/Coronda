@@ -7,7 +7,7 @@
     10
   ],
   "techo": "techo",
-  "inactividad_seg": 20,
+  "inactividad_seg": 10,
   "espera_seg": 5,
   "reparto_horas": 3,
   "max_pedidos_por_jugador": 5,

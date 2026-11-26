@@ -5,7 +5,8 @@
 //
 // Dónde está el servidor:
 //   1) Si la página la sirvió el propio servidor (lo normal: http://localhost:8080 o tu dirección del túnel), es el mismo sitio.
-//   2) Si no (ej. la abriste desde GitHub Pages), se usa "url" de data/tables/servidor.json (ej. "https://coronda.tudominio.com").
+//   2) En tu PC desde el Studio (localhost:5173): el servidor del juego en localhost:8080.
+//   3) Si no (ej. la abriste desde GitHub Pages), se usa "url" de data/tables/servidor.json (ej. "https://coronda.tudominio.com").
 // Si no responde: "El servidor está apagado".
 import { loadJSON } from '../core/assets.js';
 
@@ -23,6 +24,11 @@ async function buscarServidor() {
   };
   const aqui = location.origin;
   if (/^https?:/.test(aqui) && await probar(aqui)) return aqui;
+  // En tu PC con otro servidor (ej. la vista previa del Studio en :5173): el servidor del juego en el puerto 8080
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && location.port !== '8080') {
+    const local = `http://${location.hostname}:8080`;
+    if (await probar(local)) return local;
+  }
   const cfg = await loadJSON('data/tables/servidor.json').catch(() => null);
   const url = String(cfg?.url ?? '').trim().replace(/\/+$/, '');
   if (url && await probar(url)) return url;

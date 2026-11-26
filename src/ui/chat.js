@@ -4,12 +4,13 @@
 const SHOW_SECS = 12;   // s que queda visible cada mensaje en la lista
 const MAX_LINES = 7;
 
-export function createChat({ net, myName, blocked = () => false, onCommand = null }) {
+export function createChat({ net, myName, blocked = () => false, onCommand = null, getComandos = () => [] }) {
   const app = document.querySelector('.app') ?? document.body;
   const box = document.createElement('div');
   box.className = 'chat';
   box.innerHTML = `
     <ol class="chat-log" aria-live="polite"></ol>
+    <ul class="chat-cmds" role="listbox" aria-label="Comandos de admin" hidden></ul>
     <form class="chat-form" hidden>
       <input class="chat-input" maxlength="120" autocomplete="off" spellcheck="false" placeholder="Escribí y apretá Enter · Esc para cancelar" aria-label="Mensaje">
     </form>
@@ -18,7 +19,30 @@ export function createChat({ net, myName, blocked = () => false, onCommand = nul
   const log = box.querySelector('.chat-log');
   const form = box.querySelector('.chat-form');
   const input = box.querySelector('.chat-input');
+  const cmds = box.querySelector('.chat-cmds');
   let open = false;
+  // ---------- Comandos de admin: escribir "/" muestra la lista (se filtra mientras escribís) ----------
+  let sel = 0, visibles = [];
+  const escHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function sugerir() {
+    const t = input.value;
+    const lista = t.startsWith('/') ? getComandos() : [];
+    const q = t.toLowerCase();
+    visibles = lista.filter((c) => c.uso.toLowerCase().startsWith(q) || q.startsWith(c.uso.trim().toLowerCase()) || q === '/');
+    if (!visibles.length) { cmds.hidden = true; return; }
+    sel = Math.min(sel, visibles.length - 1);
+    cmds.innerHTML = visibles.map((c, i) => `<li role="option" data-i="${i}" aria-selected="${i === sel}"><b>${escHtml(c.ej ?? c.uso.trim())}</b><span>${escHtml(c.desc)}</span></li>`).join('');
+    cmds.hidden = false;
+  }
+  function completar(i = sel) {
+    const c = visibles[i];
+    if (!c) return;
+    input.value = c.uso;
+    sel = 0; sugerir();
+    input.focus();
+  }
+  input.addEventListener('input', () => { sel = 0; sugerir(); });
+  cmds.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); const li = e.target.closest('li'); if (li) completar(Number(li.dataset.i)); });
 
   function add(name, text, mine = false, system = false) {
     const li = document.createElement('li');
@@ -53,10 +77,12 @@ export function createChat({ net, myName, blocked = () => false, onCommand = nul
     box.classList.add('chat-on');
     refresh();
     input.value = '';
-    setTimeout(() => input.focus(), 0);
+    input.focus(); // enseguida: si escribís rápido después de Enter (ej. "/"), no se pierde la primera letra
+    setTimeout(() => { if (document.activeElement !== input) input.focus(); }, 0);
   }
   function hide() {
     open = false;
+    cmds.hidden = true;
     form.hidden = true;
     box.classList.remove('chat-on');
     input.blur();
@@ -72,6 +98,11 @@ export function createChat({ net, myName, blocked = () => false, onCommand = nul
     hide();
   });
   input.addEventListener('keydown', (e) => {
+    if (!cmds.hidden && visibles.length) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sel = (sel + (e.key === 'ArrowDown' ? 1 : visibles.length - 1)) % visibles.length; sugerir(); e.stopPropagation(); return; }
+      if (e.key === 'Tab') { e.preventDefault(); completar(); e.stopPropagation(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); cmds.hidden = true; e.stopPropagation(); return; }
+    }
     if (e.key === 'Escape') { e.preventDefault(); hide(); }
     e.stopPropagation(); // las letras no mueven al personaje ni abren puertas
   });

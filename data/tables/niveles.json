@@ -1,13 +1,19 @@
 {
   "_ayuda": "Niveles y aptitudes (ver src/systems/niveles.js; también desde el Studio, panel Mundo). Ganás experiencia (XP) talando y retirando muebles. Para pasar del nivel n al n+1 hacen falta xp_base × n^xp_exponente puntos de XP. Cada nivel da puntos_por_nivel puntos de aptitud. Aptitudes: energia = +por_punto de energía máxima por punto (hasta max_puntos).",
-  "xp_por_hachazo": 2,
-  "xp_por_arbol": 10,
-  "xp_por_mueble": 15,
+  "xp_por_hachazo": 2.5,
+  "xp_por_arbol": 5,
+  "xp_por_mueble": 5,
   "xp_base": 50,
   "xp_exponente": 1.5,
-  "nivel_max": 30,
+  "nivel_max": 50,
   "puntos_por_nivel": 1,
   "aptitudes": {
-    "energia": { "nombre": "Energía", "icono": "⚡", "descripcion": "Más energía máxima para talar y correr.", "por_punto": 5, "max_puntos": 10 }
+    "energia": {
+      "nombre": "Energía",
+      "icono": "⚡",
+      "descripcion": "Más energía máxima para talar y correr.",
+      "por_punto": 5,
+      "max_puntos": 10
+    }
   }
 }

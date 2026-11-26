@@ -127,3 +127,11 @@
 /* En el micro-menú del HUD los botones son static: el número del atajo necesita que cada botón sea su referencia */
 .app.wow .wow-micro > button[data-tecla] { position: relative !important; inset: auto !important; transform: none !important; }
 .app.wow .wow-micro > .perfil-btn { border-radius: 4px; }
+
+/* Chat: lista de comandos de admin al escribir "/" (ver src/ui/chat.js) */
+.chat-cmds { list-style: none; margin: 0; padding: 4px; border-radius: 6px; background: rgba(14, 11, 7, 0.95); border: 1px solid var(--cw-oro-osc); max-height: 220px; overflow: auto; display: grid; gap: 2px; }
+.chat-cmds[hidden] { display: none; }
+.chat-cmds li { display: grid; gap: 1px; padding: 5px 8px; border-radius: 4px; cursor: pointer; color: var(--cw-texto); }
+.chat-cmds li b { font: 600 13px ui-monospace, Consolas, monospace; color: var(--cw-oro-claro); }
+.chat-cmds li span { font-size: 11px; color: #c9b88f; }
+.chat-cmds li[aria-selected="true"], .chat-cmds li:hover { background: rgba(212, 175, 55, 0.2); }

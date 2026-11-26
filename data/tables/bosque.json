@@ -3,7 +3,7 @@
   "golpes_por_tanda": 3,
   "madera_por_tanda": 2,
   "tandas_por_arbol": 3,
-  "rebrote_minutos": 5,
+  "rebrote_minutos": 3,
   "animacion": "talar",
   "radio": 1.6,
   "recurso": "madera",

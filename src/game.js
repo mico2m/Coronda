@@ -616,7 +616,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       // Chat: Enter para escribir (ver ui/chat.js)
       const { createChat } = await import('./ui/chat.js');
       let admin = null;
-      const chatUi = createChat({ net, myName: choice.name, blocked: () => !!dialogue?.active, onCommand: (t) => admin?.comando(t) });
+      const chatUi = createChat({ net, myName: choice.name, blocked: () => !!dialogue?.active, onCommand: (t) => admin?.comando(t), getComandos: () => admin?.comandos ?? [] });
       // Comandos de admin en el chat: /admin CLAVE, /time set 19, /anuncio… (ver systems/admin.js; los ven todos)
       const { createAdmin } = await import('./systems/admin.js');
       admin = createAdmin({ net, chat: chatUi, stage, notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 3500); } });

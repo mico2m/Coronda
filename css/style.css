@@ -715,3 +715,12 @@ body:has(.talking) .energia { opacity: 0.4; }
 /* Menú de Esc: salir del servidor */
 .menu-salir { display: block; width: 100%; margin-top: 8px; padding: 9px; border-radius: 10px; border: 1px solid #ef4444; background: transparent; color: #fecaca; font: 600 14px var(--font-body); cursor: pointer; }
 .menu-salir.seguro { background: #b91c1c; color: #fff; }
+
+/* Minimapa en grande (tecla M): cuadrado en el centro de la pantalla */
+.app .minimap.grande, .app.wow .minimap.grande {
+  top: 50% !important; left: 50% !important; right: auto !important; bottom: auto !important;
+  width: min(80vmin, 640px) !important; height: min(80vmin, 640px) !important;
+  transform: translate(-50%, -50%); z-index: 7;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45), 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+.minimap.grande .minimap-n { font-size: 16px; top: 6px; }

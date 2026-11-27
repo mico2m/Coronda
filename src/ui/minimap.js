@@ -3,7 +3,8 @@
 //     ortográfica mira hacia abajo y pinta la escena en una imagen chica (RES × RES píxeles).
 //   - Cada cuadro se recorta el pedazo alrededor tuyo y se dibujan encima: vos (flecha), los otros jugadores (puntos)
 //     y los lotes libres (cuadraditos amarillos).
-//   - Tecla M: mostrar u ocultar (se recuerda).
+//   - Tecla M: abre el mapa en grande (cuadrado, en el centro de la pantalla, con toda la escena); M otra vez (o Esc) vuelve
+//     al minimapa de siempre.
 import * as THREE from 'three';
 import { isSkyName } from '../systems/shading.js';
 
@@ -11,7 +12,7 @@ const RES = 256;            // píxeles del dibujo del mapa entero (baja resoluc
 const VIEW = 70;            // metros que entran de lado a lado en el minimapa
 const MAX_SIZE = 600;       // m: si la escena es más grande, se dibuja este cuadrado alrededor del centro
 const SIZE_PX = 168;        // tamaño en pantalla
-const STORE = 'coronda.minimapa';
+const BIG_PX = 640;         // resolución del dibujo cuando el mapa está en grande (en pantalla se ajusta al tamaño de la ventana, ver css)
 // Lo que no va en el mapa: cielo, ayudas del modo desarrollador, flechas de lotes, globos y nombres
 const SKIP_RE = /^(?:lote-flecha|lote-helper|collision-debug|route-debug|spawn-debug|jugador:)/i;
 
@@ -33,15 +34,23 @@ export function createMinimap({ renderer, scene }) {
   map.width = map.height = RES;
   const mctx = map.getContext('2d');
   let area = null; // { minX, minZ, size }
-  let visible = true;
-  try { visible = localStorage.getItem(STORE) !== '0'; } catch { /* nada */ }
-  wrap.hidden = !visible;
+  const visible = true;
+  let big = false;     // mapa en grande (tecla M)
+  function setBig(on) {
+    big = on;
+    wrap.classList.toggle('grande', on);
+    view.width = view.height = on ? BIG_PX : SIZE_PX; // al cambiar el tamaño del canvas se borra: el próximo cuadro lo vuelve a dibujar
+    lastDraw = 0;
+  }
   addEventListener('keydown', (e) => {
     if (e.code !== 'KeyM' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return;
-    visible = !visible;
-    wrap.hidden = !visible;
-    try { localStorage.setItem(STORE, visible ? '1' : '0'); } catch { /* nada */ }
+    setBig(!big);
   });
+  // Esc cierra el mapa grande (antes de que el menú de Esc se abra)
+  addEventListener('keydown', (e) => {
+    if (e.code !== 'Escape' || !big) return;
+    setBig(false); e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
 
   const rt = new THREE.WebGLRenderTarget(RES, RES);
   rt.texture.colorSpace = THREE.SRGBColorSpace;
@@ -102,6 +111,7 @@ export function createMinimap({ renderer, scene }) {
     const now = performance.now();
     if (now - lastDraw < 66) return; // ~15 veces por segundo alcanza
     lastDraw = now;
+    if (big) return drawBig(me, others, lots);
     const k = RES / area.size;              // píxeles del mapa por metro
     const half = (VIEW / 2) * k;            // medio lado del recorte, en píxeles del mapa
     const cx = (me.x - area.minX) * k, cz = (me.z - area.minZ) * k;
@@ -135,5 +145,35 @@ export function createMinimap({ renderer, scene }) {
     vctx.restore();
   }
 
-  return { capture, update, get visible() { return visible; } };
+  // Mapa en grande: toda la escena (no un recorte alrededor tuyo), con vos, los otros jugadores y los lotes
+  function drawBig(me, others, lots) {
+    const S = BIG_PX, k = S / area.size;
+    vctx.imageSmoothingEnabled = false;
+    vctx.fillStyle = '#0d1418';
+    vctx.fillRect(0, 0, S, S);
+    vctx.drawImage(map, 0, 0, RES, RES, 0, 0, S, S);
+    const toScreen = (x, z) => [(x - area.minX) * k, (z - area.minZ) * k];
+    for (const l of lots) {
+      const [x, y] = toScreen(l.x, l.z);
+      vctx.fillStyle = l.color ?? '#ffd23f';
+      vctx.strokeStyle = '#0b1215'; vctx.lineWidth = 2;
+      vctx.fillRect(Math.round(x) - 6, Math.round(y) - 6, 12, 12);
+      vctx.strokeRect(Math.round(x) - 6, Math.round(y) - 6, 12, 12);
+    }
+    for (const o of others) {
+      const [x, y] = toScreen(o.x, o.z);
+      vctx.fillStyle = '#7dd3fc'; vctx.strokeStyle = '#0b1215'; vctx.lineWidth = 2.5;
+      vctx.beginPath(); vctx.arc(x, y, 7, 0, Math.PI * 2); vctx.fill(); vctx.stroke();
+    }
+    const [mx, my] = toScreen(me.x, me.z);
+    vctx.save();
+    vctx.translate(mx, my);
+    vctx.rotate(Math.PI - me.facing);
+    vctx.fillStyle = '#ffd43b'; vctx.strokeStyle = '#0b1215'; vctx.lineWidth = 2.5;
+    vctx.beginPath(); vctx.moveTo(0, -15); vctx.lineTo(11, 11); vctx.lineTo(0, 6); vctx.lineTo(-11, 11); vctx.closePath();
+    vctx.fill(); vctx.stroke();
+    vctx.restore();
+  }
+
+  return { capture, update, get visible() { return visible; }, get grande() { return big; }, setBig };
 }

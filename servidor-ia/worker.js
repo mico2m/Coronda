@@ -7,10 +7,10 @@
 //   1) Groq (plan gratis): secreto GROQ_API_KEY. Nunca está en el juego ni en GitHub. Va primero.
 //   2) Workers AI de Cloudflare: Settings -> Bindings -> Add binding -> Workers AI, nombre de variable exactamente "AI". No necesita clave.
 // Con una sola configurada, usa esa.
-// Variables opcionales: MODELO (cambia el modelo del proveedor que se use), ORIGENES (direcciones del juego, separadas por coma).
+// Variables opcionales: MODELO (modelo de Groq), MODELO_CF (modelo de Cloudflare), ORIGENES (direcciones del juego, separadas por coma).
 // Pasos para publicarlo: ver servidor-ia/README.md.
 
-const MODELO_GROQ = 'llama-3.3-70b-versatile';
+const MODELO_GROQ = 'openai/gpt-oss-120b'; // llama-3.3-70b-versatile lo apagó Groq el 16/08/2026
 const MODELO_CF = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const TIPOS = ['seguir', 'ir_a_casa', 'entrar_casa', 'ir_a', 'irse', 'mandado', 'quedarse', 'volver', 'animar', 'encargar'];
 const POR_MINUTO = 12;            // preguntas por minuto por jugador (para no gastar el cupo gratis)
@@ -95,19 +95,21 @@ function interpretar(args, texto) {
 // Solo si las dos están sin cupo se contesta "límite" (el juego dice "Pará, pará, que me mareás").
 async function conLaQueAnde(env, mensajes) {
   const proveedores = [env.GROQ_API_KEY && conGroq, env.AI && conWorkersAI].filter(Boolean);
-  let ultimo = null, todasSinCupo = true;
+  let todasSinCupo = true;
+  const fallas = []; // qué le pasó a cada una, para que el servidor muestre el motivo real
   for (const pedir of proveedores) {
     try { return await pedir(env, mensajes); } catch (e) {
-      ultimo = e;
+      const quien = pedir === conGroq ? 'Groq' : 'Cloudflare';
+      fallas.push(`${quien}: ${e?.limite ? 'sin cupo' : (e?.message || 'error')}`);
       if (!e?.limite) todasSinCupo = false;
     }
   }
   if (todasSinCupo) throw { limite: true };
-  throw ultimo instanceof Error ? ultimo : new Error(String(ultimo?.message || 'sin conexión con la IA'));
+  throw new Error(fallas.join(' | '));
 }
 
 async function conWorkersAI(env, mensajes) {
-  const modelo = env.MODELO || MODELO_CF;
+  const modelo = env.MODELO_CF || MODELO_CF; // MODELO es solo para Groq (los nombres no sirven en las dos)
   const f = HERRAMIENTA.function;
   let r;
   try {
@@ -134,13 +136,14 @@ async function conGroq(env, mensajes) {
       method: 'POST',
       headers: { Authorization: `Bearer ${env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: env.MODELO || MODELO_GROQ, messages: mensajes, temperature: 0.8, max_tokens: 300,
+        model: env.MODELO || MODELO_GROQ, messages: mensajes, temperature: 0.8, max_tokens: 800,
+        reasoning_effort: 'low', // gpt-oss piensa antes de contestar: poco, para que sea rápido y no se coma los tokens
         tools: [HERRAMIENTA], tool_choice: { type: 'function', function: { name: 'responder' } },
       }),
     });
-  } catch { throw new Error('sin conexión con la IA'); }
+  } catch (e) { throw new Error('sin conexión (' + (e?.message || 'fetch') + ')'); }
   if (r.status === 429) throw { limite: true };
-  if (!r.ok) throw new Error(`IA ${r.status}`);
+  if (!r.ok) throw new Error(`respondió ${r.status}: ${(await r.text().catch(() => '')).slice(0, 60)}`);
   const msg = (await r.json())?.choices?.[0]?.message;
   return interpretar(msg?.tool_calls?.[0]?.function?.arguments, msg?.content);
 }
@@ -296,7 +299,7 @@ ${vistaTexto(mundo.vista)}${carpinteriaTexto(mundo.carpinteria)}`;
       out = await conLaQueAnde(env, mensajes);
     } catch (e) {
       if (e?.limite) return json({ error: 'limite' }, 429, h);
-      return json({ error: String(e?.message || 'sin conexión con la IA').slice(0, 120) }, 502, h);
+      return json({ error: String(e?.message || 'sin conexión con la IA').slice(0, 200) }, 502, h);
     }
     if (!out?.decir) return json({ error: 'respuesta vacía' }, 502, h);
     const acciones = (Array.isArray(out.acciones) ? out.acciones : []).slice(0, 4)

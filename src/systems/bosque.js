@@ -59,19 +59,20 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
   };
   if (net) net.onYo?.((yo) => desdeServidor(yo.energia));
   const maxE = () => cfg.resistencia_por_dia + Math.max(0, Number(extraEnergia()) || 0); // la del día + la aptitud Energía
+  let infinita = false; // modo estudio (dev): energía infinita, no gasta al talar ni al correr
   function quedan() {
-    if (!cfg.resistencia_por_dia) return Infinity;
+    if (!cfg.resistencia_por_dia || infinita) return Infinity;
     return Math.max(0, maxE() - res.usados);
   }
   function gastar() {
-    if (!cfg.resistencia_por_dia) return;
+    if (!cfg.resistencia_por_dia || infinita) return;
     quedan(); res.usados++;
     if (!net) { try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }
   }
   // Correr gasta energía de a poco (dt en segundos). Devuelve false si no queda: el personaje camina.
   let guardarT = 0, avisado = false;
   function correr(dt) {
-    if (!cfg.resistencia_por_dia || !(cfg.energia_correr_por_seg > 0)) return true;
+    if (infinita || !cfg.resistencia_por_dia || !(cfg.energia_correr_por_seg > 0)) return true;
     if (quedan() <= 0) {
       if (!avisado) { avisado = true; notify(`Estás agotado: no podés correr. ${recupera()}`); }
       return false;
@@ -248,8 +249,11 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     get near() { return !!near; },
     recargar() { res = { dia: hoy(), usados: 0 }; if (!net) { try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } } }, // (admin)
     correr,
+    // Energía infinita (solo estudio): bosque.infinita = true/false. Con servidor, talar lo sigue validando el servidor.
+    get infinita() { return infinita; },
+    set infinita(v) { infinita = !!v; },
     // quedan: entero (redondeado hacia arriba) para mostrar · exacto: con decimales (correr gasta de a poco)
-    get resistencia() { const q = quedan(); return { quedan: Number.isFinite(q) ? Math.ceil(q - 1e-6) : null, exacto: Number.isFinite(q) ? q : null, max: cfg.resistencia_por_dia ? maxE() : 0, dia: res.dia }; },
+    get resistencia() { const q = quedan(); return { quedan: Number.isFinite(q) ? Math.ceil(q - 1e-6) : null, exacto: Number.isFinite(q) ? q : null, max: cfg.resistencia_por_dia ? maxE() : 0, dia: res.dia, infinita }; },
     get trees() { return trees.map((t) => ({ id: t.id, caido: isDown(t), hasta: fallen.get(t.key) ?? 0 })); },
   };
 }

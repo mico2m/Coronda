@@ -10,6 +10,10 @@ export function createEnergia({ stage, getBosque }) {
   let antes = null;
   function dibujar() {
     const r = getBosque?.()?.resistencia;
+    if (r?.infinita && r.max) { // modo estudio: energía infinita
+      el.hidden = false; bar.style.width = '100%'; num.textContent = '∞';
+      el.classList.remove('poca', 'vacia'); antes = null; return;
+    }
     if (!r || r.quedan == null || !r.max) { el.hidden = true; return; }
     el.hidden = false;
     const k = Math.max(0, Math.min(1, (r.exacto ?? r.quedan) / r.max));

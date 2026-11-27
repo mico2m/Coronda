@@ -4,6 +4,7 @@
 //   .getInventario()                       inventario del jugador (recursos y muebles; .snapshot(), .add(), .remove())
 //   .getTienda()                           la tienda: .point('pos_mostrador'), .slots()
 //   .forgetJSON(url)                       olvida un JSON cacheado
+//   .setFlying(on) / .setInfiniteStamina(on)   flotar con el personaje · energía infinita (también teclas F y T)
 //   .routePoints()                         Empties de la escena: [{ name, x, y, z, file }] (file: el .glb de donde sale)
 //   .showRoute(json | null)                dibuja un recorrido (data/routes/*.json) dentro de la vista previa
 import * as THREE from 'three';

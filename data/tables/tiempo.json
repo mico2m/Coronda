@@ -1,7 +1,7 @@
 {
   "_ayuda": "Hora del juego y día/noche (ver src/systems/tiempo.js). dia_minutos = minutos reales que dura un día entero (24 = 1 minuto real por hora del juego). desfase_horas corre el reloj. tienda = horario de la Carpintería (abre/cierra, horas del juego). momentos = cómo se ve el mundo a cada hora: tinte y brillo multiplican los colores; fondo = color del cielo y la niebla (null = el de la escena). Se mezcla de un momento al siguiente.",
   "dia_minutos": 15,
-  "desfase_horas": 0,
+  "desfase_horas": 17.5,
   "tienda": {
     "abre": 6,
     "cierra": 20

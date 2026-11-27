@@ -3,6 +3,8 @@
 // En Blender: un Empty llamado lote_01, lote_03… (o con la Custom Property "lote" = 1) marca el terreno.
 //   - Display As = Cube, Size = 1: el cubo (±1 en X e Y de Blender) es la zona del lote. Escalalo al tamaño del terreno.
 //   - La casa aparece en el CENTRO del Empty, apoyada en su altura, con SU GIRO (la flecha verde / el frente del Empty).
+//     En el .glb de la casa, un Empty "casa_centro" (en el suelo, en el medio de la casa) es el punto que se pone sobre el
+//     Empty del lote, con su giro en vertical (el frente de la casa). Sin ese Empty se usa el origen del modelo.
 //     La escala del Empty NO se le aplica: el modelo de la casa sale en metros reales.
 //   - Si un modelo de casa trae objetos col_… (o colision = 1), la casa colisiona (ver collision.js).
 //
@@ -34,6 +36,8 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { loadJSON, loadGLB } from '../core/assets.js';
 import { makeUnlit, setShade } from './shading.js';
 import { getUid } from '../net/uid.js';
+
+const EYE_HEIGHT = 1.7; // el Empty va en el suelo; la cámara se pone a esta altura (igual que en spawns.js)
 
 const NAME_RE = /^(?:empty_)?lote_(.+)$/i;
 const KEY_RE = /^[a-z0-9_.-]{1,80}$/;
@@ -234,6 +238,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       roof.position.y = h + h * 0.3; roof.rotation.y = Math.PI / 4;
       obj.add(body, roof);
     }
+    obj.userData.centro = centroCasa(obj); // antes de mover la casa
     await addMailbox(obj, spot);
     if (unlit) { makeUnlit(obj); setShade(obj, getShade()); }
     obj.name = `lote-casa:${modelId}`;
@@ -257,6 +262,28 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     b.name = `lote_${nro}_buzon`;
   }
 
+  // Centro de la casa: un Empty "casa_centro" dentro del .glb de la casa. Ese punto (y hacia dónde mira, solo el giro en
+  // vertical) es el que se pone sobre el Empty del lote del mundo. Va en el suelo, en el medio de la casa; así el origen del
+  // modelo da igual. Sin ese Empty se usa el origen del modelo, como siempre. Se lee con la casa todavía sin mover.
+  function centroCasa(house) {
+    let punto = null;
+    house.updateMatrixWorld(true);
+    house.traverse((o) => { if (!punto && /^casa_centro(?:[._]?\d+)?$/i.test(o.name)) punto = o; });
+    if (!punto) return null;
+    const pos = punto.getWorldPosition(new THREE.Vector3());
+    const yaw = new THREE.Euler().setFromQuaternion(punto.getWorldQuaternion(new THREE.Quaternion()), 'YXZ').y;
+    return { pos, yaw };
+  }
+  // Pone la casa en el lote: el casa_centro (o el origen del modelo) queda sobre el centro del lote, con el giro del lote
+  function colocarCasa(house, spot) {
+    const c = house.userData.centro;
+    house.quaternion.copy(spot.quat);
+    house.position.copy(spot.pos);
+    if (!c) return;
+    house.quaternion.multiply(_q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -c.yaw));
+    house.position.sub(_p.copy(c.pos).applyQuaternion(house.quaternion));
+  }
+
   async function render(key) {
     const s = spots.find((x) => x.key === key);
     if (!s) return;
@@ -272,7 +299,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     const hadCol = hasCollision(s.house);
     if (s.house) { s.house.removeFromParent(); s.house = null; }
     if (house) {
-      house.position.copy(s.pos); house.quaternion.copy(s.quat);
+      colocarCasa(house, s);
       root.add(house);
       house.updateMatrixWorld(true);
       s.house = house;
@@ -328,10 +355,33 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   }
 
   // Dónde está el lote (para volver al salir de la casa): escena, centro, giro y tamaño
+  // Entrada de la casa: un Empty "casa_entrada" dentro del .glb de la casa (también vale el nombre viejo "entrada_casa").
+  // Es el punto de la puerta, afuera, por donde aparece el jugador al salir de la casa:
+  // el Empty va en el suelo, delante de la puerta, y su frente (el mismo que el del cartel_dueno: -Y de Blender = +Z del juego)
+  // marca hacia dónde mira el jugador al aparecer. Sin ese Empty se usa el cálculo de siempre (delante del lote, en game.js).
+  function entradaCasa(house) {
+    if (!house) return null;
+    let punto = null;
+    house.updateMatrixWorld(true);
+    house.traverse((o) => { if (!punto && /^(?:casa_entrada|entrada_casa)(?:[._]?\d+)?$/i.test(o.name)) punto = o; });
+    if (!punto) {
+      // Diagnóstico: qué nodos sin geometría (Empties) llegaron del .glb, para ver si el nombre quedó distinto
+      const empties = [];
+      house.traverse((o) => { if (o !== house && !o.isMesh && !o.isBone && !o.isLight && !o.isCamera && o.name) empties.push(o.name); });
+      console.warn(`Lotes: la casa "${house.name}" no trae el Empty "casa_entrada". Nodos sin geometría que sí llegaron: ${empties.join(', ') || '(ninguno)'}. Se sale delante del lote.`);
+      return null;
+    }
+    const p = punto.getWorldPosition(new THREE.Vector3());
+    const f = new THREE.Vector3(0, 0, 1).applyQuaternion(punto.getWorldQuaternion(new THREE.Quaternion())).setY(0).normalize();
+    console.info(`Lotes: se sale por "${punto.name}" en (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}).`);
+    return { position: [p.x, p.y + EYE_HEIGHT, p.z], yaw: Math.atan2(-f.x, -f.z) };
+  }
+
+  // Dónde está el lote (para volver al salir de la casa): escena, centro, giro y tamaño (+ entrada, si la casa trae el Empty casa_entrada)
   function spotInfo(key) {
     const sp = spots.find((x) => x.key === key);
     if (!sp) return null;
-    return { scene: sceneId, key, pos: sp.pos.toArray(), quat: sp.quat.toArray(), size: sp.size.toArray(), label: sp.label };
+    return { scene: sceneId, key, pos: sp.pos.toArray(), quat: sp.quat.toArray(), size: sp.size.toArray(), label: sp.label, entrada: entradaCasa(sp.house) };
   }
 
   // ---------- Panel para elegir la casa ----------
@@ -455,6 +505,9 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
           const base = (m ? m[1] : o.name).toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
           const key = `${sceneId}.${m ? 'lote_' : ''}${base}`.slice(0, 80);
           o.matrixWorld.decompose(_p, _q, _s);
+          // Un Empty espejado (escala negativa, ej. Ctrl+M o Scale -1) no se puede traducir a un giro: la casa NO sale espejada
+          // y su orientación no coincide con lo que se ve en Blender. Para mirar al revés se rota 180° en Z, con escala positiva.
+          if (o.matrixWorld.determinant() < 0) console.warn(`Lotes: el Empty "${o.name}" está espejado (escala negativa). En Blender usá rotación Z 180° con escala positiva (Ctrl+A > Scale) o la casa saldrá mal orientada y corrida.`);
           const spot = {
             key, node: o, label: m ? `Lote ${m[1]}` : o.name, model: null, token: 0, house: null, silent: true, helper: null,
             pos: _p.clone(), quat: _q.clone(), size: _s.clone().multiplyScalar(2),

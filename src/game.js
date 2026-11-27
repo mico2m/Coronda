@@ -141,6 +141,26 @@ export async function startGame({ dev = false, retro = null } = {}) {
     if (hintFree) hintFree.hidden = asPlayer;
     if (hintPlayer) hintPlayer.hidden = !asPlayer;
   }
+  // Estudio (dev): F = flotar con el personaje (Espacio sube, X baja) · T = energía infinita
+  const aviso = (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 1800); };
+  function setFlying(on) {
+    if (!player) return false;
+    const v = player.setFlying(on);
+    aviso(v ? 'Vuelo: ON (Espacio sube · X baja)' : 'Vuelo: OFF');
+    return v;
+  }
+  function setInfiniteStamina(on) {
+    if (!bosque) return false;
+    bosque.infinita = on;
+    aviso(bosque.infinita ? 'Energía infinita: ON' : 'Energía infinita: OFF');
+    return bosque.infinita;
+  }
+  if (dev) window.addEventListener('keydown', (e) => {
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || dialogue?.active || casas?.inside) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.target?.isContentEditable) return;
+    if (e.code === 'KeyF' && mode === 'player') setFlying(!player.flying);
+    else if (e.code === 'KeyT') setInfiniteStamina(!bosque?.infinita);
+  });
   // En dev, C alterna entre cámara libre y personaje
   if (dev) window.addEventListener('keydown', (e) => { if (e.code === 'KeyC' && !e.repeat && player && !dialogue?.active) setMode(mode === 'player' ? 'free' : 'player'); });
 
@@ -468,7 +488,9 @@ export async function startGame({ dev = false, retro = null } = {}) {
     casas.setOnExit(() => {
       const b = casas.inside?.back;
       if (!b) return travel(() => enterScene(Object.keys(scenesTable).find((id) => scenesTable[id].start) ?? Object.keys(scenesTable)[0]), 'Saliendo…');
-      // Aparecés delante del lote, mirando hacia afuera
+      // Si la casa trae un Empty "casa_entrada" en su .glb, se sale ahí (posición y mirada del Empty)
+      if (b.entrada) return travel(() => enterScene(b.scene, { position: b.entrada.position, yaw: b.entrada.yaw }), 'Saliendo…');
+      // Si no, aparecés delante del lote, mirando hacia afuera
       const q = new THREE.Quaternion().fromArray(b.quat);
       const out = new THREE.Vector3(0, 0, 1).applyQuaternion(q).setY(0).normalize();
       const dist = Math.abs(b.size[2] || 6) / 2 + 1.5;
@@ -671,5 +693,5 @@ export async function startGame({ dev = false, retro = null } = {}) {
     ui.setStatus(String(err.message || err));
   }
   // Para las herramientas del modo desarrollador (panel de NPC, etc.)
-  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null, getInventario: () => inventario, getTienda: () => tienda, getTiempo: () => tiempo, getBosque: () => bosque, getNiveles: () => niveles };
+  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null, getInventario: () => inventario, getTienda: () => tienda, getTiempo: () => tiempo, getBosque: () => bosque, getNiveles: () => niveles, setFlying, setInfiniteStamina };
 }

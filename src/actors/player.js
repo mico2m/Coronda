@@ -70,7 +70,7 @@ function parseActionName(clipName) {
 }
 const humanize = (id) => { const t = id.replace(/_+/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
 
-const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'KeyX', 'ShiftLeft', 'ShiftRight', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 const ALIAS = { ShiftRight: 'ShiftLeft' }; // las flechas no mueven: miran (ver la cámara)
 const TAU = Math.PI * 2;
 const INTERACT = 'interactuar'; // clave de la animación de puertas en `clips`
@@ -198,6 +198,7 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
   let keys = {};
   let world = null;   // mundo de colisión de la escena actual (ver collision.js)
   let fallSpeed = 0;  // m/s hacia abajo
+  let flying = false; // modo estudio (dev): flota sin gravedad. Espacio sube, X baja (ver setFlying)
   let lastSafe = null; // último punto con suelo (si se cae del mapa, vuelve ahí)
   let obstacles = []; // círculos { x, z, r } que no se atraviesan (NPC)
   const target = new THREE.Vector3();
@@ -384,6 +385,9 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
     get firstPerson() { return fp; },
     get movimiento() { return movimiento; },
     setRunGate(fn) { runGate = typeof fn === 'function' ? fn : null; },
+    // Flotar libremente (solo estudio): sin gravedad; las paredes siguen chocando. Al apagarlo vuelve a caer al suelo.
+    get flying() { return flying; },
+    setFlying(on) { flying = !!on; fallSpeed = 0; if (!flying) keys = {}; return flying; },
     set firstPerson(on) { setFirstPerson(on); },
     onFirstPerson(fn) { onFpChange.add(fn); return () => onFpChange.delete(fn); },
     get actions() { return actions; },
@@ -524,12 +528,20 @@ export async function createPlayer({ scene, camera, stage, pad, touch = null, co
         pivot.rotation.y = facing;
       }
 
+      // Vuelo (solo estudio): Espacio sube, X baja; con Shift va más rápido. No cae ni se pega al suelo.
+      if (flying && !frozen && !doing) {
+        const up = (keys.Space ? 1 : 0) - (keys.KeyX ? 1 : 0);
+        if (up) root.position.y += up * (keys.ShiftLeft ? cfg.runSpeed : cfg.walkSpeed) * dt;
+      }
+
       if (!moving && !doing) { playClip('idle'); }
 
       // Suelo: sube escalones y rampas suavemente; si no hay suelo a un escalón de distancia, cae con gravedad.
       // Si no hay suelo en absoluto debajo (fuera del mapa) se queda a esa altura.
-      const g = groundY(root.position.x, root.position.y, root.position.z);
-      if (g === null) {
+      const g = flying ? null : groundY(root.position.x, root.position.y, root.position.z);
+      if (flying) {
+        fallSpeed = 0;                           // flotando: sin gravedad ni suelo
+      } else if (g === null) {
         if (world?.hasGround && lastSafe) {      // fuera del mapa (la escena sí tiene suelo): cae, y si se va muy abajo vuelve al último lugar seguro
           fallSpeed = Math.min(fallSpeed + col.gravity * dt, 40);
           root.position.y -= fallSpeed * dt;

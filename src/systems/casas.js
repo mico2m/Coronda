@@ -8,7 +8,7 @@
 //
 // El cascarón (piso y paredes):
 //   - assets/models/interiores/interior_base.glb (o el "interior" de esa casa en data/casas.json), con su piso
-//     sólido (col_… o colision = 1), un Empty "spawn" donde aparecés y un Empty "salida" en la puerta para salir.
+//     sólido (col_… o colision = 1), un Empty "spawn" donde aparecés y un Empty "casa_salida" (o "salida") en la puerta para salir.
 //   - Mientras ese archivo no exista, se arma una habitación simple de "tamano": [ancho, largo, alto] metros (10 × 10 × 3,2).
 //
 // Muebles: data/muebles.json  { "muebles": [{ id, nombre, archivo, caja: [ancho, alto, largo] }] }
@@ -226,7 +226,8 @@ export function createCasas({ net = null, uid, lotes, stage, camera, getPlayer, 
       shell.add(door);
       group.add(shell);
     } else {
-      const s = group.getObjectByName('salida');
+      // La puerta de adentro: Empty "casa_salida" (o "salida", el nombre viejo)
+      const s = group.getObjectByName('casa_salida') ?? group.getObjectByName('salida');
       if (s) exit = s.getWorldPosition(new THREE.Vector3());
       // El techo no se ve (la cámara mira desde arriba): todo lo que se llame techo…, roof… o ceiling…
       group.traverse((o) => { if (/^(?:techo|roof|ceiling)/i.test(o.name ?? '')) o.visible = false; });

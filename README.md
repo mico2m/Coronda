@@ -498,7 +498,8 @@ En Blender:
 - **Piso sólido:** un objeto `col_piso` (o tu piso con la Custom Property `colision` = `malla`). Lo mismo para las paredes (`col_pared…` o `colision`).
 - **Techo:** llamalo `techo` (o `techo_…`): el juego lo oculta para que la cámara vea desde arriba.
 - **Empty `spawn`:** donde aparece el jugador al entrar (la flecha verde = hacia dónde mira).
-- **Empty `salida`:** en la puerta; ahí aparece *E Salir de la casa*.
+- **Empty `casa_salida`** (o `salida`): en la puerta; ahí aparece *E Salir de la casa*.
+- **Empty `casa_entrada`** (en el `.glb` de la casa de afuera, ver `casas.json`): en el suelo, delante de la puerta. Es por donde aparece el jugador al salir; su frente (el mismo que el de `cartel_dueno`) marca hacia dónde mira. Sin él se usa el punto de siempre: delante del lote.
 - Exportá como siempre (glTF Binary, +Y Up, con Custom Properties). Mientras el archivo no exista se arma una habitación de prueba de 10 × 10 m.
 
 ### Los muebles (también los modelás vos)
@@ -644,6 +645,15 @@ Claude atiende la tienda y fabrica muebles a cambio de madera. Código: `src/sys
 Cada casa tiene un buzón: `blender -b -P blender/agregar_buzon.py` le agrega uno a los `.glb` de `data/tables/casas.json` que existan (un Empty `buzon` con el buzón adentro, al frente a la derecha; deja `blender/<casa>_buzon.blend`) y crea `assets/models/objects/buzon.glb`. Las casas que no traen buzón reciben `buzon.glb` al frente. El juego lo renombra `lote_<número>_buzon` y ahí Claude deja la nota de los pedidos listos (ver *La Carpintería*).
 
 Para tu propio modelo de casa alcanza con un objeto (malla o Empty) llamado `buzon`.
+
+## Studio: volar y energía infinita
+
+Solo en `dev.html` (la vista previa del Studio), con el personaje (tecla **C** alterna con la cámara libre):
+
+- **F:** flotar libremente. Sin gravedad: **Espacio** sube, **X** baja, **Shift** va más rápido. Las paredes siguen chocando. Apretá F otra vez y el personaje cae al suelo.
+- **T:** energía infinita (talar y correr no gastan; la barra ⚡ muestra ∞). Vale también con la cámara libre.
+- Desde el Studio: `iframe.contentWindow.coronda.setFlying(true)` y `.setInfiniteStamina(true)`.
+- Con servidor propio, el servidor sigue validando la energía al talar. Código: `src/actors/player.js` (`setFlying`) y `src/systems/bosque.js` (`infinita`).
 
 ## Studio: panel Mundo
 

@@ -736,13 +736,26 @@ export async function startGame({ dev = false, retro = null } = {}) {
       });
     }
     // Atajos 1 a 5 para los apartados del menú (ver ui/atajos.js). No andan escribiendo ni en una charla.
+    // Gestión del servidor (solo admins: lotes, jugadores y mundo). Se abre desde el menú de Esc.
+    let panelGestion = null;
+    if (net?.admin) {
+      const { crearPanelGestion } = await import('./ui/panel-gestion.js');
+      panelGestion = crearPanelGestion({
+        net,
+        onAbrir: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
+        onCerrar: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
+      });
+    }
     const { createAtajos } = await import('./ui/atajos.js');
-    createAtajos({ ocupado: () => !!dialogue?.active || (lotes?.blocked ?? false) || (casas?.designing ?? false) });
+    createAtajos({ ocupado: () => !!dialogue?.active || (lotes?.blocked ?? false) || (casas?.designing ?? false) || (panelGestion?.abierto ?? false) });
     const { createMenu } = await import('./ui/menu.js');
     menu = createMenu({
-      stage, voz, extras: [{ texto: '⭐ Nivel y aptitudes (N)', accion: () => niveles?.abrir() }],
+      stage, voz, extras: [
+        { texto: '⭐ Nivel y aptitudes (N)', accion: () => niveles?.abrir() },
+        ...(panelGestion ? [{ texto: '🛠️ Gestión del servidor', accion: () => panelGestion.abrir() }] : []),
+      ],
       salir: { texto: net ? '🚪 Salir del servidor' : '🚪 Salir al menú de inicio', aviso: net ? '¿Seguro? Tocá de nuevo para salir del servidor' : '¿Seguro? Tocá de nuevo para salir', accion: salirDelJuego },
-      blocked: () => !!dialogue?.active || (lotes?.blocked ?? false) || (casas?.designing ?? false),
+      blocked: () => !!dialogue?.active || (lotes?.blocked ?? false) || (casas?.designing ?? false) || (panelGestion?.abierto ?? false),
       onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
       onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),
     });

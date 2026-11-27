@@ -38,6 +38,16 @@ A mano:
 
 Las contraseñas se guardan con *scrypt* (nunca en texto). Hacé copias de `servidor/datos/` de vez en cuando (un pendrive, la nube).
 
+## Gestión del servidor (solo admins)
+
+Desde el juego: menú de **Esc → 🛠️ Gestión del servidor** (solo aparece si tu cuenta está en `admins`). Tiene tres pestañas:
+
+- **Mundo:** hora del juego, cuánto lleva encendido el servidor, jugadores conectados y totales de lotes (en el mapa, adquiridos y libres).
+- **Lotes:** dueño, casa y muebles de cada lote. **Despojar** le saca el lote al dueño y le devuelve a la mochila los muebles y lo de los cofres; **Eliminar** libera el lote y borra la casa (lo de los cofres vuelve al dueño, los muebles se pierden). Los dos piden confirmación.
+- **Jugadores:** última conexión de cada cuenta y su inventario completo.
+
+La lógica está en `servidor/gestion.mjs` (operación `gestion`) y la ventana en `src/ui/panel-gestion.js`. Cada despojo o eliminación queda anotado en `servidor/datos/gestion-registro.log`.
+
 ## Que entren tus amigos desde sus casas: Cloudflare Tunnel (recomendado)
 
 Así no abrís puertos en el router ni mostrás tu IP, y la dirección es `https://` (necesario para el micrófono del chat de voz).

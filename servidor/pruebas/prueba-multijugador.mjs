@@ -266,6 +266,45 @@ try {
   const pv2 = await b2.rpc('cofre.ver', { k: 'coronda_plaza.lote_01', i: 'c' });
   check(pv2.r?.items['recursos:madera'] === 10, 'El cofre conserva su contenido');
   b2.cerrar();
+
+  // Gestión del servidor (servidor/gestion.mjs). Usa cuentas propias para no depender de las secciones anteriores.
+  {
+  console.log('\n12. Gestión del servidor (solo admins)');
+  const gAna = await entrar('Ana', 'secreta1', 'login');
+  gAna.send({ t: 'entrar' });
+  const gabi = await entrar('Gabi', 'clave123');
+  gabi.send({ t: 'entrar' });
+  await espera(300);
+  const K = 'coronda_plaza.lote_02';
+  const gst = (c, a) => c.rpc('gestion', a);
+  const sinPermiso = await gst(gabi, { a: 'resumen' });
+  check(!sinPermiso.ok && /No sos admin/.test(sinPermiso.error), 'Gabi (no admin) no puede usar la gestión');
+  check(!(await gst(gabi, { a: 'despojar', k: K })).ok, 'Gabi tampoco puede despojar ni eliminar');
+  check(!(await gst(gAna, { a: 'borrar-todo' })).ok, 'Una operación de gestión desconocida se rechaza');
+  const res = (await gst(gAna, { a: 'resumen' })).r;
+  check(/^\d\d:\d\d$/.test(res.hora) && res.iniciado <= res.ahora && res.conectados >= 2, `Resumen: hora del mundo ${res.hora}, ${res.conectados} conectados`);
+  await gAna.rpc('admin', { cmd: '/madera Gabi 150' });
+  check((await gabi.rpc('lote.adquirir', { k: K, m: 'casa_model01' })).ok, 'Gabi adquiere el lote 02');
+  const fila = (await gst(gAna, { a: 'lotes' })).r.lista.find((f) => f.k === K);
+  check(fila?.dueño === 'Gabi' && fila.conectado && !!fila.modelo, `Lotes: el 02 es de ${fila?.dueño} (casa "${fila?.modelo}")`);
+  const lista = (await gst(gAna, { a: 'jugadores' })).r.lista;
+  check(lista.find((x) => x.n === 'Gabi')?.lotes === 1 && lista.every((x) => x.ultimo > 0), 'Jugadores: última conexión y lotes de cada cuenta');
+  const inv = (await gst(gAna, { a: 'jugador', u: gabi.u })).r;
+  check(inv.n === 'Gabi' && inv.recursos.some((x) => x.id === 'madera' && x.n === 50) && inv.lotes.length === 1, 'Inventario de Gabi: 50 de madera y su lote');
+  for (const u of ['constructor', '__proto__', 'nadie']) check(!(await gst(gAna, { a: 'jugador', u })).ok, `Cuenta "${u}": no existe`);
+  const desp = await gst(gAna, { a: 'despojar', k: K });
+  check(desp.ok && /despojado/.test(desp.r.txt), `Despojar: ${desp.r?.txt ?? desp.error}`);
+  check(!!(await gabi.espera((m) => m.t === 'aviso' && /quitó el lote/.test(m.txt))), 'Gabi recibe el aviso de que le quitaron el lote');
+  await espera(200);
+  check(gabi.kv.get(K)?.o === null, 'El lote queda libre para todos');
+  check(!(await gst(gAna, { a: 'despojar', k: K })).ok, 'Despojar un lote libre: rechazado');
+  await gAna.rpc('admin', { cmd: '/madera Gabi 100' });
+  check((await gabi.rpc('lote.adquirir', { k: K, m: 'casa_model01' })).ok, 'Gabi vuelve a adquirir el lote');
+  const elim = await gst(gAna, { a: 'eliminar', k: K });
+  check(elim.ok && /eliminado/.test(elim.r.txt), `Eliminar: ${elim.r?.txt ?? elim.error}`);
+  check(!(await gst(gAna, { a: 'lotes' })).r.lista.find((f) => f.k === K)?.dueño, 'El lote 02 queda sin dueño');
+  gAna.cerrar(); gabi.cerrar();
+  }
 } catch (e) {
   mal++; console.error(e);
 } finally {

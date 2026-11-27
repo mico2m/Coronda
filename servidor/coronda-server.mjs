@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { aceptarWebSocket } from './ws.mjs';
 import { abrirDB } from './db.mjs';
 import * as R from '../src/shared/reglas.mjs';
+import { crearGestion } from './gestion.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(AQUI, '..');
@@ -825,6 +826,8 @@ const OPS = {
     falla('Comandos: /time set 19 · /time reset · /anuncio texto · /madera Nombre 20 · /resistencia Nombre · /expulsar Nombre · /borrarpedido id · /lotes · /lote eliminar N · /claude reiniciar');
   },
 };
+// Gestión del servidor (solo admins): lotes, jugadores y mundo. Ver servidor/gestion.mjs y src/ui/panel-gestion.js
+OPS.gestion = crearGestion({ D, db, T, R, ROOT, DATOS, jugadores, esAdmin, falla, ahora, leer, tiempoCfg, numeroLote, liberarLoteAdmin, vaciarCofresDe, sumar, contarMuebles, kv, enviarYo, enviar, enLinea });
 
 // ---------- Mensajes ----------
 const RELAY = new Set(['estado', 'ping', 'voz', 'claude']);

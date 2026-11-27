@@ -4,7 +4,8 @@
 //
 // opts: stage, voz (systems/voz.js, o null jugando solo), blocked() (otra cosa usa Esc), onOpen() / onClose()
 // extras: [{ texto, accion }] botones de otras ventanas (ej. Nivel y aptitudes), arriba de "Volver al juego"
-export function createMenu({ stage, voz = null, extras = [], blocked = () => false, onOpen = () => {}, onClose = () => {} }) {
+// salir: { texto, aviso, accion } botón rojo para salir del servidor (pide confirmar con un segundo toque)
+export function createMenu({ stage, voz = null, extras = [], salir = null, blocked = () => false, onOpen = () => {}, onClose = () => {} }) {
   const el = document.createElement('div');
   el.className = 'menu-esc'; el.hidden = true;
   el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Menú');
@@ -37,6 +38,7 @@ export function createMenu({ stage, voz = null, extras = [], blocked = () => fal
         </section>
         ${extras.map((x, i) => `<button type="button" class="menu-extra" data-extra="${i}">${esc(x.texto)}</button>`).join('')}
         <button type="button" class="menu-volver">Volver al juego</button>
+        ${salir ? `<button type="button" class="menu-salir">${esc(salir.texto)}</button>` : ''}
       </div>`;
     dibujarCerca();
   }
@@ -67,6 +69,11 @@ export function createMenu({ stage, voz = null, extras = [], blocked = () => fal
   el.addEventListener('click', (e) => {
     const x = e.target.closest('[data-extra]');
     if (x) { cerrar(); setTimeout(() => extras[Number(x.dataset.extra)]?.accion?.(), 0); return; }
+    const s = e.target.closest('.menu-salir');
+    if (s) { // dos toques: el primero pide confirmar
+      if (!s.classList.contains('seguro')) { s.classList.add('seguro'); s.textContent = salir?.aviso ?? '¿Seguro? Tocá de nuevo para salir'; setTimeout(() => { if (s.isConnected) { s.classList.remove('seguro'); s.textContent = salir?.texto ?? 'Salir'; } }, 4000); return; }
+      cerrar(); salir?.accion?.(); return;
+    }
     if (e.target.closest('.menu-x, .menu-volver')) cerrar();
   });
   el.addEventListener('pointerdown', (e) => { e.stopPropagation(); if (e.target === el) cerrar(); }); // clic en lo oscuro: cierra

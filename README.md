@@ -48,6 +48,8 @@ Con el servidor apagado, `index.html` muestra *"El servidor está apagado"*. `de
 - **Misma hora y mismos pedidos para todos:** salen del reloj del servidor (cada navegador lo sincroniza con su reloj interno, así cambiar la hora de la PC no afecta).
 - **Chat:** avisa *"X se ha unido al mundo"* / *"X ha abandonado el mundo"* (un corte de menos de 20 s cuenta como reconexión y no avisa).
 - **Atajos:** 1 Mochila · 2 Nivel y aptitudes · 3 Jugadores · 4 Mi perfil · 5 Menú (no andan escribiendo ni en una charla). Las acciones del personaje pasaron a Mayús + número.
+- **Menú de Esc:** ajustes de voz, Nivel y aptitudes y **🚪 Salir del servidor** (pide confirmar con un segundo toque: guarda dónde estás, te desconecta —los demás dejan de verte— y vuelve al menú de inicio). Jugando solo dice *Salir al menú de inicio*. Código: `src/ui/menu.js`.
+- **Aparecer donde te quedaste:** al entrar, si ya jugaste, la pantalla *¿Dónde querés aparecer?* trae primero **📍 Donde te quedaste** (la escena, el punto y hacia dónde mirabas; si estabas adentro de una casa, vuelve a esa casa). El servidor lo guarda en tu cuenta (`ultimoLugar`) con tu estado; jugando solo se guarda en el navegador. Si esa escena ya no existe, la opción no aparece. Código: `ultimoLugar()` en `src/game.js` y `src/ui/spawn-choice.js`.
 - **Social:** clic sobre otro jugador → Ver perfil · Dejar una firma · Intercambiar. Foto de perfil en 👤 Mi perfil (se recorta y comprime sola).
 - **Cofre:** Claude lo fabrica; ponelo en tu casa y acercate: *E Abrir el cofre*.
 - **Casas:** el cartel del frente (Empty `cartel_dueno`) muestra el nombre del dueño actual.
@@ -483,6 +485,8 @@ servidor propio que valide, y `lotes.js` ya está separado para eso: solo cambia
 5. Exportá el mapa. Lo que sí va **adentro del `.glb` de la casa** es: `casa_centro` (punto que se apoya en el Empty del lote), `casa_entrada` (por dónde sale el jugador) y `cartel_dueno`.
 
 **Costo del lote:** `data/casas.json` > cada casa tiene `"costo": { "madera": 50 }` (0 o sin la clave = gratis). Se cobra una sola vez, al adquirir el lote, y el botón de cada casa muestra su precio. Con servidor lo cobra el servidor (que recarga la tabla solo); jugando solo, el juego. Se edita en el Studio: panel **Mundo > Lotes y casas**, junto con el máximo de lotes por jugador.
+
+**Vender un lote:** en tu lote, **E** > *Vender lote*. Escribís el nombre de otro jugador (conectado) y un precio en madera (1 a 999). A él le aparece un cartel *Comprar / Rechazar* que vence a los 60 s. Si compra, el servidor pasa la madera y el lote de una vez (o no pasa nada): la casa queda nueva y vacía para el comprador, y lo que había en tus cofres vuelve a tu mochila. No se vende si el comprador ya tiene el máximo de lotes, no le alcanza la madera o a vos no te entra más en la mochila. Solo con servidor. Código: `lote.vender` y `lote.responder` en `servidor/coronda-server.mjs`, y `src/systems/lotes.js`.
 
 **Entrar, ceder y destruir:** en tu lote, **E** abre el menú: *Entrar a la casa*, *Ceder lote* o *Destruir casa* (las dos últimas avisan antes: se borra todo lo de adentro). En el lote de otro, **E** > *Visitar la casa*.
 

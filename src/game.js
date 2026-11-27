@@ -335,6 +335,44 @@ export async function startGame({ dev = false, retro = null } = {}) {
       else { camera.position.set(...sp.position); controls.setLook(sp.yaw ?? 0, 0); }
     }
 
+    // ---------- Último lugar (aparecer donde te quedaste) ----------
+    // Con servidor lo guarda el servidor (te lo manda en "yo.lugar"); jugando solo, el navegador (localStorage).
+    const LUGAR_KEY = 'coronda.ultimoLugar';
+    function lugarActual() {
+      const id = sceneManager.current?.id;
+      if (mode !== 'player' || !player || !id) return null;
+      return { s: id, p: [player.position.x, player.position.y, player.position.z].map((v) => Math.round(v * 100) / 100), cy: Math.round(player.yaw * 1000) / 1000, lt: casas?.inside?.key ?? '' };
+    }
+    function guardarLugar() {
+      if (net) return; // con servidor, el servidor ya lo sabe por tu estado
+      const l = lugarActual();
+      if (l) { try { localStorage.setItem(LUGAR_KEY, JSON.stringify(l)); } catch { /* sin almacenamiento */ } }
+    }
+    addEventListener('pagehide', guardarLugar);
+    // Devuelve { s, p, cy, lt, etiqueta } si ese lugar todavía existe; si no, null
+    async function ultimoLugar() {
+      let l = null;
+      if (net) {
+        l = await new Promise((resolve) => { // el servidor lo manda en el primer "yo"
+          let listo = false;
+          const off = net.onYo((y) => { if (listo) return; listo = true; setTimeout(() => off?.(), 0); resolve(y.lugar ?? null); });
+          setTimeout(() => { if (!listo) { listo = true; resolve(null); } }, 1500);
+        });
+      } else { try { l = JSON.parse(localStorage.getItem(LUGAR_KEY)); } catch { l = null; } }
+      if (!l || typeof l.s !== 'string' || !Array.isArray(l.p) || l.p.length !== 3 || !l.p.every(Number.isFinite)) return null;
+      if (l.lt) return /^[a-z0-9_.-]{1,80}$/i.test(l.lt) ? { ...l, cy: Number(l.cy) || 0, etiqueta: 'Adentro de una casa' } : null;
+      const esc = scenesTable[l.s];
+      if (!esc) return null; // esa escena ya no existe
+      return { ...l, cy: Number(l.cy) || 0, etiqueta: esc.name || String(l.s).replace(/^scene_/, '').replace(/_/g, ' ') };
+    }
+    // Menú de Esc > Salir: se guarda el lugar, se corta la conexión (los demás dejan de verte) y se vuelve al menú de inicio
+    function salirDelJuego() {
+      guardarLugar();
+      try { net?.disconnect(); } catch { /* nada */ }
+      setTimeout(() => location.reload(), 350);
+    }
+
+
     // Puertas y teleports (ver systems/doors.js): fundido a negro -> viajar -> fundido desde negro.
     //  - mismo .glb: se mueve al jugador al spawn destino (ej. spawn_muelle)
     //  - otra escena: se carga su .glb y se aparece en el spawn pedido (o en el normal)
@@ -577,17 +615,25 @@ export async function startGame({ dev = false, retro = null } = {}) {
     // Si tenés casa: "¿Dónde querés aparecer?" → tu casa o la plaza (ver ui/spawn-choice.js)
     if (choice && !kept && mode === 'player') {
       const houses = lotes.myLots().map((key) => ({ key, label: lotes.spotInfo(key)?.label ?? 'Lote' }));
-      if (houses.length) {
-        const { askSpawn } = await import('./ui/spawn-choice.js');
-        const key = await askSpawn({ houses, plazaName: scenesTable[startId]?.name || 'Plaza' });
-        if (key && await lotes.ensureMine(key)) {
-          boot.show('Entrando a tu casa…');
+      const ultimo = await ultimoLugar(); // dónde te quedaste la última vez (null si nunca jugaste o ya no existe)
+      if (houses.length || ultimo) {
+        const { askSpawn, ULTIMO } = await import('./ui/spawn-choice.js');
+        const key = await askSpawn({ houses, plazaName: scenesTable[startId]?.name || 'Plaza', ultimo: ultimo && { text: 'Donde te quedaste', sub: ultimo.etiqueta } });
+        const casaDe = async (k) => {
+          boot.show('Entrando a la casa…');
           try {
-            const entry = await casas.sceneEntry(key, lotes.spotInfo(key));
+            const entry = await casas.sceneEntry(k, lotes.spotInfo(k));
             scenesTable[entry.id] = entry;
             await enterScene(entry.id);
           } catch (err) { console.error(err); await enterScene(startId); }
-        }
+        };
+        if (key === ULTIMO) {
+          if (ultimo.lt) { // te quedaste adentro de una casa
+            await lotes.ensureMine(ultimo.lt);
+            if (lotes.record(ultimo.lt)?.o) await casaDe(ultimo.lt);
+          } else if (ultimo.s === sceneManager.current?.id) moveTo({ position: [ultimo.p[0], ultimo.p[1] + EYE, ultimo.p[2]], yaw: ultimo.cy });
+          else { boot.show('Volviendo a donde estabas…'); await enterScene(ultimo.s, { position: [ultimo.p[0], ultimo.p[1] + EYE, ultimo.p[2]], yaw: ultimo.cy }); }
+        } else if (key && await lotes.ensureMine(key)) await casaDe(key);
       }
     }
     // El mundo ya está: se saca la pantalla de carga después de dibujarlo una vez
@@ -602,6 +648,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
         me: () => (mode === 'player' && player ? {
           s: sceneManager.current?.id, p: [r(player.position.x), r(player.position.y), r(player.position.z)],
           f: r(player.facing), a: player.clipName, m: ch.model, sc: ch.scale, yo: ch.yawOffset, n: choice.name, cn: ch.name,
+          cy: r(player.yaw), lt: casas?.inside?.key ?? '', // para aparecer donde te quedaste (ver ultimoLugar)
         } : null),
       });
       // Tab: lista de jugadores con su ping y su última conexión (ver ui/players.js)
@@ -682,6 +729,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     const { createMenu } = await import('./ui/menu.js');
     menu = createMenu({
       stage, voz, extras: [{ texto: '⭐ Nivel y aptitudes (N)', accion: () => niveles?.abrir() }],
+      salir: { texto: net ? '🚪 Salir del servidor' : '🚪 Salir al menú de inicio', aviso: net ? '¿Seguro? Tocá de nuevo para salir del servidor' : '¿Seguro? Tocá de nuevo para salir', accion: salirDelJuego },
       blocked: () => !!dialogue?.active || (lotes?.blocked ?? false) || (casas?.designing ?? false),
       onOpen: () => { player.frozen = true; if (mode === 'free') controls.setEnabled(false); },
       onClose: () => setTimeout(() => { player.frozen = false; if (mode === 'free') controls.setEnabled(true); }, 0),

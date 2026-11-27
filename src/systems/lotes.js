@@ -411,7 +411,14 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     const other = cur?.o && !own;
     const items = [...casas.map.values()];
     let body;
-    if (view === 'cede') { // ceder a otro jugador: también se borra todo lo de adentro
+    if (view === 'sell') { // vender a otro jugador por madera: él tiene que aceptar
+      body = `<h3>Vender ${esc(s.label.toLowerCase())}</h3>
+        <label class="lote-field">Nombre del jugador (tiene que estar conectado)<input class="lote-input" data-f="nombre" maxlength="20" autocomplete="off" spellcheck="false"></label>
+        <label class="lote-field">Precio en madera<input class="lote-input" data-f="precio" type="number" min="1" max="999" step="1" value="50"></label>
+        <p class="lote-warn">Le llega la oferta y puede aceptarla o no. Si acepta, se le pasan el lote y la casa y recibís la madera, pero <b>todo lo que tenés adentro se borra</b> (lo de los cofres vuelve a tu mochila). No se puede deshacer.</p>
+        <p class="lote-msg" aria-live="polite"></p>
+        <div class="lote-foot"><button type="button" data-act="sell" class="danger">Ofrecer</button><button type="button" data-act="back">Cancelar <kbd>Esc</kbd></button></div>`;
+    } else if (view === 'cede') { // ceder a otro jugador: también se borra todo lo de adentro
       body = `<h3>Ceder ${esc(s.label.toLowerCase())}</h3>
         <label class="lote-field">Nombre del jugador<input class="lote-input" maxlength="20" autocomplete="off" spellcheck="false"></label>
         <p class="lote-warn">El lote y la casa pasan a ser de ese jugador, pero <b>todo lo que tiene adentro se borra</b> (los muebles y el diseño). No se puede deshacer.</p>
@@ -429,21 +436,66 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
         ${own ? `<button type="button" data-act="enter" class="lote-enter">Entrar a la casa <kbd>E</kbd></button>
           <p class="lote-note">Tu casa: ${esc(casas.map.get(cur.m)?.nombre ?? cur.m)}. Para cambiar de modelo hay que destruirla y volver a adquirir el lote (se pierde todo lo de adentro).</p>`
           : `<div class="lote-list">${items.map((c, i) => `<button type="button" data-id="${esc(c.id)}"><kbd>${i + 1}</kbd> ${esc(c.nombre)}${Object.keys(c.costo).length ? ` <small>· ${esc(costoTxt(c.costo))}</small>` : ' <small>· gratis</small>'}</button>`).join('') || '<p>No hay casas en data/casas.json</p>'}</div>`}
-        <div class="lote-foot">${own && !solo ? '<button type="button" data-act="ask-cede">Ceder lote</button>' : ''}${own ? '<button type="button" data-act="ask-destroy" class="danger">Destruir casa</button>' : ''}<button type="button" data-act="close">Cancelar <kbd>Esc</kbd></button></div>`;
+        <div class="lote-foot">${own && !solo ? '<button type="button" data-act="ask-sell">Vender lote</button><button type="button" data-act="ask-cede">Ceder lote</button>' : ''}${own ? '<button type="button" data-act="ask-destroy" class="danger">Destruir casa</button>' : ''}<button type="button" data-act="close">Cancelar <kbd>Esc</kbd></button></div>`;
     }
     panel.innerHTML = `<div class="lote-box" data-view="${view}">${body}</div>`;
     panel.hidden = false;
     near = null; prompt.hidden = true; sig = '';
-    if (view === 'cede') setTimeout(() => panel.querySelector('.lote-input')?.focus(), 0);
+    if (view === 'cede' || view === 'sell') setTimeout(() => panel.querySelector('.lote-input')?.focus(), 0);
     onOpen?.();
   }
   panel.addEventListener('keydown', (e) => {
     if (!e.target.classList?.contains('lote-input')) return;
-    if (e.key === 'Enter') { e.preventDefault(); doCede(panelKey); }
+    if (e.key === 'Enter') { e.preventDefault(); if (panel.querySelector('.lote-box')?.dataset.view === 'sell') doSell(panelKey); else doCede(panelKey); }
     else if (e.key === 'Escape') { e.preventDefault(); openPanel(panelKey); }
     else panel.querySelector('.lote-msg').textContent = '';
     e.stopPropagation(); // las letras no mueven al personaje
   });
+  // Vender: le manda la oferta al otro jugador (el servidor la valida); él acepta o rechaza
+  async function doSell(key) {
+    const name = panel.querySelector('[data-f="nombre"]')?.value.trim() ?? '';
+    const precio = Math.floor(Number(panel.querySelector('[data-f="precio"]')?.value));
+    const msg = panel.querySelector('.lote-msg');
+    if (!name) { if (msg) msg.textContent = 'Escribí el nombre del jugador.'; return; }
+    if (!(precio >= 1)) { if (msg) msg.textContent = 'Poné un precio de al menos 1.'; return; }
+    try {
+      const r = await net.rpc('lote.vender', { k: key, nombre: name, precio });
+      const texts = { nadie: `No hay ningún jugador llamado "${name}".`, vos: 'Ese sos vos.', desconectado: 'Ese jugador no está conectado.', lleno: `Ese jugador ya tiene ${casas.max} lote${casas.max > 1 ? 's' : ''}.` };
+      if (r?.r !== 'ok') { if (msg) msg.textContent = texts[r?.r] ?? 'No se pudo ofrecer el lote.'; return; }
+      closePanel();
+      notify(`Le ofreciste el lote a ${r.nombre ?? name} por ${precio} de madera. Esperá su respuesta.`);
+    } catch (e) { if (msg) msg.textContent = e.message; }
+  }
+
+  // Oferta que te llega (otro jugador te vende su lote): un cartel con Comprar / Rechazar, sin frenar al personaje
+  const oferta = document.createElement('div');
+  oferta.className = 'lote-oferta lote-box';
+  oferta.hidden = true;
+  stage.parentElement.appendChild(oferta);
+  let ofertaT = null;
+  function cerrarOferta() { clearTimeout(ofertaT); oferta.hidden = true; oferta.innerHTML = ''; }
+  function mostrarOferta(m) {
+    clearTimeout(ofertaT);
+    oferta.innerHTML = `<h3>💰 ${esc(m.de)} te vende el lote ${esc(m.nro ?? '')}</h3>
+      <p class="lote-warn">Cuesta <b>${esc(m.precio)} de ${esc(m.moneda ?? 'madera')}</b>. Es una casa nueva: el interior arranca vacío. La oferta vence en ${esc(m.seg ?? 60)} segundos.</p>
+      <p class="lote-msg" aria-live="polite"></p>
+      <div class="lote-foot"><button type="button" data-of="si">Comprar</button><button type="button" data-of="no" class="danger">Rechazar</button></div>`;
+    oferta.dataset.id = m.id;
+    oferta.hidden = false;
+    ofertaT = setTimeout(cerrarOferta, (Number(m.seg) || 60) * 1000);
+  }
+  oferta.addEventListener('pointerdown', (e) => e.stopPropagation());
+  oferta.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-of]'); if (!b || !net) return;
+    const ok = b.dataset.of === 'si', msg = oferta.querySelector('.lote-msg');
+    try {
+      await net.rpc('lote.responder', { id: oferta.dataset.id, ok });
+      cerrarOferta();
+      notify(ok ? '¡Compraste el lote! Ya es tuyo.' : 'Rechazaste la oferta.');
+    } catch (err) { if (msg) msg.textContent = err.message; if (/venci|disponible|cambi/i.test(err.message)) setTimeout(cerrarOferta, 2500); }
+  });
+  if (net) net.onOfertaLote = mostrarOferta;
+
   async function doCede(key) {
     const name = panel.querySelector('.lote-input')?.value.trim() ?? '';
     const msg = panel.querySelector('.lote-msg');
@@ -466,6 +518,8 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     if (b.dataset.act === 'close') closePanel();
     else if (b.dataset.act === 'ask-destroy') openPanel(key, 'destroy');
     else if (b.dataset.act === 'ask-cede') openPanel(key, 'cede');
+    else if (b.dataset.act === 'ask-sell') openPanel(key, 'sell');
+    else if (b.dataset.act === 'sell') doSell(key);
     else if (b.dataset.act === 'cede') doCede(key);
     else if (b.dataset.act === 'back') openPanel(key);
     else if (b.dataset.act === 'destroy') { closePanel(); release(key); if (!net) notify('Destruiste tu casa: el lote quedó libre'); }
@@ -486,7 +540,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     if (panelKey !== null) {
       const view = panel.querySelector('.lote-box')?.dataset.view;
       const r = state.get(panelKey);
-      if (e.code === 'Escape') { if (view === 'destroy' || view === 'cede') openPanel(panelKey); else closePanel(); }
+      if (e.code === 'Escape') { if (view === 'destroy' || view === 'cede' || view === 'sell') openPanel(panelKey); else closePanel(); }
       else if (e.code === 'KeyE' && !e.repeat && view === 'main' && r?.o) { const key = panelKey; closePanel(); onEnterHouse?.(key, spotInfo(key)); }
       else if (/^Digit[1-9]$/.test(e.code) && view === 'main' && !r?.o) { // solo para adquirir: el modelo no se cambia después
         const c = [...casas.map.values()][Number(e.code.slice(5)) - 1];

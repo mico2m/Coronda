@@ -181,7 +181,7 @@ function avisoChat(txt) { aTodos({ t: 'chat', sys: true, txt }); }
 function enviarYo(j) {
   if (!j?.ws) return;
   const c = j.c;
-  enviar(j.ws, { t: 'yo', u: c.id, nombre: c.nombre, inv: c.inv, niveles: c.niveles, energia: energia(c), stats: c.stats, foto: c.perfil.foto, admin: esAdmin(c) });
+  enviar(j.ws, { t: 'yo', u: c.id, nombre: c.nombre, inv: c.inv, niveles: c.niveles, energia: energia(c), stats: c.stats, foto: c.perfil.foto, admin: esAdmin(c), lugar: c.ultimoLugar ?? null });
 }
 function enviarHora(ws) {
   const msg = { t: 'hora', cfg: tiempoCfg() };
@@ -371,6 +371,14 @@ function reiniciarClaude() {
   aTodos({ t: 'claude-reset' });
 }
 
+// ---------- Venta de lotes entre jugadores (por ahora se paga con madera) ----------
+// El dueño le ofrece su lote a otro jugador conectado por un precio; el comprador acepta o rechaza. Las ofertas viven en
+// memoria y vencen a los 60 s. Al aceptar se vuelve a comprobar todo (que el lote siga siendo del vendedor, el máximo de
+// lotes y la madera de los dos) y recién ahí se mueve la madera y el lote: o pasa todo o no pasa nada.
+const MONEDA_LOTE = 'madera';
+const OFERTA_LOTE_SEG = 60;
+const ofertasLote = new Map(); // id -> { id, k, c (id de la casa), de (vendedor), a (comprador), precio, t }
+
 // ---------- Operaciones (rpc): todo lo que cambia el mundo pasa por acá ----------
 const OPS = {
   // ----- Lotes -----
@@ -412,6 +420,51 @@ const OPS = {
     D.lotes[k] = { o: otro.id, n: otro.nombre, m: cur.m, v: cur.v + 1, c: nuevoId(6) };
     delete D.casas[k];
     db.cambio(); kv(k, D.lotes[k]); kv(`casa~${k}`, null); enviarYo(j);
+    return { r: 'ok' };
+  },
+
+  'lote.vender'(j, { k, nombre, precio }) {
+    const cur = D.lotes[k];
+    if (!cur || cur.o !== j.c.id) falla('Ese lote no es tuyo.');
+    const p = entero(precio, 1, RECURSO_MAX(MONEDA_LOTE));
+    if (!p) falla(`Poné un precio entre 1 y ${RECURSO_MAX(MONEDA_LOTE)} de ${T.recursos[MONEDA_LOTE]?.nombre ?? MONEDA_LOTE}.`);
+    const otroId = D.nombres[R.normNombre(nombre)];
+    const otro = otroId && D.cuentas[otroId];
+    if (!otro) return { r: 'nadie' };
+    if (otro.id === j.c.id) return { r: 'vos' };
+    const jj = jugadores.get(otro.id);
+    if (!jj?.dentro || !jj.ws) return { r: 'desconectado' };
+    if (Object.values(D.lotes).filter((r) => r.o === otro.id).length >= T.casas.max) return { r: 'lleno' };
+    const ahoraMs = Date.now();
+    for (const [id, o] of ofertasLote) if (o.k === k || ahoraMs - o.t > OFERTA_LOTE_SEG * 1000) ofertasLote.delete(id); // una sola oferta por lote
+    const id = nuevoId(6);
+    ofertasLote.set(id, { id, k, c: cur.c, de: j.c.id, a: otro.id, precio: p, t: ahoraMs });
+    enviar(jj.ws, { t: 'oferta-lote', id, nro: numeroLote(k), de: j.c.nombre, precio: p, moneda: T.recursos[MONEDA_LOTE]?.nombre ?? MONEDA_LOTE, seg: OFERTA_LOTE_SEG });
+    return { r: 'ok', nombre: otro.nombre };
+  },
+  'lote.responder'(j, { id, ok }) {
+    const o = ofertasLote.get(String(id ?? ''));
+    if (!o || o.a !== j.c.id) falla('Esa oferta ya no está disponible.');
+    const vendedor = D.cuentas[o.de];
+    const jv = vendedor && jugadores.get(vendedor.id);
+    const avisarVendedor = (txt) => { if (jv?.ws) enviar(jv.ws, { t: 'aviso', txt }); };
+    if (Date.now() - o.t > (OFERTA_LOTE_SEG + 5) * 1000) { ofertasLote.delete(o.id); falla('La oferta venció.'); }
+    if (!ok) { ofertasLote.delete(o.id); avisarVendedor(`${j.c.nombre} rechazó tu oferta por el lote ${numeroLote(o.k) ?? ''}.`); return { r: 'no' }; }
+    const cur = D.lotes[o.k];
+    if (!vendedor || !cur || cur.o !== o.de || cur.c !== o.c) { ofertasLote.delete(o.id); falla('El lote cambió: la oferta ya no vale.'); }
+    if (Object.values(D.lotes).filter((r) => r.o === j.c.id).length >= T.casas.max) falla(`Solo podés tener ${T.casas.max} lote${T.casas.max > 1 ? 's' : ''}.`);
+    const costo = { [MONEDA_LOTE]: o.precio };
+    if (!alcanza(j.c, costo)) falla(`Te falta ${T.recursos[MONEDA_LOTE]?.nombre ?? MONEDA_LOTE}: el lote cuesta ${o.precio}.`);
+    if (cuenta(vendedor, 'recursos', MONEDA_LOTE) + o.precio > tope('recursos', MONEDA_LOTE)) falla('El vendedor no puede llevar tanta madera en la mochila: pedile que baje el precio.');
+    ofertasLote.delete(o.id);
+    pagar(j.c, costo);
+    sumar(vendedor, 'recursos', MONEDA_LOTE, o.precio);
+    vaciarCofresDe(o.k, cur.c, o.de); // lo de los cofres vuelve a la mochila del vendedor
+    D.lotes[o.k] = { o: j.c.id, n: j.c.nombre, m: cur.m, v: cur.v + 1, c: nuevoId(6) }; // casa nueva: el interior arranca vacío
+    delete D.casas[o.k];
+    db.cambio(); kv(o.k, D.lotes[o.k]); kv(`casa~${o.k}`, null);
+    enviarYo(j); if (jv) enviarYo(jv);
+    avisarVendedor(`💰 ${j.c.nombre} te compró el lote ${numeroLote(o.k) ?? ''} por ${o.precio} de madera.`);
     return { r: 'ok' };
   },
 
@@ -783,6 +836,7 @@ function limpiarEstado(j, d) {
     playing: true, u: j.c.id, n: j.c.nombre, s: texto(d.s, 60), p, f: Number.isFinite(d.f) ? d.f : 0, a: texto(d.a, 40), m,
     sc: Number.isFinite(d.sc) ? Math.min(10, Math.max(0.05, d.sc)) : 1, yo: Number.isFinite(d.yo) ? d.yo : 0, cn: texto(d.cn, 30),
     t: Number.isFinite(d.t) ? d.t : ahora(), q: Number.isFinite(d.q) ? d.q : 0,
+    cy: Number.isFinite(d.cy) ? Math.round(d.cy * 1000) / 1000 : 0, lt: texto(d.lt, 80), // cy: hacia dónde mira la cámara · lt: lote de la casa donde estás (si estás adentro)
   };
 }
 
@@ -909,7 +963,7 @@ async function alMensaje(ws, texto0, ip) {
     if (JSON.stringify(d ?? null).length > 16000) return;
     if (m.n === 'estado') {
       d = limpiarEstado(j, d); if (!d) return;
-      if (d.playing) { j.est = d; j.c.ultimaEscena = d.s; }
+      if (d.playing) { j.est = d; j.c.ultimaEscena = d.s; j.c.ultimoLugar = { s: d.s, p: d.p, cy: d.cy, lt: d.lt }; } // para "aparecer donde te quedaste"
     }
     if (m.n === 'claude' && d && typeof d === 'object' && (d.st || d.say) && conductor() !== j.c.id) return; // solo el que lo maneja mueve a Claude
     const out = JSON.stringify({ t: 'a', n: m.n, from: j.c.id, d });

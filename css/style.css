@@ -707,3 +707,11 @@ body:has(.talking) .energia { opacity: 0.4; }
   pointer-events: none; animation: admin-in 0.25s ease-out; }
 .admin-anuncio[hidden] { display: none; }
 @keyframes admin-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* Oferta de venta de un lote (te la manda otro jugador): cartel arriba al centro, sin tapar la pantalla */
+.lote-oferta { position: absolute; top: 14%; left: 50%; transform: translateX(-50%); z-index: 6; }
+.lote-oferta[hidden] { display: none; }
+
+/* Menú de Esc: salir del servidor */
+.menu-salir { display: block; width: 100%; margin-top: 8px; padding: 9px; border-radius: 10px; border: 1px solid #ef4444; background: transparent; color: #fecaca; font: 600 14px var(--font-body); cursor: pointer; }
+.menu-salir.seguro { background: #b91c1c; color: #fff; }

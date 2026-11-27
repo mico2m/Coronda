@@ -4,14 +4,16 @@
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // houses: [{ key, label }]   plazaName: nombre de la escena de inicio
-export function askSpawn({ houses, plazaName = 'Plaza' }) {
+// ultimo: { text, sub } si hay un último lugar donde te quedaste: sale como primera opción y devuelve ULTIMO
+export const ULTIMO = '@ultimo';
+export function askSpawn({ houses, plazaName = 'Plaza', ultimo = null }) {
   return new Promise((resolve) => {
     const el = document.createElement('div');
     el.className = 'spawn-choice';
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-modal', 'true');
     el.setAttribute('aria-labelledby', 'spawn-choice-t');
-    const opts = [...houses.map((h) => ({ key: h.key, icon: '🏠', text: houses.length > 1 ? `Mi casa · ${h.label}` : 'Mi casa', sub: houses.length > 1 ? '' : h.label })),
+    const opts = [...(ultimo ? [{ key: ULTIMO, icon: '📍', text: ultimo.text, sub: ultimo.sub }] : []), ...houses.map((h) => ({ key: h.key, icon: '🏠', text: houses.length > 1 ? `Mi casa · ${h.label}` : 'Mi casa', sub: houses.length > 1 ? '' : h.label })),
       { key: null, icon: '⛲', text: plazaName, sub: 'Donde arrancan todos' }];
     el.innerHTML = `<div class="sc-card">
         <b class="sc-title" id="spawn-choice-t">¿Dónde querés aparecer?</b>

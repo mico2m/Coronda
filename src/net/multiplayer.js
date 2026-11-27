@@ -77,6 +77,7 @@ export async function connectServer() {
     onEstado: null,           // ('conectado' | 'reconectando' | 'expulsado', texto) para avisar en pantalla
     onAviso: null,            // (texto) avisos del servidor (ej. "Tu pedido volvió al taller")
     onAnuncio: null,          // (texto) anuncios del admin
+    onOfertaLote: null,       // ({ id, nro, de, precio, moneda, seg }) alguien te ofrece su lote (ver systems/lotes.js)
     onClaudeReset: null,      // () un admin reinició a Claude (/claude reiniciar)
     onTrato: null,            // (msg) intercambios (ver ui/social.js)
     onFoto: null,             // (uid, versión) alguien cambió su foto de perfil
@@ -192,6 +193,7 @@ export async function connectServer() {
       }
       case 'aviso': net.onAviso?.(m.txt); return;
       case 'anuncio': net.onAnuncio?.(m.txt); return;
+      case 'oferta-lote': net.onOfertaLote?.(m); return;
       case 'claude-reset': net.onClaudeReset?.(); return;
       case 'trato': net.onTrato?.(m); return;
       default:

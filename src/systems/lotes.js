@@ -97,6 +97,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   let casas = { max: 1, map: new Map() };
   let spots = [];                // lotes de la escena actual
   let root = null, sceneId = null, unlit = true;
+  let adminDoor = null; // lote tuyo cuya casa_puerta tenés cerca: se ofrece "Administrar" (vender · ceder · destruir)
   let near = null, nearDoor = null, panelKey = null, sig = ''; // near: zona del lote · nearDoor: lote cuya casa_puerta tenés cerca
   let templates = new Map();     // archivo -> Promise<gltf> (por escena)
 
@@ -319,7 +320,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   }
   // Entrar a la casa de un lote (la tuya o, para visitar, la de otro)
   function entrarPorPuerta(key) {
-    nearDoor = null; near = null; prompt.hidden = true; sig = '';
+    nearDoor = null; near = null; adminDoor = null; prompt.hidden = true; adminPrompt.hidden = true; sig = '';
     onEnterHouse?.(key, spotInfo(key));
   }
 
@@ -411,11 +412,21 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   // Es el punto de la puerta, afuera, por donde aparece el jugador al salir de la casa:
   // el Empty va en el suelo, delante de la puerta, y su frente (el mismo que el del cartel_dueno: -Y de Blender = +Z del juego)
   // marca hacia dónde mira el jugador al aparecer. Sin ese Empty se usa el cálculo de siempre (delante del lote, en game.js).
-  function entradaCasa(house) {
+  function entradaCasa(house, sp = null) {
     if (!house) return null;
     let punto = null;
     house.updateMatrixWorld(true);
     house.traverse((o) => { if (!punto && /^(?:casa_entrada|entrada_casa)(?:[._]?\d+)?$/i.test(o.name)) punto = o; });
+    if (!punto && sp?.puerta) {
+      // Sin casa_entrada: se sale por la casa_puerta, afuera de la casa (del centro del lote hacia la puerta), mirando hacia afuera
+      const pu = sp.puerta, c = pu.box.getCenter(new THREE.Vector3());
+      const out = new THREE.Vector3(c.x - sp.pos.x, 0, c.z - sp.pos.z);
+      if (out.lengthSq() > 1e-4) {
+        out.normalize();
+        const dist = 0.5 * Math.max(pu.box.max.x - pu.box.min.x, pu.box.max.z - pu.box.min.z) + 1.2;
+        return { position: [c.x + out.x * dist, pu.box.min.y + EYE_HEIGHT, c.z + out.z * dist], yaw: Math.atan2(-out.x, -out.z) };
+      }
+    }
     if (!punto) {
       // Diagnóstico: qué nodos sin geometría (Empties) llegaron del .glb, para ver si el nombre quedó distinto
       const empties = [];
@@ -433,7 +444,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   function spotInfo(key) {
     const sp = spots.find((x) => x.key === key);
     if (!sp) return null;
-    return { scene: sceneId, key, pos: sp.pos.toArray(), quat: sp.quat.toArray(), size: sp.size.toArray(), label: sp.label, entrada: entradaCasa(sp.house) };
+    return { scene: sceneId, key, pos: sp.pos.toArray(), quat: sp.quat.toArray(), size: sp.size.toArray(), label: sp.label, entrada: entradaCasa(sp.house, sp) };
   }
 
   // ---------- Panel para elegir la casa ----------
@@ -480,7 +491,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     }
     panel.innerHTML = `<div class="lote-box" data-view="${view}">${body}</div>`;
     panel.hidden = false;
-    near = null; nearDoor = null; prompt.hidden = true; sig = '';
+    near = null; nearDoor = null; adminDoor = null; prompt.hidden = true; adminPrompt.hidden = true; sig = '';
     if (view === 'cede' || view === 'sell') setTimeout(() => panel.querySelector('.lote-input')?.focus(), 0);
     onOpen?.();
   }
@@ -578,6 +589,14 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     else if (near) openPanel(near.key);
   });
   stage.parentElement.appendChild(prompt);
+  // Segundo aviso, solo para el dueño frente a su casa_puerta: abre el menú de vender / ceder / destruir
+  const adminPrompt = document.createElement('button');
+  adminPrompt.type = 'button';
+  adminPrompt.className = 'door-prompt lote-prompt admin';
+  adminPrompt.hidden = true;
+  adminPrompt.innerHTML = '<kbd>G</kbd> Administrar lote';
+  adminPrompt.addEventListener('click', () => { if (!blocked() && adminDoor) openPanel(adminDoor.key); });
+  stage.parentElement.appendChild(adminPrompt);
 
   window.addEventListener('keydown', (e) => {
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -594,6 +613,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       e.stopPropagation();
       return;
     }
+    if (e.code === 'KeyG' && !e.repeat && !blocked() && !yieldE() && adminDoor) { openPanel(adminDoor.key); return; } // el dueño, frente a su casa_puerta: vender · ceder · destruir
     if (e.code === 'KeyE' && !e.repeat && !blocked() && !yieldE()) {
       if (nearDoor) entrarPorPuerta(nearDoor.key); // frente a la casa_puerta: directo adentro
       else if (near) openPanel(near.key);
@@ -606,7 +626,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     async setup(data, rootGroup) {
       await ready;
       closePanel();
-      near = null; nearDoor = null; prompt.hidden = true; sig = '';
+      near = null; nearDoor = null; adminDoor = null; prompt.hidden = true; adminPrompt.hidden = true; sig = '';
       root = rootGroup; sceneId = data.id; unlit = data.environment?.shading !== 'lit';
       templates = new Map();
       spots = [];
@@ -722,20 +742,23 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
           if (d <= s.puerta.radio && d < doorD) { door = s; doorD = d; }
         }
       }
+      adminDoor = null;
       if (door) {
         const r = state.get(door.key);
         nearDoor = door;
+        if (r.o === uid) adminDoor = door;
         html = r.o === uid ? `<kbd>E</kbd> Entrar a tu casa` : `<kbd>E</kbd> Entrar a la casa de ${esc(r.n || 'otro jugador')}`;
       } else if (best) {
-        // 2) Zona del lote: adquirirlo si está libre. Con una casa que trae casa_puerta, el dueño solo lo administra desde acá
-        //    (no se entra por la zona) y a un lote ajeno no se le ofrece nada: se visita por su puerta.
+        // 2) Zona del lote: solo sirve para adquirirlo cuando está libre. Con dueño y casa_puerta, la zona ya no ofrece nada:
+        //    entrar, vender, ceder y destruir se hacen por la puerta. Si el lote se libera, la zona vuelve a funcionar sola.
         const r = state.get(best.key);
         if (!r?.o) { near = best; html = `<kbd>E</kbd> Adquirir ${esc(best.label.toLowerCase())}`; }
-        else if (best.puerta) { if (r.o === uid) { near = best; html = `<kbd>E</kbd> Administrar tu lote`; } }
+        else if (best.puerta) { /* con dueño y casa_puerta: todo se hace por la puerta (entrar, vender, ceder, destruir) */ }
         else if (r.o === uid) { near = best; html = `<kbd>E</kbd> Tu casa`; }
         else { near = best; html = `<kbd>E</kbd> Casa de ${esc(r.n || 'otro jugador')}`; }
       }
-      if (yieldE() && (near || nearDoor)) { near = null; nearDoor = null; html = ''; } // la E es de la puerta del mundo (doors.js)
+      if (yieldE() && (near || nearDoor)) { near = null; nearDoor = null; adminDoor = null; html = ''; } // la E es de la puerta del mundo (doors.js)
+      if (adminPrompt.hidden === !!adminDoor) adminPrompt.hidden = !adminDoor;
       if (html !== sig) {
         sig = html;
         prompt.innerHTML = html;

@@ -6,7 +6,7 @@
       "nombre": "Casa 1",
       "archivo": "assets/models/objects/casa_model01.glb",
       "costo": {
-        "madera": 0
+        "madera": 100
       }
     },
     {
@@ -14,7 +14,7 @@
       "nombre": "Casa 2",
       "archivo": "assets/models/objects/casa_model02.glb",
       "costo": {
-        "madera": 0
+        "madera": 100
       }
     }
   ]

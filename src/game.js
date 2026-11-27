@@ -18,6 +18,7 @@ import { createFollowers } from './systems/followers.js';
 import { createPlayer } from './actors/player.js';
 import { buildCollision } from './systems/collision.js';
 import { createNpcs } from './actors/npc.js';
+import { createMiraBorde } from './systems/mira-borde.js';
 import { createDialogue } from './systems/dialogue.js';
 import { createTextbox } from './ui/textbox.js';
 import { isSkyName } from './systems/shading.js';
@@ -77,6 +78,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
   stage.addEventListener('contextmenu', (e) => { if (!(e.target instanceof HTMLElement && /^(INPUT|TEXTAREA)$/.test(e.target.tagName))) e.preventDefault(); });
 
   let inspector = null;
+  let miraBorde = null;  // borde amarillo al apuntar a un NPC o jugador (ver systems/mira-borde.js)
   let collisionDebug = null;
   let spawnDebug = null;
   let routeDebug = null;
@@ -178,6 +180,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
     npcs.update(dt);
     net?.update(dt);
     inspector?.update(dt);
+    miraBorde?.update();
     world?.updateSky(camera.position);
     // Punto que se compara con puertas y NPC: el jugador (a la altura del pecho) o la cámara libre
     const focus = mode === 'player' && player ? _focus.copy(player.position).setY(player.position.y + 1) : camera.position;
@@ -262,6 +265,15 @@ export async function startGame({ dev = false, retro = null } = {}) {
     mira.className = 'fp-mira'; mira.hidden = true; mira.setAttribute('aria-hidden', 'true');
     stage.append(mira);
     player.onFirstPerson((on) => { mira.hidden = !on; });
+    // Borde amarillo: al apuntar con la mira (primera persona) a un NPC o a otro jugador
+    miraBorde = createMiraBorde({
+      renderer, camera,
+      isActive: () => !mira.hidden && !dialogue?.active,
+      getTargets: () => [
+        ...npcs.list.map((n) => ({ id: n.id, root: n.holder })),
+        ...(net?.avatars?.() ?? []).map((a) => ({ id: a.u, root: a.root })),
+      ],
+    });
     const audio = createAudio(musicTable);
     const sceneManager = createSceneManager({ scene, camera, controls, audio, ui, scenesTable });
     if (!dev || /[?&]minimapa/.test(location.search)) { // en dev.html el inspector ocupa ese lugar (con ?minimapa aparece igual)

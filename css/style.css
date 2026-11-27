@@ -140,6 +140,7 @@ button:hover, .filebtn:hover { border-color: var(--accent); }
 /* Lotes: aviso al entrar a un terreno y menú para elegir la casa (src/systems/lotes.js) */
 .lote-prompt { bottom: 27%; }
 .lote-prompt.passive { pointer-events: none; opacity: 0.85; }
+.lote-prompt.admin { bottom: calc(27% - 54px); }
 .lote-panel { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.35); }
 .lote-panel[hidden] { display: none; }
 .lote-box { min-width: min(320px, 88vw); max-width: 92vw; padding: 16px; display: grid; gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
@@ -674,6 +675,7 @@ body:has(.talking) .energia { opacity: 0.4; }
   }
   .door-prompt kbd, .talk-prompt kbd { display: none; }
   .door-prompt.lote-prompt { bottom: calc(var(--edge-b) + 34%); }
+  .door-prompt.lote-prompt.admin { bottom: calc(var(--edge-b) + 34% - 56px); }
   .door-prompt.lote-prompt.passive { border-color: var(--line); } /* solo informa, no se toca */
 }
 @media (pointer: coarse) and (max-height: 500px) {

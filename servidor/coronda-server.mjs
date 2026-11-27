@@ -767,7 +767,9 @@ const OPS = {
   admin(j, { cmd }) {
     if (!esAdmin(j.c)) falla('No sos admin.');
     const partes = texto(cmd, 200).replace(/^\//, '').split(/\s+/);
-    const [c0, ...rest] = partes;
+    const [c0raw, ...rest] = partes;
+    const c0 = String(c0raw ?? '').toLowerCase(); // "/Madera", "/TIME set"… (el teclado del celu puede poner mayúscula)
+    if (rest[0]) rest[0] = /^(set|reset)$/i.test(rest[0]) ? rest[0].toLowerCase() : rest[0];
     const buscar = (n) => { if (/^todos$/i.test(n)) return [...jugadores.values()].filter((x) => x.dentro).map((x) => x.c); const id = D.nombres[R.normNombre(n)]; return id ? [D.cuentas[id]] : []; };
     if (c0 === 'time' && rest[0] === 'set') {
       const [hh, mm = '0'] = String(rest[1] ?? '').split(':');
@@ -775,10 +777,10 @@ const OPS = {
       if (!(h >= 0 && h < 24)) falla('Uso: /time set 19 o /time set 19:30');
       D.mundo.desfase = R.desfaseParaHora(T.tiempo, h, ahora()); db.cambio(); enviarHora(); recalcularFila();
       avisoChat(`🕒 El admin puso la hora en ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}.`);
-      return { ok: true };
+      return { ok: true, txt: `Hora puesta en ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}.` };
     }
-    if (c0 === 'time' && rest[0] === 'reset') { D.mundo.desfase = null; db.cambio(); enviarHora(); recalcularFila(); avisoChat('🕒 La hora volvió a la normal.'); return { ok: true }; }
-    if (c0 === 'anuncio') { const t = rest.join(' ').slice(0, 140); if (!t) falla('Uso: /anuncio texto'); aTodos({ t: 'anuncio', txt: t }); return { ok: true }; }
+    if (c0 === 'time' && rest[0] === 'reset') { D.mundo.desfase = null; db.cambio(); enviarHora(); recalcularFila(); avisoChat('🕒 La hora volvió a la normal.'); return { ok: true, txt: 'La hora volvió a la normal.' }; }
+    if (c0 === 'anuncio') { const t = rest.join(' ').slice(0, 140); if (!t) falla('Uso: /anuncio texto'); aTodos({ t: 'anuncio', txt: t }); return { ok: true, txt: 'Anuncio enviado.' }; }
     if (c0 === 'madera') {
       const n = entero(rest.at(-1), 1, 999), quienes = buscar(rest.slice(0, -1).join(' '));
       if (!n || !quienes.length) falla('Uso: /madera Nombre 20  (o todos)');
@@ -789,15 +791,15 @@ const OPS = {
       const quienes = buscar(rest.join(' '));
       if (!quienes.length) falla('Uso: /resistencia Nombre  (o todos)');
       for (const c of quienes) { c.energia = { usados: 0, t: ahora() }; const jj = jugadores.get(c.id); enviarYo(jj); if (jj?.ws) enviar(jj.ws, { t: 'aviso', txt: '⚡ El admin te recargó la energía.' }); }
-      db.cambio(); return { ok: true };
+      db.cambio(); return { ok: true, txt: `Energía recargada (${quienes.map((c) => c.nombre).join(', ')}).` };
     }
     if (c0 === 'expulsar') {
       const [c] = buscar(rest.join(' '));
       const jj = c && jugadores.get(c.id);
       if (!jj?.ws) falla('Ese jugador no está conectado.');
-      enviar(jj.ws, { t: 'expulsado', motivo: 'El admin te sacó del servidor.' }); jj.ws.close(); return { ok: true };
+      enviar(jj.ws, { t: 'expulsado', motivo: 'El admin te sacó del servidor.' }); jj.ws.close(); return { ok: true, txt: `${c.nombre} fue expulsado.` };
     }
-    if (c0 === 'borrarpedido') { if (!D.pedidos[rest[0]]) falla('Ese pedido no existe.'); borrarPedido(rest[0]); return { ok: true }; }
+    if (c0 === 'borrarpedido') { if (!D.pedidos[rest[0]]) falla('Ese pedido no existe.'); borrarPedido(rest[0]); return { ok: true, txt: 'Pedido borrado.' }; }
     // /lotes  ·  /lote eliminar 4  ·  /lote eliminar coronda_plaza.lote_04
     if (c0 === 'lotes') {
       const lista = Object.entries(D.lotes).filter(([, r]) => r.o).sort((a, b) => (numeroLote(a[0]) ?? 0) - (numeroLote(b[0]) ?? 0)).map(([k, r]) => `${numeroLote(k) ?? k}: ${r.n}`);

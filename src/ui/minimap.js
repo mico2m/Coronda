@@ -13,8 +13,9 @@ const VIEW = 70;            // metros que entran de lado a lado en el minimapa
 const MAX_SIZE = 600;       // m: si la escena es más grande, se dibuja este cuadrado alrededor del centro
 const SIZE_PX = 168;        // tamaño en pantalla
 const BIG_PX = 640;         // resolución del dibujo cuando el mapa está en grande (en pantalla se ajusta al tamaño de la ventana, ver css)
-// Lo que no va en el mapa: cielo, ayudas del modo desarrollador, flechas de lotes, globos y nombres
-const SKIP_RE = /^(?:lote-flecha|lote-helper|collision-debug|route-debug|spawn-debug|jugador:)/i;
+// Lo que no va en el mapa: cielo, ayudas del modo desarrollador, flechas de lotes, globos y nombres, y los NPC
+// (el grupo "npcs" y cada "npc:<id>": el mapa se vuelve a dibujar cuando aparece o se va una casa, y para entonces los NPC ya están en la escena)
+const SKIP_RE = /^(?:lote-flecha|lote-helper|collision-debug|route-debug|spawn-debug|jugador:|npcs$|npc:)/i;
 
 export function createMinimap({ renderer, scene }) {
   const app = document.querySelector('.app') ?? document.body;
@@ -64,14 +65,16 @@ export function createMinimap({ renderer, scene }) {
     root.updateMatrixWorld(true);
     const box = new THREE.Box3();
     const hidden = [];
-    root.traverse((o) => {
+    // Recorrido que NO entra en lo que se saltea (un NPC oculto no tiene que sumar a las medidas del mapa)
+    (function walk(o) {
       if (!o.visible) return;
       if (isSkyName(o.name) || SKIP_RE.test(o.name ?? '') || o.isSprite || o.isLine || o.isPoints) { o.visible = false; hidden.push(o); return; }
       if (o.isMesh && o.geometry) {
         o.geometry.computeBoundingBox?.();
         if (o.geometry.boundingBox) box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
       }
-    });
+      for (const c of o.children) walk(c);
+    })(root);
     if (box.isEmpty()) { hidden.forEach((o) => { o.visible = true; }); return; }
     const c = box.getCenter(new THREE.Vector3());
     const size = Math.min(MAX_SIZE, Math.max(box.max.x - box.min.x, box.max.z - box.min.z, 10)) * 1.04;

@@ -70,10 +70,16 @@ export function createBosque({ stage, net = null, getRoot, getSceneId, getPlayer
     if (!net) { try { localStorage.setItem(RES_KEY, JSON.stringify(res)); } catch { /* nada */ } }
   }
   // Correr gasta energía de a poco (dt en segundos). Devuelve false si no queda: el personaje camina.
-  let guardarT = 0, avisado = false;
+  // Al agotarte NO se vuelve a correr apenas aparece un poquito de energía: caminando se recupera un poco, eso alcanzaba para
+  // correr un cuadro, se gastaba de nuevo y el personaje alternaba caminar/correr 60 veces por segundo (la animación se
+  // reiniciaba en cada cuadro y se veía rota). Ahora, una vez agotado, hay que recuperar un mínimo para volver a correr.
+  let guardarT = 0, avisado = false, cansado = false;
+  const minParaCorrer = () => Math.min(maxE(), Math.max(3, maxE() * 0.1)); // energía que hay que juntar para volver a correr
   function correr(dt) {
-    if (infinita || !cfg.resistencia_por_dia || !(cfg.energia_correr_por_seg > 0)) return true;
-    if (quedan() <= 0) {
+    if (infinita || !cfg.resistencia_por_dia || !(cfg.energia_correr_por_seg > 0)) { cansado = false; return true; }
+    if (cansado && quedan() >= minParaCorrer()) { cansado = false; avisado = false; } // ya descansaste lo suficiente (o el admin te recargó)
+    if (!cansado && quedan() <= 0) cansado = true;
+    if (cansado) {
       if (!avisado) { avisado = true; notify(`Estás agotado: no podés correr. ${recupera()}`); }
       return false;
     }

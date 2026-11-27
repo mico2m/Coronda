@@ -1,14 +1,14 @@
 {
   "_ayuda": "Talar árboles y energía (ver src/systems/bosque.js). Cada golpes_por_tanda golpes se recibe madera_por_tanda de madera; después de tandas_por_arbol tandas el árbol se cae y vuelve a crecer a los rebrote_minutos minutos. animacion = clip del personaje al talar. radio = a cuántos metros del tronco aparece 'E Talar'. resistencia_por_dia = energía máxima (cada hachazo gasta 1; 0 = sin límite). energia_correr_por_seg = energía que gasta correr por segundo. recupera_quieto_por_seg / recupera_caminando_por_seg = cuánta energía se recupera por segundo quieto o caminando (corriendo o talando no se recupera).",
-  "golpes_por_tanda": 3,
+  "golpes_por_tanda": 8,
   "madera_por_tanda": 2,
-  "tandas_por_arbol": 3,
+  "tandas_por_arbol": 5,
   "rebrote_minutos": 3,
   "animacion": "talar",
   "radio": 1.6,
   "recurso": "madera",
-  "resistencia_por_dia": 60,
-  "energia_correr_por_seg": 1,
-  "recupera_quieto_por_seg": 0.5,
-  "recupera_caminando_por_seg": 0.2
+  "resistencia_por_dia": 10,
+  "energia_correr_por_seg": 3,
+  "recupera_quieto_por_seg": 1,
+  "recupera_caminando_por_seg": 0.4
 }

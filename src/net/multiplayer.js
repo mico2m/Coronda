@@ -77,6 +77,7 @@ export async function connectServer() {
     onEstado: null,           // ('conectado' | 'reconectando' | 'expulsado', texto) para avisar en pantalla
     onAviso: null,            // (texto) avisos del servidor (ej. "Tu pedido volvió al taller")
     onAnuncio: null,          // (texto) anuncios del admin
+    onClaudeReset: null,      // () un admin reinició a Claude (/claude reiniciar)
     onTrato: null,            // (msg) intercambios (ver ui/social.js)
     onFoto: null,             // (uid, versión) alguien cambió su foto de perfil
     get network() { return { open: srv.conectado ? 1 : 0, total: 1, peers: peers.size }; },
@@ -191,6 +192,7 @@ export async function connectServer() {
       }
       case 'aviso': net.onAviso?.(m.txt); return;
       case 'anuncio': net.onAnuncio?.(m.txt); return;
+      case 'claude-reset': net.onClaudeReset?.(); return;
       case 'trato': net.onTrato?.(m); return;
       default:
     }

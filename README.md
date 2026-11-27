@@ -51,7 +51,7 @@ Con el servidor apagado, `index.html` muestra *"El servidor está apagado"*. `de
 - **Social:** clic sobre otro jugador → Ver perfil · Dejar una firma · Intercambiar. Foto de perfil en 👤 Mi perfil (se recorta y comprime sola).
 - **Cofre:** Claude lo fabrica; ponelo en tu casa y acercate: *E Abrir el cofre*.
 - **Casas:** el cartel del frente (Empty `cartel_dueno`) muestra el nombre del dueño actual.
-- **Admins:** nombres en `servidor/config.json > admins`. Comandos: `/time set 19`, `/time reset`, `/anuncio`, `/madera Nombre 20`, `/resistencia Nombre`, `/expulsar Nombre`.
+- **Admins:** nombres en `servidor/config.json > admins`. Comandos: `/time set 19`, `/time reset`, `/anuncio`, `/madera Nombre 20`, `/resistencia Nombre`, `/expulsar Nombre`, `/lotes` (lista número: dueño), `/lote eliminar 4` (libera el lote número 4: se borra la casa y lo de los cofres vuelve a su dueño, que recibe un aviso) y `/claude reiniciar` (si Claude se bugea: cancela sus trabajos, suelta la charla y lo deja en su ruta en todos los juegos).
 - **Consola (F12):** `corondaNet.debug()`, `corondaTienda.pedidos()`, `corondaClaude.state`.
 
 Las secciones de abajo que hablan de MQTT, brokers o `localStorage` describen cómo era antes; con el servidor esos datos están en `servidor/datos/`.
@@ -475,6 +475,15 @@ Jugando solo, se guarda en `localStorage`.
 no garantizan guardar para siempre ni impiden que alguien escriba. Para algo serio (lotes que cuestan monedas, que no se puedan robar) hace falta un
 servidor propio que valide, y `lotes.js` ya está separado para eso: solo cambian `publish()` y la entrada de `receive()`.
 
+**Cómo se configura un lote (paso a paso):** el Empty que hace que el jugador pueda comprar es el `lote_<número>` del `.glb` del **mapa** (no el de la casa: mientras el lote está libre no hay casa, así que esa zona no puede vivir adentro del `.glb` de la casa).
+1. En Blender: *Add > Empty > Cube*. Nombralo `lote_05` (el número es el que usan los comandos `/lote eliminar 5`).
+2. Ponelo en el suelo, en el centro del terreno, y escalá el cubo al tamaño del lote: al entrar en ese cubo aparece **E Adquirir lote**.
+3. Rotalo en Z para que el frente de la casa mire a donde querés. Escala siempre positiva (nada de espejos).
+4. Opcional (Custom Properties del Empty): `lote_aviso_radio` y `lote_flecha_altura`.
+5. Exportá el mapa. Lo que sí va **adentro del `.glb` de la casa** es: `casa_centro` (punto que se apoya en el Empty del lote), `casa_entrada` (por dónde sale el jugador) y `cartel_dueno`.
+
+**Costo del lote:** `data/casas.json` > cada casa tiene `"costo": { "madera": 50 }` (0 o sin la clave = gratis). Se cobra una sola vez, al adquirir el lote, y el botón de cada casa muestra su precio. Con servidor lo cobra el servidor (que recarga la tabla solo); jugando solo, el juego. Se edita en el Studio: panel **Mundo > Lotes y casas**, junto con el máximo de lotes por jugador.
+
 **Entrar, ceder y destruir:** en tu lote, **E** abre el menú: *Entrar a la casa*, *Ceder lote* o *Destruir casa* (las dos últimas avisan antes: se borra todo lo de adentro). En el lote de otro, **E** > *Visitar la casa*.
 
 **Modo dev (`dev.html`):** cada lote muestra su zona (verde libre · celeste tuyo · rojo de otro). Para borrar el estado de prueba: `localStorage.removeItem('coronda.lotes.solo')` (solo)
@@ -499,6 +508,7 @@ En Blender:
 - **Techo:** llamalo `techo` (o `techo_…`): el juego lo oculta para que la cámara vea desde arriba.
 - **Empty `spawn`:** donde aparece el jugador al entrar (la flecha verde = hacia dónde mira).
 - **Empty `casa_salida`** (o `salida`): en la puerta; ahí aparece *E Salir de la casa*.
+- **Empty `casa_centro`** (en el `.glb` de la casa de afuera): en el suelo, en el medio de la casa. Ese punto es el que se coloca sobre el Empty del lote, con su giro en vertical (hacia dónde mira el frente), así el origen del modelo no importa. Sin él se usa el origen del modelo.
 - **Empty `casa_entrada`** (en el `.glb` de la casa de afuera, ver `casas.json`): en el suelo, delante de la puerta. Es por donde aparece el jugador al salir; su frente (el mismo que el de `cartel_dueno`) marca hacia dónde mira. Sin él se usa el punto de siempre: delante del lote.
 - Exportá como siempre (glTF Binary, +Y Up, con Custom Properties). Mientras el archivo no exista se arma una habitación de prueba de 10 × 10 m.
 

@@ -23,7 +23,7 @@ A mano:
 | campo | qué hace |
 |---|---|
 | `puerto` | dónde escucha (8080). El túnel apunta acá. |
-| `admins` | nombres de las cuentas que pueden usar los comandos de admin (`/time set 19`, `/anuncio`, `/madera Nombre 20`, `/resistencia Nombre`, `/expulsar Nombre`, `/borrarpedido id`). **Creá tu cuenta primero** (en `http://localhost:8080`, antes de abrir el túnel) y después poné tu nombre acá y reiniciá el servidor. |
+| `admins` | nombres de las cuentas que pueden usar los comandos de admin (`/time set 19`, `/anuncio`, `/madera Nombre 20`, `/resistencia Nombre`, `/expulsar Nombre`, `/borrarpedido id`, `/lotes`, `/lote eliminar N`, `/claude reiniciar`). **Creá tu cuenta primero** (en `http://localhost:8080`, antes de abrir el túnel) y después poné tu nombre acá y reiniciá el servidor. |
 | `registro_abierto` | `false` = nadie más puede crear cuentas. |
 | `max_jugadores` | cuántos pueden estar adentro a la vez. |
 | `escena_claude` | escena donde vive el NPC Claude. |

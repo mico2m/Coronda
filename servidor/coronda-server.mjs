@@ -51,7 +51,12 @@ function cargarTablas() {
   T.recursos = leer('data/tables/recursos.json', { recursos: {} }).recursos ?? {};
   T.muebles = new Map((leer('data/muebles.json', { muebles: [] }).muebles ?? []).filter((m) => m?.id).map((m) => [m.id, m]));
   const casas = leer('data/casas.json', { casas: [] });
-  T.casas = { max: Math.max(1, Number(casas.maxPorJugador) || 1), ids: new Set((casas.casas ?? []).map((c) => c.id)) };
+  T.casas = {
+    max: Math.max(1, Number(casas.maxPorJugador) || 1),
+    ids: new Set((casas.casas ?? []).map((c) => c.id)),
+    // costo de adquirir el lote con cada modelo de casa: { madera: 50 } (data/casas.json > casas[].costo, editable en el Studio)
+    costos: new Map((casas.casas ?? []).map((c) => [c.id, Object.fromEntries(Object.entries(c.costo ?? {}).map(([k, v]) => [k, Math.max(0, Math.floor(Number(v) || 0))]).filter(([, v]) => v > 0))])),
+  };
 }
 cargarTablas();
 // Si cambiás una tabla (a mano o desde el Studio) el servidor la vuelve a leer sola
@@ -337,6 +342,35 @@ function limpiarItems(items) {
 }
 const contarMuebles = (items) => { const c = {}; for (const it of items) if (it.m !== 'poster') c[it.m] = (c[it.m] ?? 0) + 1; return c; };
 
+// ---------- Lotes: ayuda para los comandos de admin ----------
+// "coronda_plaza.lote_04" -> 4. Con un número se elige el lote; con "escena.lote_04" (o la clave entera) se elige uno exacto.
+const numeroLote = (k) => { const m = /(\d+)\s*$/.exec(String(k)); return m ? Number(m[1]) : null; };
+function buscarLotes(sel) {
+  sel = String(sel ?? '').trim().toLowerCase();
+  if (!sel) return [];
+  if (D.lotes[sel]) return [sel];
+  const n = /^\d+$/.test(sel) ? Number(sel) : null;
+  return Object.keys(D.lotes).filter((k) => (n !== null ? numeroLote(k) === n : k.toLowerCase().endsWith(sel)));
+}
+// El admin libera el lote de cualquiera: la casa se borra, lo de los cofres vuelve a la mochila de su dueño
+function liberarLoteAdmin(k) {
+  const cur = D.lotes[k];
+  if (!cur?.o) falla('Ese lote no tiene dueño.');
+  const dueño = D.cuentas[cur.o];
+  const perdido = vaciarCofresDe(k, cur.c, cur.o);
+  D.lotes[k] = { o: null, n: '', m: null, v: cur.v + 1 };
+  delete D.casas[k];
+  db.cambio(); kv(k, D.lotes[k]); kv(`casa~${k}`, null);
+  const jj = dueño && jugadores.get(dueño.id);
+  if (jj?.ws) { enviarYo(jj); enviar(jj.ws, { t: 'aviso', txt: `🏚️ Un admin liberó tu lote ${numeroLote(k) ?? ''}: tu casa se borró${perdido ? ` (${perdido} cosas de los cofres no entraron en tu mochila)` : ' y lo de los cofres volvió a tu mochila'}.` }); }
+  return { dueño: cur.n, perdido };
+}
+// Reinicia a Claude: se cancelan sus trabajos y todos los juegos lo dejan libre, en su ruta (por si se bugeó)
+function reiniciarClaude() {
+  for (const j of [...trabajos]) cancelarTrabajo(j, 'Claude se reinició: tus pedidos siguen listos en el taller. Pedíselos de nuevo.');
+  aTodos({ t: 'claude-reset' });
+}
+
 // ---------- Operaciones (rpc): todo lo que cambia el mundo pasa por acá ----------
 const OPS = {
   // ----- Lotes -----
@@ -348,9 +382,13 @@ const OPS = {
     if (cur?.o && cur.o !== j.c.id) falla('Ese lote ya tiene dueño.');
     const mios = Object.entries(D.lotes).filter(([kk, r]) => r.o === j.c.id && kk !== k).length;
     if (mios >= T.casas.max) falla(`Solo podés tener ${T.casas.max} lote${T.casas.max > 1 ? 's' : ''}.`);
-    const c = cur?.o === j.c.id && cur.c ? cur.c : nuevoId(6);
+    const yaEraMio = cur?.o === j.c.id;
+    const costo = yaEraMio ? {} : (T.casas.costos.get(m) ?? {});
+    if (!alcanza(j.c, costo)) falla(`Te falta para el lote: cuesta ${Object.entries(costo).map(([id, n]) => `${n} de ${T.recursos[id]?.nombre ?? id}`).join(' + ')}.`);
+    const c = yaEraMio && cur.c ? cur.c : nuevoId(6);
+    pagar(j.c, costo);
     D.lotes[k] = { o: j.c.id, n: j.c.nombre, m, v: (cur?.v ?? 0) + 1, c };
-    db.cambio(); kv(k, D.lotes[k]);
+    db.cambio(); kv(k, D.lotes[k]); if (Object.keys(costo).length) enviarYo(j);
     return D.lotes[k];
   },
   'lote.liberar'(j, { k }) {
@@ -707,7 +745,29 @@ const OPS = {
       enviar(jj.ws, { t: 'expulsado', motivo: 'El admin te sacó del servidor.' }); jj.ws.close(); return { ok: true };
     }
     if (c0 === 'borrarpedido') { if (!D.pedidos[rest[0]]) falla('Ese pedido no existe.'); borrarPedido(rest[0]); return { ok: true }; }
-    falla('Comandos: /time set 19 · /time reset · /anuncio texto · /madera Nombre 20 · /resistencia Nombre · /expulsar Nombre · /borrarpedido id');
+    // /lotes  ·  /lote eliminar 4  ·  /lote eliminar coronda_plaza.lote_04
+    if (c0 === 'lotes') {
+      const lista = Object.entries(D.lotes).filter(([, r]) => r.o).sort((a, b) => (numeroLote(a[0]) ?? 0) - (numeroLote(b[0]) ?? 0)).map(([k, r]) => `${numeroLote(k) ?? k}: ${r.n}`);
+      return { ok: true, txt: lista.length ? `Lotes con dueño → ${lista.join(' · ')}` : 'Ningún lote tiene dueño.' };
+    }
+    if (c0 === 'lote') {
+      const accion = String(rest[0] ?? '').toLowerCase();
+      if (!['eliminar', 'liberar', 'borrar'].includes(accion) || !rest[1]) falla('Uso: /lote eliminar 4   (el número del lote; /lotes los lista)');
+      const ks = buscarLotes(rest.slice(1).join(' '));
+      const conDueño = ks.filter((k) => D.lotes[k]?.o);
+      if (!ks.length) falla('No existe ese lote. Mirá los números con /lotes');
+      if (!conDueño.length) falla('Ese lote no tiene dueño.');
+      if (conDueño.length > 1) falla(`Hay ${conDueño.length} lotes con ese número (${conDueño.join(', ')}). Escribí el nombre completo: /lote eliminar ${conDueño[0]}`);
+      const r = liberarLoteAdmin(conDueño[0]);
+      return { ok: true, txt: `Lote ${numeroLote(conDueño[0]) ?? conDueño[0]} liberado (era de ${r.dueño}).` };
+    }
+    // /claude reiniciar: por si Claude se bugea
+    if (c0 === 'claude') {
+      if (!['reiniciar', 'reset', 'reiniciar!'].includes(String(rest[0] ?? '').toLowerCase())) falla('Uso: /claude reiniciar');
+      reiniciarClaude();
+      return { ok: true, txt: 'Claude reiniciado.' };
+    }
+    falla('Comandos: /time set 19 · /time reset · /anuncio texto · /madera Nombre 20 · /resistencia Nombre · /expulsar Nombre · /borrarpedido id · /lotes · /lote eliminar N · /claude reiniciar');
   },
 };
 

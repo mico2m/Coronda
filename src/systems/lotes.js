@@ -80,7 +80,7 @@ const beats = (a, b) => !b || a.v > b.v || (a.v === b.v && (a.o ?? '') < (b.o ??
 //   onChange()   cambió una casa de la escena actual (hay que rehacer las colisiones)
 //   notify(msg)  avisos en pantalla
 //   getShade()   tono/brillo de la escena
-export function createLotes({ stage, net = null, name = 'Viajero', dev = false, blocked = () => false, yieldE = () => false, onOpen, onClose, onChange, onRedraw, onEnterHouse, onReleased, notify = () => {}, getShade = () => ({}) }) {
+export function createLotes({ stage, net = null, name = 'Viajero', dev = false, blocked = () => false, yieldE = () => false, onOpen, onClose, onChange, onRedraw, onEnterHouse, onReleased, notify = () => {}, getShade = () => ({}), getInventario = () => null }) {
   const uid = net ? net.uid : makeUid(); // con servidor: el id de tu cuenta
   const solo = !net;
   const state = new Map();       // clave -> { o, n, m, v }
@@ -91,8 +91,14 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
   let near = null, panelKey = null, sig = '';
   let templates = new Map();     // archivo -> Promise<gltf> (por escena)
 
+  // costo: lo que cuesta adquirir el lote con esa casa, { madera: 50 } (data/casas.json, o el Studio). Vacío = gratis.
+  const limpiarCosto = (c) => Object.fromEntries(Object.entries(c ?? {}).map(([k, v]) => [k, Math.max(0, Math.floor(Number(v) || 0))]).filter(([, v]) => v > 0));
+  const costoTxt = (c) => Object.entries(c ?? {}).map(([k, v]) => `${v} ${getInventario()?.nameOf?.('recursos', k) ?? k}`).join(' + ');
+  function leerCasas(c) {
+    return { max: Math.max(1, Number(c.maxPorJugador) || 1), map: new Map((c.casas ?? []).map((x) => [x.id, { id: x.id, nombre: x.nombre ?? x.id, archivo: x.archivo ?? `assets/models/objects/${x.id}.glb`, costo: limpiarCosto(x.costo) }])) };
+  }
   const ready = loadJSON('data/casas.json').catch(() => ({ casas: [] })).then((c) => {
-    casas = { max: Math.max(1, Number(c.maxPorJugador) || 1), map: new Map((c.casas ?? []).map((x) => [x.id, { id: x.id, nombre: x.nombre ?? x.id, archivo: x.archivo ?? `assets/models/objects/${x.id}.glb` }])) };
+    casas = leerCasas(c);
     if (!casas.map.size) console.warn('Lotes: data/casas.json no tiene casas.');
     if (solo) for (const [k, r] of Object.entries(readJSON(SOLO_STORE))) { const c2 = clean(k, r); if (c2) state.set(k, c2); }
   });
@@ -144,6 +150,12 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
     if (!casas.map.has(modelId)) return;
     const owned = [...state].filter(([k, r]) => r.o === uid && k !== key).length;
     if (owned >= casas.max) { notify(`Solo podés tener ${casas.max} lote${casas.max > 1 ? 's' : ''}`); return; }
+    // Jugando solo se cobra acá (con servidor lo cobra el servidor)
+    const costo = cur?.o === uid ? {} : casas.map.get(modelId).costo;
+    if (Object.keys(costo).length) {
+      const inv = getInventario();
+      if (!inv?.pay?.(costo)) { notify(`Te falta para el lote: cuesta ${costoTxt(costo)}`); return; }
+    }
     // Si ya era tuyo (cambiás el modelo) la casa sigue siendo la misma; si no, es una casa nueva con su interior vacío
     const c = cur?.o === uid && cur.c ? cur.c : Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
     const rec = { o: uid, n: name, m: modelId, v: (cur?.v ?? 0) + 1, c };
@@ -416,7 +428,7 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       body = `<h3>${esc(s.label)}${own ? ' · tu casa' : ''}</h3>
         ${own ? `<button type="button" data-act="enter" class="lote-enter">Entrar a la casa <kbd>E</kbd></button>
           <p class="lote-note">Tu casa: ${esc(casas.map.get(cur.m)?.nombre ?? cur.m)}. Para cambiar de modelo hay que destruirla y volver a adquirir el lote (se pierde todo lo de adentro).</p>`
-          : `<div class="lote-list">${items.map((c, i) => `<button type="button" data-id="${esc(c.id)}"><kbd>${i + 1}</kbd> ${esc(c.nombre)}</button>`).join('') || '<p>No hay casas en data/casas.json</p>'}</div>`}
+          : `<div class="lote-list">${items.map((c, i) => `<button type="button" data-id="${esc(c.id)}"><kbd>${i + 1}</kbd> ${esc(c.nombre)}${Object.keys(c.costo).length ? ` <small>· ${esc(costoTxt(c.costo))}</small>` : ' <small>· gratis</small>'}</button>`).join('') || '<p>No hay casas en data/casas.json</p>'}</div>`}
         <div class="lote-foot">${own && !solo ? '<button type="button" data-act="ask-cede">Ceder lote</button>' : ''}${own ? '<button type="button" data-act="ask-destroy" class="danger">Destruir casa</button>' : ''}<button type="button" data-act="close">Cancelar <kbd>Esc</kbd></button></div>`;
     }
     panel.innerHTML = `<div class="lote-box" data-view="${view}">${body}</div>`;
@@ -568,6 +580,8 @@ export function createLotes({ stage, net = null, name = 'Viajero', dev = false, 
       return state.get(key)?.o === uid;
     },
     claim, release,
+    // (Studio) cambia en vivo el máximo por jugador y el costo de cada casa: el contenido de data/casas.json
+    setCasas(c) { if (c && typeof c === 'object') casas = leerCasas(c); },
 
     // `focus`: punto del jugador (o de la cámara libre). Cada cuadro.
     update(focus, feetY = focus.y - 1, dt = 1 / 60) {

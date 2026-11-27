@@ -7,6 +7,9 @@
 //   /resistencia Ana                   recargar la energía de un jugador (o "todos")
 //   /expulsar Ana                      sacarlo del servidor
 //   /borrarpedido id                   sacar un pedido de la Carpintería
+//   /lotes                             lista los lotes que tienen dueño (número: dueño)
+//   /lote eliminar 4                   liberar el lote número 4 (se borra la casa; lo de los cofres vuelve a su dueño)
+//   /claude reiniciar                  reiniciar a Claude si se bugeó (cancela sus trabajos y lo deja en su ruta)
 //   /ayuda                             la lista
 // Si sos admin, al escribir "/" en el chat aparece la lista de comandos (se filtra mientras escribís; clic o Tab la completa).
 //
@@ -39,9 +42,12 @@ export function createAdmin({ net, chat, stage = null, notify = () => {} }) {
     { uso: '/resistencia ', ej: '/resistencia Nombre', desc: 'Recargar la energía de un jugador (o "todos")' },
     { uso: '/expulsar ', ej: '/expulsar Nombre', desc: 'Sacar a un jugador del servidor' },
     { uso: '/borrarpedido ', ej: '/borrarpedido id', desc: 'Sacar un pedido de la Carpintería' },
+    { uso: '/lotes', desc: 'Ver los lotes con dueño (número: dueño)' },
+    { uso: '/lote eliminar ', ej: '/lote eliminar 4', desc: 'Liberar el lote número 4 (borra la casa)' },
+    { uso: '/claude reiniciar', desc: 'Reiniciar a Claude si se bugeó' },
     { uso: '/ayuda', desc: 'Ver esta lista en el chat' },
   ];
-  const AYUDA = 'Comandos de admin: /time set 19 (o 19:30) · /time reset · /anuncio texto · /madera Jugador 20 · /resistencia Jugador · /expulsar Jugador · /borrarpedido id';
+  const AYUDA = 'Comandos de admin: /time set 19 (o 19:30) · /time reset · /anuncio texto · /madera Jugador 20 · /resistencia Jugador · /expulsar Jugador · /borrarpedido id · /lotes · /lote eliminar N · /claude reiniciar';
 
   // Devuelve true si el texto era un comando (nunca va al chat de los demás)
   async function comando(texto) {
@@ -55,6 +61,7 @@ export function createAdmin({ net, chat, stage = null, notify = () => {} }) {
     try {
       const r = await net.rpc('admin', { cmd: t });
       if (/^\/madera/i.test(t)) sys(`🪵 Listo (${(r?.a ?? []).join(', ') || 'hecho'}).`);
+      else if (r?.txt) sys(`✅ ${r.txt}`);
       else if (/^\/(resistencia|expulsar|borrarpedido)/i.test(t)) sys('✅ Hecho.');
     } catch (e) { sys(`❌ ${e.message}`); }
     return true;

@@ -395,6 +395,7 @@ export async function startGame({ dev = false, retro = null } = {}) {
       onReleased: (key) => casas?.clear(key),
       notify: (msg) => { ui.setStatus(msg); setTimeout(() => ui.clearStatus(), 2500); },
       getShade: () => sceneManager.shade,
+      getInventario: () => inventario, // para cobrar el lote jugando solo (con servidor cobra el servidor)
     });
 
     // Inventario del jugador (recursos y muebles) y la tienda donde Claude fabrica los muebles
@@ -632,6 +633,8 @@ export async function startGame({ dev = false, retro = null } = {}) {
       casas.setOnCofre((k, i) => cofre.abrir(k, i));
       // Avisos del servidor (pedidos que vuelven al taller, firmas, regalos del admin…)
       net.onAviso = (txt) => { ui.setStatus(txt); setTimeout(() => ui.clearStatus(), 5000); };
+      // Un admin reinició a Claude (/claude reiniciar): se suelta la charla y vuelve a su ruta
+      net.onClaudeReset = () => { claudeNpc?.reset(); ui.setStatus('Claude se reinició'); setTimeout(() => ui.clearStatus(), 2500); };
       // 5 minutos sin tocar nada: "¿Seguís ahí?" y, si no respondés, se te desconecta (ver ui/afk.js)
       const { createAfk } = await import('./ui/afk.js');
       createAfk({ onDisconnect: () => net.disconnect() });
@@ -693,5 +696,5 @@ export async function startGame({ dev = false, retro = null } = {}) {
     ui.setStatus(String(err.message || err));
   }
   // Para las herramientas del modo desarrollador (panel de NPC, etc.)
-  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null, getInventario: () => inventario, getTienda: () => tienda, getTiempo: () => tiempo, getBosque: () => bosque, getNiveles: () => niveles, setFlying, setInfiniteStamina };
+  return { npcs, camera, controls, scene, getRoot: () => world?.root ?? null, getInventario: () => inventario, getTienda: () => tienda, getTiempo: () => tiempo, getBosque: () => bosque, getNiveles: () => niveles, getLotes: () => lotes, setFlying, setInfiniteStamina };
 }

@@ -627,8 +627,29 @@ export function createClaudeNpc({ net = null, npcs, lotes, getPlayer, getSceneId
     }
   }
 
+  // Reinicio (/claude reiniciar, de un admin): suelta la charla y los trabajos, lo deja visible y en su ruta, y el
+  // descanso de la IA se borra. Lo corren todos los juegos; el que lo maneja además lo vuelve a poner en marcha.
+  function reset() {
+    const pendiente = mode.done?.resolve; // un camino de la tienda que esperaba llegar: se libera para que no quede colgado
+    talk = { u: null, n: '', keep: 0 }; myTalking = false; carry = ''; commenting = false; fallos = 0; commentT = 30;
+    waiters.forEach((fn) => { try { fn(null); } catch { /* nada */ } }); waiters = [];
+    try { localStorage.removeItem(REST_KEY); } catch { /* nada */ }
+    mode = { type: 'route' };
+    navKey = ''; navPts = [];
+    if (entry) {
+      const h = entry.holder;
+      if (driving && h.position.y < HIDE_Y / 2) h.position.y = 0.1; // si se había metido en una casa, aparece
+      if (driving) { h.visible = true; if (entry.obstacle) { entry.obstacle.x = h.position.x; entry.obstacle.z = h.position.z; } }
+      npcs.play(entry, null);
+      entry._held = false;
+      if (driving) resumeRoute();
+    }
+    try { pendiente?.(); } catch { /* nada */ }
+    if (driving) broadcast();
+  }
+
   return {
-    update, gate, ended, ask, choiceOk, act, heard, greeting, precargarSaludo,
+    update, gate, ended, ask, choiceOk, act, heard, greeting, precargarSaludo, reset,
     set onSay(fn) { onSay = fn; },
     // ---- Para la tienda (systems/tienda.js) ----
     get entry() { return entry; },

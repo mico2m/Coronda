@@ -2,8 +2,8 @@
 // de árboles, de la Carpintería (charla, reparto, precios y tiempos de cada mueble) y vista en tiempo real de la
 // tienda (lo que hace Claude, el stock del taller y los pedidos).
 // Todo lo que cambiás se aplica al toque en la vista previa y se guarda en su JSON (data/tables/tiempo.json,
-// bosque.json, tienda.json y data/muebles.json), conservando el resto del archivo.
-const FILES = { tiempo: 'data/tables/tiempo.json', bosque: 'data/tables/bosque.json', tienda: 'data/tables/tienda.json', muebles: 'data/muebles.json', niveles: 'data/tables/niveles.json' };
+// bosque.json, tienda.json, data/muebles.json y data/casas.json), conservando el resto del archivo.
+const FILES = { tiempo: 'data/tables/tiempo.json', bosque: 'data/tables/bosque.json', tienda: 'data/tables/tienda.json', muebles: 'data/muebles.json', niveles: 'data/tables/niveles.json', casas: 'data/casas.json' };
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // opts: root (elemento), game() -> iframe.contentWindow.coronda, api(path) -> url, quiet (Map), toast(msg, err)
@@ -51,6 +51,11 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {}, has
       <label>Horas de reparto tras el cierre <input type="number" min="0.5" max="12" step="0.5" data-k="reparto_horas"></label>
       <label>Pedidos por jugador <input type="number" min="1" max="50" step="1" data-k="max_pedidos_por_jugador"></label>
     </form>
+    <form class="mp-sec" data-f="casas"><b>Lotes y casas (data/casas.json)</b>
+      <label>Lotes máximos por jugador <input type="number" min="1" max="20" step="1" data-k="maxPorJugador"></label>
+      <div id="mpCasas"></div>
+      <span class="k">Costo de adquirir un lote con cada modelo de casa (0 = gratis). Se cobra una sola vez, al adquirirlo.</span>
+    </form>
     <div class="mp-sec"><b>Precios y tiempos (data/muebles.json)</b><div id="mpMuebles"></div></div>
     <div class="mp-sec"><b>Mochila de la vista previa</b><div id="mpInv"></div>
       <div class="mp-row"><button type="button" id="mpMadera">+10 madera</button><button type="button" id="mpVaciar">Vaciar</button></div></div>`;
@@ -83,6 +88,7 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {}, has
       if (name === 'tienda') g.getTienda?.()?.setConfig?.(data.tienda);
       if (name === 'muebles') g.getTienda?.()?.setCatalog?.(data.muebles.muebles ?? []);
       if (name === 'niveles') g.getNiveles?.()?.setConfig?.(data.niveles);
+      if (name === 'casas') g.getLotes?.()?.setCasas?.(data.casas);
     } catch { /* la vista previa todavía no cargó */ }
   }
   root.querySelectorAll('form[data-f]').forEach((form) => {
@@ -128,6 +134,19 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {}, has
     live('muebles'); save('muebles');
   });
 
+  // Costo del lote por modelo de casa
+  function drawCasas() {
+    const list = data.casas?.casas ?? [];
+    $('#mpCasas').innerHTML = `<table class="mp-t"><tr><th>Casa</th><th>Madera</th></tr>${list.map((c, i) => `<tr><td>${esc(c.nombre ?? c.id)}<span class="mp-glb"><code>${esc(c.id)}</code></span></td>
+      <td><input type="number" min="0" max="999" step="1" data-ci="${i}" value="${esc(c.costo?.madera ?? 0)}"></td></tr>`).join('')}</table>`;
+  }
+  $('#mpCasas').addEventListener('input', (e) => {
+    const i = e.target.closest('[data-ci]'); if (!i) return;
+    const c = data.casas.casas[Number(i.dataset.ci)]; const v = Number(i.value); if (!c || !Number.isFinite(v)) return;
+    c.costo = { ...(c.costo ?? {}), madera: Math.max(0, Math.round(v)) };
+    live('casas'); save('casas');
+  });
+
   $('#mpXp').onclick = () => { try { game().getNiveles().ganar(100); } catch { toast('La vista previa todavía no cargó', true); } };
   $('#mpNivelReset').onclick = () => { if (!confirm('¿Volver al nivel 1 y sacar los puntos de la vista previa?')) return; try { game().getNiveles().reiniciar(); } catch { /* nada */ } };
   $('#mpMadera').onclick = () => { try { game().getInventario().add('recursos', 'madera', 10); } catch { toast('La vista previa todavía no cargó', true); } };
@@ -171,7 +190,7 @@ export function createMundoPanel({ root, game, api, quiet, toast = () => {}, has
   }
   setInterval(tick, 1000);
 
-  async function refresh() { await Promise.all(Object.keys(FILES).map(load)); drawMuebles(); tick(); }
+  async function refresh() { await Promise.all(Object.keys(FILES).map(load)); drawMuebles(); drawCasas(); tick(); }
   refresh();
   return { refresh };
 }

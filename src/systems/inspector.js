@@ -274,7 +274,7 @@ export function createInspector({ scene, camera, getRoot }) {
     setActive(!active);
   });
 
-  setActive(true);
+  setActive(false); // arranca apagado: se enciende con la tecla I o el botón
 
   return {
     // Se llama en cada cuadro; el rayo se lanza unas 12 veces por segundo.
